@@ -40,8 +40,8 @@ wb_license_client/
 ├── README.rst
 ├── models/
 │   ├── __init__.py
-│   ├── wb_license_client.py         # Hauptmodell (AbstractModel, Service-Klasse)
-│   ├── wb_license_info.py           # TransientModel für Status-Cache
+│   ├── wb_license_client.py         # AbstractModel: Service-Klasse mit @api.model-Methoden
+│   ├── wb_license_info.py           # models.Model: Persistenter Status-Cache (MUSS Model sein, nicht Transient!)
 │   └── res_config_settings.py       # Einstellungen (Server-URL, optional Override)
 ├── controllers/
 │   ├── __init__.py
@@ -164,18 +164,29 @@ class WbLicenseClient(models.AbstractModel):
 ```python
 from functools import wraps
 
-def license_required(product_code):
+def license_required(product_code, min_cache_age_days=30):
     """Decorator für Methoden die eine gültige Lizenz erfordern.
 
+    Args:
+        product_code: 4-stelliger Produkt-Code (z.B. 'TELE')
+        min_cache_age_days: Maximales Alter der letzten erfolgreichen Server-Prüfung
+            für 'unknown'-State. Default 30 (liberal, für Offline-Toleranz).
+            Setze auf 7 oder weniger für Methoden die externe Kosten verursachen.
+
     Usage:
-        @license_required('ELST')
-        def action_export_xml(self):
+        @license_required('TELE')
+        def action_send_sms(self):
+            ...
+
+        @license_required('TELE', min_cache_age_days=7)
+        def action_send_bulk_sms(self):  # verursacht reale Kosten bei Telnyx
             ...
     """
     def decorator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
-            info = self.env['wb.license.client'].check_license(product_code)
+            info = self.env['wb.license.client'].check_license(
+                product_code, min_cache_age_days=min_cache_age_days)
             if not info.is_valid:
                 from odoo.exceptions import UserError
                 raise UserError(info.user_message)
@@ -184,11 +195,16 @@ def license_required(product_code):
     return decorator
 ```
 
-### 2. `wb.license.info` — Status-Cache
+### 2. `wb.license.info` — Status-Cache (persistent)
+
+**Wichtig:** Dies ist ein **`models.Model`** (persistent), **kein** `TransientModel`.
+Der Cache muss Odoo-Restarts und Server-Ausfälle überleben, sonst
+fällt die Lizenz bei jedem Neustart in `state='unknown'` und Kunden
+bekommen unnötig Warn-Banner.
 
 | Feld | Typ | Beschreibung |
 |---|---|---|
-| `product_code` | Char(4) | 'ELST', 'DATV', ... |
+| `product_code` | Char(4) | 'TELE', 'DATV', ... — unique zusammen mit company_id |
 | `key` | Char | Public Key (in config_parameter gespiegelt) |
 | `state` | Selection | 'active', 'grace', 'expired', 'unknown', 'unlicensed' |
 | `valid_from` | Date | aus Server-Response |
@@ -199,8 +215,11 @@ def license_required(product_code):
 | `last_check_success` | Boolean | |
 | `last_error_message` | Char | |
 | `user_message` | Text computed | Benutzerfreundliche Fehlermeldung |
-| `is_valid` | Boolean computed | state in ('active', 'grace') |
+| `is_valid` | Boolean computed | siehe Logik unten |
 | `server_response_raw` | Text | Original-JSON-Response (für Debugging) |
+| `company_id` | M2O res.company | Für Multi-Company-Setups |
+
+**SQL-Constraint:** `UNIQUE(product_code, company_id)` — genau ein Cache-Eintrag pro Produkt pro Company.
 
 **States:**
 - `active` — Lizenz gültig, alles OK
@@ -238,12 +257,27 @@ def _compute_user_message(self):
         rec.user_message = messages.get(rec.state, False)
 ```
 
-**is_valid-Logik:**
+**is_valid-Logik (v1.5 — entschärft):**
 - `active` → True
 - `grace` → True (Features funktionieren noch, nur Banner warnt)
 - `expired` → **False** (Features gesperrt)
-- `unknown` → True wenn letzte erfolgreiche Prüfung < 7 Tage her, sonst False
+- `unknown` → **True wenn letzte erfolgreiche Prüfung < 30 Tage her**, sonst False
 - `unlicensed` → False
+
+**Begründung für 30-Tage-Toleranz bei `unknown`:**
+Der frühere 7-Tage-Wert wurde auf 30 erhöht. Motivation: Wenn der WB-Lizenz-Server ausfällt (Hardware, DNS, Provider-Outage), dürfen zahlende Kunden nicht sperr-blockiert werden. Der Schmerz eines fälschlich gesperrten Zahlers ist größer als der Vorteil, einen Piracy-Versuch 23 Tage früher zu erkennen — Piraterie-Schutz läuft ohnehin primär über Activation + bound_domain, nicht über Ping-Timeouts.
+
+**Operations-Alerts bei `unknown`:**
+Ab Tag 3 `unknown` → lokale Admin-Mail an `company.email` (Template `mail_template_license_server_unreachable`). Ab Tag 14 → zusätzlich rote Banner-Meldung im Backend. Ab Tag 30 → `is_valid=False`, Features gesperrt.
+
+**Ausnahme für kritische Methoden:**
+Produkt-Module können pro Methode eine strengere Policy verlangen:
+```python
+@license_required('TELE', min_cache_age_days=7)  # nur wenn Cache < 7 Tage alt
+def action_expensive_telnyx_call(self):
+    ...
+```
+Default ist `min_cache_age_days=30`. Dieser Parameter wird nur gesetzt für Methoden, die real Kosten beim externen Provider verursachen (z.B. kostenpflichtige SMS-Sends) — dort ist Piracy-Schutz wichtiger als Offline-Toleranz.
 
 ### 3. `res.config.settings` — Lokale Einstellungen
 

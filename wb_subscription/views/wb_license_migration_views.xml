@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="wb_license_migration_view_list" model="ir.ui.view">
+        <field name="name">wb.license.migration.request.list</field>
+        <field name="model">wb.license.migration.request</field>
+        <field name="arch" type="xml">
+            <list decoration-warning="state == 'pending'"
+                  decoration-success="state in ('approved', 'completed')"
+                  decoration-muted="state == 'rejected'">
+                <field name="name"/>
+                <field name="license_id"/>
+                <field name="partner_id"/>
+                <field name="new_domain"/>
+                <field name="state"/>
+                <field name="create_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="wb_license_migration_view_form" model="ir.ui.view">
+        <field name="name">wb.license.migration.request.form</field>
+        <field name="model">wb.license.migration.request</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_approve" type="object" string="Genehmigen"
+                            class="btn-primary" invisible="state != 'pending'"/>
+                    <button name="action_reject" type="object" string="Ablehnen"
+                            invisible="state != 'pending'"
+                            confirm="Migration ablehnen? Der Kunde bekommt eine Benachrichtigung."/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,approved,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="license_id"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="contact_email"/>
+                        </group>
+                        <group>
+                            <field name="reviewed_by_id" readonly="1"/>
+                            <field name="reviewed_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Umzug">
+                        <group string="Von">
+                            <field name="current_domain"/>
+                            <field name="current_db_uuid"/>
+                        </group>
+                        <group string="Nach">
+                            <field name="new_domain"/>
+                            <field name="new_db_uuid"/>
+                            <field name="new_fingerprint" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="reason" nolabel="1" placeholder="Warum der Umzug?"/>
+                    </group>
+                    <group string="Review-Notiz">
+                        <field name="review_note" nolabel="1"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="wb_license_migration_action" model="ir.actions.act_window">
+        <field name="name">Migrationen</field>
+        <field name="res_model">wb.license.migration.request</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

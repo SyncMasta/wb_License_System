@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="res_partner_form_view_wb_license" model="ir.ui.view">
+        <field name="name">res.partner.form.wb.license</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <div name="button_box" position="inside">
+                <button name="action_view_wb_licenses" type="object"
+                        class="oe_stat_button" icon="fa-key"
+                        invisible="wb_license_count == 0">
+                    <field name="wb_active_license_count" widget="statinfo"
+                           string="Aktive Lizenzen"/>
+                </button>
+            </div>
+        </field>
+    </record>
+
+</odoo>

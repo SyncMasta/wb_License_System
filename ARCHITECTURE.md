@@ -1,9 +1,22 @@
 # WB Subscription & License Platform — Architektur
 
-**Version:** 1.4
-**Datum:** 23.04.2026
+**Version:** 1.5
+**Datum:** 24.04.2026
 **Autor:** Tobias Wissen (WISSEN BERATUNG)
 **Status:** Freigegeben für Umsetzung
+
+**Änderungen in v1.5 (24.04.2026):**
+- **Review-Fixes vor Sprint 1** eingearbeitet:
+  - DECISION #48: Ticket-Code-Storage per Fernet fixiert (statt offener Design-Frage)
+  - DECISION #48c: Portal-Ticket an erste IP gebunden (Anti-Forward)
+  - `wb.license.info` explizit als `models.Model` (nicht Transient) — sonst kein Cache über Restarts
+  - `@license_required` entschärft: bei `unknown` 30 Tage Toleranz statt 7 (Offline-Resilienz)
+  - Rate-Limiting bekommt eigenes Modell `wb.rate.limit.entry`
+  - CORS pro Endpoint-Typ differenziert (`*` nur für Ping/Activate/Migrate, `*.wissen-beratung.de` für Trial/Order)
+- **Strategie-Shift:** Lizenz-Plattform wird als Infrastruktur vor erstem Produkt gebaut.
+  - `ELST`-Produkt-Code verworfen, `wb_elster_reports` nicht mehr verfolgt
+  - Erstes reales Produkt nach Lizenz-Plattform: `TELE` (Telnyx-Integration)
+  - Interims-Produkt-Code `TEST` für End-to-End-Tests während Sprint 1–8
 
 **Änderungen in v1.4:**
 - Bestell-Flow: direkter Odoo-Controller statt n8n-Zwischenschritt
@@ -1113,7 +1126,8 @@ Geringe Anpassung durch Activation-Code:
 | 1.1 | 23.04.2026 | Activation-Code (25 Zeichen) + bcrypt-Hash + "issued"-State hinzugefügt |
 | 1.2 | 23.04.2026 | Code-Auslieferung via Portal-Ticket + Email-OTP (Kanal-Trennung). Key-Format: Checksum direkt an UUID angehängt (17 statt 19 Zeichen). |
 | 1.3 | 23.04.2026 | Mahn-/Grace-Logik aus `account_followup` abgeleitet statt hart codiert. Zahlungsziel via `account.payment.term` pflegbar pro Kunde. Design: weißer Hintergrund durchgängig. |
-| **1.4** | **23.04.2026** | **Bestell-Flow: direkter Odoo-Controller statt n8n-Zwischenschritt. Weniger Komponenten, weniger Fehlerquellen.** |
+| 1.4 | 23.04.2026 | Bestell-Flow: direkter Odoo-Controller statt n8n-Zwischenschritt. Weniger Komponenten, weniger Fehlerquellen. |
+| **1.5** | **24.04.2026** | **Review-Fixes vor Sprint 1: DECISION #48 (Fernet) fixiert, IP-Binding für Tickets, wb.license.info persistent, unknown-Gating entschärft (30d), Rate-Limit-Model, CORS differenziert. Strategie: Lizenz-Plattform vor erstem Produkt, ELSTER verworfen, TELE geplant.** |
 
 ---
 
@@ -1164,6 +1178,39 @@ Geringe Anpassung durch Activation-Code:
   keine externen Systeme zu koordinieren, keine komplexe Branching-
   Logik, kein Upside. Weniger Komponenten = weniger Fehlerquellen,
   Debugging einfacher.
+
+**v1.5 Entscheidungen (24.04.2026):**
+- **DECISION #48 (Ticket-Code-Storage):** Activation-Code wird beim
+  Ticket-Create mit Fernet (symmetric) verschlüsselt und in
+  `wb.activation.ticket.encrypted_code` abgelegt. Nach `state='consumed'`
+  wird `encrypted_code` gelöscht (Minimierung des Angriffsfensters).
+  Fernet-Key aus ENV-Variable mit Fallback auf `ir.config_parameter`.
+- **DECISION #48c (IP-Binding):** Portal-Ticket wird bei erstem GET
+  an die IP gebunden. Nach 3 IP-Mismatches wird Ticket revoked.
+  Schützt gegen versehentliches Email-Forwarding.
+- **`wb.license.info` als `models.Model`:** Explizit persistent
+  (nicht `TransientModel`). Sonst kein Cache über Odoo-Restarts.
+- **`@license_required` 30-Tage-Toleranz bei `unknown`:** Früher 7.
+  Gegen falsch-positive Sperrungen bei WB-Server-Ausfall. Kritische
+  Methoden können per `min_cache_age_days`-Parameter strenger sein.
+- **Rate-Limiting per `wb.rate.limit.entry`-Modell:** Eigenes Modell
+  mit TTL-Einträgen und stündlichem Cleanup-Cron. Ersetzt das
+  vage "ir-Table" aus v1.2.
+- **CORS pro Endpoint-Typ differenziert:** `*` nur für Check/Activate/
+  Migrate (Kunden-Odoos haben beliebige Domains). `*.wissen-beratung.de`
+  für Trial/Order (nur eigene Webseite).
+- **Strategie-Shift:** Lizenz-Plattform wird als produkt-agnostische
+  Infrastruktur gebaut, bevor das erste reale Produkt existiert.
+  Begründung: Tobias will vermeiden, das System später mehrfach
+  umzubauen. Trade-off bewusst eingegangen.
+- **Produkt-Status:** `ELST` verworfen (ELSTER-Steuermodul nicht
+  mehr verfolgt), `wb_elster_reports/` bleibt als archiviertes Skelett.
+  Erstes reales Produkt wird `TELE` (Telnyx-Integration) nach
+  Abschluss Sprint 8.
+- **Interims-Produkt-Code `TEST`:** Für End-to-End-Tests während
+  Sprint 1–8 kann ein Dummy-Produkt mit Code `TEST` registriert
+  werden, um den kompletten Aktivierungs-Flow zu validieren, ohne
+  ein echtes Produkt zu brauchen.
 
 ---
 

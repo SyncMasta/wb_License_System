@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="wb_license_event_view_list" model="ir.ui.view">
+        <field name="name">wb.license.event.list</field>
+        <field name="model">wb.license.event</field>
+        <field name="arch" type="xml">
+            <list string="Events" create="false" edit="false"
+                  decoration-danger="event_type in ('activation_failed', 'otp_failed', 'ticket_ip_mismatch', 'revoked')"
+                  decoration-success="event_type in ('activation', 'otp_verified', 'reactivated', 'renewal')">
+                <field name="timestamp"/>
+                <field name="license_id"/>
+                <field name="event_type"/>
+                <field name="ip_address"/>
+                <field name="domain"/>
+                <field name="created_by_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="wb_license_event_view_form" model="ir.ui.view">
+        <field name="name">wb.license.event.form</field>
+        <field name="model">wb.license.event</field>
+        <field name="arch" type="xml">
+            <form create="false" edit="false">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="timestamp"/>
+                            <field name="event_type"/>
+                            <field name="license_id"/>
+                            <field name="created_by_id"/>
+                        </group>
+                        <group>
+                            <field name="ip_address"/>
+                            <field name="user_agent"/>
+                            <field name="domain"/>
+                            <field name="db_uuid"/>
+                        </group>
+                    </group>
+                    <group string="Details (JSON)">
+                        <field name="details" nolabel="1" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="wb_license_event_view_search" model="ir.ui.view">
+        <field name="name">wb.license.event.search</field>
+        <field name="model">wb.license.event</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="license_id"/>
+                <field name="event_type"/>
+                <field name="ip_address"/>
+                <field name="domain"/>
+                <filter name="failures" string="Nur Fehler"
+                        domain="[('event_type', 'in', ['activation_failed', 'otp_failed', 'ticket_ip_mismatch'])]"/>
+                <filter name="today" string="Heute"
+                        domain="[('timestamp', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <group expand="0" string="Gruppieren nach">
+                    <filter name="group_type" string="Event-Typ" context="{'group_by': 'event_type'}"/>
+                    <filter name="group_license" string="Lizenz" context="{'group_by': 'license_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="wb_license_event_action" model="ir.actions.act_window">
+        <field name="name">Events (Audit-Log)</field>
+        <field name="res_model">wb.license.event</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="wb_license_event_view_search"/>
+    </record>
+
+</odoo>

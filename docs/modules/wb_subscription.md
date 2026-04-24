@@ -44,6 +44,7 @@ wb_subscription/
 │   ├── wb_license_migration.py      # Umzugs-Anträge
 │   ├── wb_license_trial.py          # Trial-Requests + Lead-Capture
 │   ├── wb_notification_log.py       # Benachrichtigungs-Log
+│   ├── wb_rate_limit_entry.py       # Rate-Limit-Zähler mit TTL
 │   └── wb_key_generator.py          # AbstractModel: Key/Code/Ticket-Algorithmen
 ├── controllers/
 │   ├── __init__.py
@@ -314,50 +315,50 @@ def _notify_state_change(self, old_state, new_state):
 | `ip_address` | Char | IP beim Create |
 | `last_accessed_ip` | Char | IP beim letzten Aufruf |
 
+**Zusatzfeld (fixiert durch DECISION #48):**
+
+| Feld | Typ | Besonderheit |
+|---|---|---|
+| `encrypted_code` | Binary | Fernet-encrypted Activation-Code. Wird bei Ticket-Create gesetzt, bei `state='consumed'` gelöscht |
+| `bound_ip` | Char | IP der ersten Anfrage auf `/activate/<ticket>` — danach gepinnt |
+
 **Methoden:**
 
 ```python
 def action_send_otp(self):
-    """Generiert 6-stelligen OTP, hasht ihn, versendet per Email."""
+    """Generiert 6-stelligen OTP, hasht ihn, versendet per Email.
+    Prüft vorher: request.httprequest.remote_addr == self.bound_ip."""
 
 def action_verify_otp(self, otp_input):
-    """Prüft OTP. Bei Erfolg: state='code_revealed', gibt Code zurück (unhashed, temporär)."""
-    # WICHTIG: Code wird NICHT aus DB gelesen (existiert dort nicht!)
-    # Trick: Der Activation-Code wird *beim Key-Create* RAM-hold
-    # und dann beim Ticket-Create ebenfalls als *second hash* gespeichert
-    # HIER: Nach OTP-Erfolg dekryptieren wir... moment.
-    # ALTERNATIVE: Code bei Ticket-Create als encrypted blob mit
-    # Fernet (symmetric) speichern, Key aus Server-Config.
-    # TODO: entscheiden in Sprint 1 — siehe "Design-Entscheidung #1" unten
+    """Prüft OTP gegen current_otp_hash.
+    Bei Erfolg:
+      1. code = env['wb.key.generator'].decrypt_code(self.encrypted_code)
+      2. state='code_revealed', code_revealed_at=now
+      3. Return code an Portal-Template (nicht persistent!)
+    """
+
+def action_consume(self):
+    """Wird nach erfolgreicher Activation aufgerufen.
+    Löscht encrypted_code, setzt state='consumed'."""
 
 def _cron_cleanup_expired_tickets(self):
-    """Cron täglich: alte Tickets/OTPs invalidieren."""
+    """Cron täglich: abgelaufene Tickets invalidieren, encrypted_code löschen."""
 ```
 
-**Design-Entscheidung #1 — wie kommt der Code beim Verify an die Anzeige?**
+**Code-Storage-Design (fixiert, siehe DECISION #48):**
 
-Problem: Der Activation-Code steht nur als bcrypt-Hash in `wb.license.key`.
-Nach OTP-Verifikation müssen wir ihn aber im Portal *anzeigen* können.
+- Beim Ticket-Create: `ticket.encrypted_code = env['wb.key.generator'].encrypt_code(code)`
+- Fernet-Key aus ENV-Variable `WB_SUBSCRIPTION_FERNET_KEY`, Fallback auf `ir.config_parameter` `wb_subscription.fernet_key`
+- Nach OTP-Verify: Code wird dekryptiert, ans Portal-Template übergeben (RAM-only), **nicht** in der Session persistiert
+- Bei `state='consumed'`: `encrypted_code = False` (Blob gelöscht)
+- Operations-Runbook: Bei vermutetem Leak → Alle Tickets mit `state != 'consumed'` revoken + Fernet-Key rotieren
 
-**Option A: Fernet-Encrypted Blob im Ticket**
-- Beim Ticket-Create: `ticket.encrypted_code = fernet.encrypt(code)`
-- Fernet-Key liegt in `ir.config_parameter` (oder ENV-Variable)
-- Nach OTP-Verify: `code = fernet.decrypt(ticket.encrypted_code)`
-- Vorteil: Klar und umsetzbar
-- Nachteil: Ein zentraler Server-Key entschlüsselt alles (bei DB+Server-Leak kompromittiert)
+**IP-Binding (DECISION #48c):**
 
-**Option B: Code-Teil im Ticket-Token einbetten**
-- Ticket-Token = `TCKT-{random_bytes}` wobei random_bytes zusammen mit OTP den Code rekonstruieren
-- Komplex, unübersichtlich
-
-**Option C: Code zu Ticket-Create-Zeit in Server-Session halten**
-- Geht nicht, weil Ticket 72h gültig ist und Odoo-Prozesse restarten
-
-**→ Empfehlung:** **Option A** mit Fernet-Verschlüsselung.
-- Server-Key `wb_subscription.fernet_key` in `ir.config_parameter` (niemals in Git!)
-- Separate Permission für Lesen dieses Parameters (nur `group_wb_subscription_manager`)
-- Bei Ticket-Consume (nach erfolgreicher OTP): `encrypted_code` wird gelöscht
-- Dokumentation: "Bei vermutetem Leak: Alle Pending-Tickets revoken + Fernet-Key rotieren"
+- Beim ersten GET `/activate/<ticket>`: `ticket.bound_ip = request.httprequest.remote_addr`
+- Jeder nachfolgende Request (Send-OTP, Verify-OTP) muss von derselben IP kommen
+- Bei IP-Mismatch: 403 + Event `ticket_ip_mismatch` geloggt
+- Exception: Zweiter Aufruf ohne `bound_ip` (z.B. Mobilnetz-Wechsel) wird in Event geloggt aber nicht hart geblockt — 3 Mismatches in 1h → Ticket invalidiert
 
 ### 8. `wb.license.migration.request`
 
@@ -445,24 +446,45 @@ Alle Algorithmen siehe ARCHITECTURE.md Kapitel 4.
 ```python
 # controllers/api_license.py
 
+# CORS-Policies pro Endpoint-Typ
+CORS_ANY = '*'                          # Ping/Activate/Migrate: jede Kunden-Domain
+CORS_WB_ONLY = '*.wissen-beratung.de'   # Trial/Order: nur Webseite
+
 class ApiLicenseController(http.Controller):
 
     @http.route('/api/license/check',
                 type='json', auth='public', methods=['POST'],
-                csrf=False, cors='*')
+                csrf=False, cors=CORS_ANY)
     def check_license(self, **kwargs):
         ...
 
     @http.route('/api/license/activate',
                 type='json', auth='public', methods=['POST'],
-                csrf=False, cors='*')
+                csrf=False, cors=CORS_ANY)
     def activate_license(self, **kwargs):
         ...
 
     @http.route('/api/license/migrate',
                 type='json', auth='public', methods=['POST'],
-                csrf=False, cors='*')
+                csrf=False, cors=CORS_ANY)
     def migrate_license(self, **kwargs):
+        ...
+
+
+# controllers/api_trial.py — Trial/Order nur für Webseite
+
+class ApiTrialController(http.Controller):
+
+    @http.route('/api/license/trial',
+                type='json', auth='public', methods=['POST'],
+                csrf=False, cors=CORS_WB_ONLY)
+    def request_trial(self, **kwargs):
+        ...
+
+    @http.route('/api/wb_subscription/order',
+                type='json', auth='public', methods=['POST'],
+                csrf=False, cors=CORS_WB_ONLY)
+    def create_order(self, **kwargs):
         ...
 ```
 
@@ -470,15 +492,44 @@ class ApiLicenseController(http.Controller):
 - Alle API-Endpoints `type='json'` (kein HTML)
 - `auth='public'` (kein Login nötig — Auth via Key+Code)
 - `csrf=False` (API-Calls, kein Form)
-- `cors='*'` für Pings von beliebigen Domains
+- **CORS differenziert:**
+  - `*` nur für `/api/license/check|activate|migrate` (Kunden-Odoos haben beliebige Domains)
+  - `*.wissen-beratung.de` für `/api/license/trial` und `/api/wb_subscription/order` (werden nur von unserer eigenen Webseite aufgerufen)
+- Portal-Endpoints (`/activate/<ticket>/...`) bekommen **kein** CORS (gleicher Origin)
 
-**Rate-Limiting:**
-Über `ir.config_parameter`:
-- `wb_subscription.rate_limit_activate` — z.B. `5/1h/ip` (5 Calls pro h pro IP)
-- `wb_subscription.rate_limit_trial` — z.B. `1/24h/email` (1 Trial pro E-Mail in 24h)
-- `wb_subscription.rate_limit_verify` — z.B. `10/1h/ip`
+**Rate-Limiting — eigenes Modell `wb.rate.limit.entry`:**
 
-Implementierung via ir-Table mit TTL-Einträgen + `ir.cron` für Cleanup.
+```python
+class WbRateLimitEntry(models.Model):
+    _name = 'wb.rate.limit.entry'
+    _description = 'Rate-Limit-Zähler mit TTL'
+
+    bucket_key = fields.Char(required=True, index=True)
+        # z.B. 'activate:192.168.1.1', 'trial:email:foo@bar.de'
+    endpoint = fields.Char(required=True)
+    count = fields.Integer(default=0)
+    window_start = fields.Datetime(required=True)
+    window_seconds = fields.Integer(required=True)
+
+    _sql_constraints = [
+        ('bucket_unique', 'UNIQUE(bucket_key)', 'Bucket-Key muss einzigartig sein'),
+    ]
+
+    @api.model
+    def check_and_increment(self, bucket_key, max_count, window_seconds):
+        """Gibt True zurück wenn im Limit, False wenn überschritten.
+        Verwendet SELECT FOR UPDATE für Atomicity."""
+```
+
+Konfigurationswerte in `ir.config_parameter`:
+- `wb_subscription.rate_limit_activate` — `5/1h/ip`
+- `wb_subscription.rate_limit_check` — `100/1h/ip`
+- `wb_subscription.rate_limit_trial` — `1/24h/email`
+- `wb_subscription.rate_limit_migrate` — `2/86400/key`
+- `wb_subscription.rate_limit_verify` — `20/1h/ip`
+- `wb_subscription.rate_limit_otp` — `5 Versuche pro Ticket` (kein Zeitfenster, Ticket-scoped)
+
+Cron `_cron_cleanup_rate_limits` (stündlich) löscht alle Einträge mit `window_start + window_seconds < now`.
 
 ### Alle Endpoints
 

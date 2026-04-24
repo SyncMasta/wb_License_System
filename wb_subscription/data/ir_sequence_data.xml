@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <record id="seq_wb_license_migration_request" model="ir.sequence">
+            <field name="name">WB Migration-Antrag</field>
+            <field name="code">wb.license.migration.request</field>
+            <field name="prefix">MIG/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <record id="seq_wb_license_trial_request" model="ir.sequence">
+            <field name="name">WB Trial-Anfrage</field>
+            <field name="code">wb.license.trial.request</field>
+            <field name="prefix">TRL/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <record id="seq_wb_license_certificate" model="ir.sequence">
+            <field name="name">WB Lizenz-Zertifikat</field>
+            <field name="code">wb.license.certificate</field>
+            <field name="prefix">LIZ-%(year)s-</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

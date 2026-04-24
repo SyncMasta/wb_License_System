@@ -1,0 +1,16 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_wb_license_key_user,wb.license.key user,model_wb_license_key,group_wb_subscription_user,1,0,0,0
+access_wb_license_key_manager,wb.license.key manager,model_wb_license_key,group_wb_subscription_manager,1,1,1,1
+access_wb_license_event_user,wb.license.event user,model_wb_license_event,group_wb_subscription_user,1,0,0,0
+access_wb_license_event_manager,wb.license.event manager,model_wb_license_event,group_wb_subscription_manager,1,1,1,0
+access_wb_license_tag_user,wb.license.tag user,model_wb_license_tag,group_wb_subscription_user,1,0,0,0
+access_wb_license_tag_manager,wb.license.tag manager,model_wb_license_tag,group_wb_subscription_manager,1,1,1,1
+access_wb_activation_ticket_user,wb.activation.ticket user,model_wb_activation_ticket,group_wb_subscription_user,1,0,0,0
+access_wb_activation_ticket_manager,wb.activation.ticket manager,model_wb_activation_ticket,group_wb_subscription_manager,1,1,1,1
+access_wb_license_migration_request_user,wb.license.migration.request user,model_wb_license_migration_request,group_wb_subscription_user,1,1,0,0
+access_wb_license_migration_request_manager,wb.license.migration.request manager,model_wb_license_migration_request,group_wb_subscription_manager,1,1,1,1
+access_wb_license_trial_request_user,wb.license.trial.request user,model_wb_license_trial_request,group_wb_subscription_user,1,1,0,0
+access_wb_license_trial_request_manager,wb.license.trial.request manager,model_wb_license_trial_request,group_wb_subscription_manager,1,1,1,1
+access_wb_notification_log_user,wb.notification.log user,model_wb_notification_log,group_wb_subscription_user,1,0,0,0
+access_wb_notification_log_manager,wb.notification.log manager,model_wb_notification_log,group_wb_subscription_manager,1,1,1,0
+access_wb_rate_limit_entry_manager,wb.rate.limit.entry manager,model_wb_rate_limit_entry,group_wb_subscription_manager,1,1,1,1

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="wb_notification_log_view_list" model="ir.ui.view">
+        <field name="name">wb.notification.log.list</field>
+        <field name="model">wb.notification.log</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false"
+                  decoration-success="state == 'sent'"
+                  decoration-danger="state == 'failed'">
+                <field name="create_date"/>
+                <field name="channel"/>
+                <field name="recipient"/>
+                <field name="subject"/>
+                <field name="state"/>
+                <field name="sent_at"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="wb_notification_log_view_form" model="ir.ui.view">
+        <field name="name">wb.notification.log.form</field>
+        <field name="model">wb.notification.log</field>
+        <field name="arch" type="xml">
+            <form create="false" edit="false">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="create_date"/>
+                            <field name="channel"/>
+                            <field name="state"/>
+                            <field name="sent_at"/>
+                        </group>
+                        <group>
+                            <field name="recipient"/>
+                            <field name="license_id"/>
+                            <field name="partner_id"/>
+                            <field name="template_xmlid"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="subject"/>
+                        <field name="body_preview" nolabel="1"/>
+                    </group>
+                    <group invisible="state != 'failed'" string="Fehler">
+                        <field name="error_message" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="wb_notification_log_action" model="ir.actions.act_window">
+        <field name="name">Benachrichtigungs-Log</field>
+        <field name="res_model">wb.notification.log</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

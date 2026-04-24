@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="product_template_form_view_wb_license" model="ir.ui.view">
+        <field name="name">product.template.form.wb.license</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <notebook position="inside">
+                <page string="WB Lizenz" name="wb_license">
+                    <group>
+                        <group>
+                            <field name="wb_is_license_product"/>
+                            <field name="wb_technical_code"
+                                   placeholder="z.B. TELE"
+                                   invisible="not wb_is_license_product"
+                                   required="wb_is_license_product"/>
+                            <field name="wb_module_technical_name"
+                                   placeholder="z.B. wb_telnyx_voip"
+                                   invisible="not wb_is_license_product"/>
+                        </group>
+                        <group invisible="not wb_is_license_product">
+                            <field name="wb_instance_limit"/>
+                            <field name="wb_extra_instance_price"/>
+                            <field name="wb_trial_days"/>
+                            <field name="wb_activation_grace_days"/>
+                        </group>
+                    </group>
+                    <group invisible="not wb_is_license_product" string="Templates">
+                        <field name="wb_eula_template_id"/>
+                        <field name="wb_certificate_template_id"/>
+                    </group>
+                </page>
+            </notebook>
+        </field>
+    </record>
+
+</odoo>

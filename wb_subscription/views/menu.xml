@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_wb_subscription_root"
+              name="WB Lizenzen"
+              sequence="65"
+              web_icon="wb_subscription,static/description/icon.png"
+              groups="wb_subscription.group_wb_subscription_user"/>
+
+    <menuitem id="menu_wb_subscription_licenses"
+              name="Lizenzen"
+              parent="menu_wb_subscription_root"
+              action="wb_license_key_action"
+              sequence="10"/>
+
+    <menuitem id="menu_wb_subscription_trials"
+              name="Trial-Anfragen"
+              parent="menu_wb_subscription_root"
+              action="wb_license_trial_action"
+              sequence="20"/>
+
+    <menuitem id="menu_wb_subscription_migrations"
+              name="Migrationen"
+              parent="menu_wb_subscription_root"
+              action="wb_license_migration_action"
+              sequence="30"/>
+
+    <menuitem id="menu_wb_subscription_tickets"
+              name="Activation-Tickets"
+              parent="menu_wb_subscription_root"
+              action="wb_activation_ticket_action"
+              sequence="40"
+              groups="wb_subscription.group_wb_subscription_manager"/>
+
+    <menuitem id="menu_wb_subscription_ops"
+              name="Betrieb"
+              parent="menu_wb_subscription_root"
+              sequence="80"
+              groups="wb_subscription.group_wb_subscription_manager"/>
+
+    <menuitem id="menu_wb_subscription_events"
+              name="Events (Audit-Log)"
+              parent="menu_wb_subscription_ops"
+              action="wb_license_event_action"
+              sequence="10"/>
+
+    <menuitem id="menu_wb_subscription_notifications"
+              name="Benachrichtigungs-Log"
+              parent="menu_wb_subscription_ops"
+              action="wb_notification_log_action"
+              sequence="20"/>
+
+    <menuitem id="menu_wb_subscription_rate_limits"
+              name="Rate-Limit-Buckets"
+              parent="menu_wb_subscription_ops"
+              action="wb_rate_limit_entry_action"
+              sequence="30"/>
+
+    <menuitem id="menu_wb_subscription_config"
+              name="Konfiguration"
+              parent="menu_wb_subscription_root"
+              sequence="90"
+              groups="wb_subscription.group_wb_subscription_manager"/>
+
+    <menuitem id="menu_wb_subscription_tags"
+              name="Tags"
+              parent="menu_wb_subscription_config"
+              action="wb_license_tag_action"
+              sequence="10"/>
+
+</odoo>

@@ -17,11 +17,11 @@ Bevor man Sicherheits-Entscheidungen trifft, muss man wissen
 |---|---|---|
 | **Lizenz-Datenbank (wb.license.key)** | Vertriebs-Existenz | Hoch |
 | **Activation-Codes** | Finanzieller Verlust (Piracy) | Sehr hoch |
+| **Fernet-Key (ENV/ir.config_parameter)** | Schlüssel zu allen Pending-Tickets | Sehr hoch |
 | **Kunden-Adressen und USt-IDs** | DSGVO-Bußgeld, Reputation | Hoch |
 | **Zahlungsdaten (account_payment)** | Finanzen, Vertrauen | Sehr hoch |
 | **Telegram-Bot-Token** | Spam-Möglichkeit, Missbrauch | Mittel |
 | **Stripe-API-Keys** | Direkter Finanzzugriff | Sehr hoch |
-| **ELSTER-XMLs** | DSGVO + Steuerrelevant | Hoch |
 
 ### Wogegen wir schützen
 
@@ -115,7 +115,7 @@ def verify_activation_code(code: str, stored: bytes) -> bool:
   → bei 10^37 möglichen Codes: Jahrtausende für Erfolg
 - SHA256 wäre in 1ms berechenbar → 86.4 Mio Versuche/Tag möglich
 
-### Layer 4: Channel-Separation
+### Layer 4: Channel-Separation + IP-Binding
 
 **Das Activation-Code-Design:**
 
@@ -134,6 +134,53 @@ Ticket-Link abgefangen) kommt an den Code. Das Szenario ist in
 - Code ist nach Anzeige nur 10min sichtbar
 - Fehlversuche werden geloggt und können alerten
 
+**IP-Binding (DECISION #48c, v1.5):**
+
+Zusätzlich zur Channel-Separation wird das Ticket an die **erste
+aufrufende IP** gepinnt. Szenario: Kunde leitet die Aktivierungs-
+Email aus Versehen an Dritte weiter (Assistent, Support-Ticket-System,
+öffentliche Mailing-Liste). Ohne IP-Binding könnte jemand, der parallel
+Mailbox-Zugriff hat, den Flow übernehmen, **bevor** der Kunde selbst
+den Link klickt.
+
+```python
+@http.route('/activate/<ticket_token>', type='http', auth='public')
+def activate_landing(self, ticket_token, **kw):
+    ticket = request.env['wb.activation.ticket'].sudo().search(
+        [('name', '=', ticket_token)], limit=1)
+
+    client_ip = request.httprequest.remote_addr
+
+    if not ticket.bound_ip:
+        # Erster Aufruf — IP festpinnen
+        ticket.bound_ip = client_ip
+    elif ticket.bound_ip != client_ip:
+        # Späterer Aufruf von anderer IP — loggen, ggf. blockieren
+        ticket._log_ip_mismatch(client_ip)
+        if ticket.ip_mismatch_count >= 3:
+            ticket.state = 'revoked'
+            return request.render('wb_subscription.ticket_revoked_template')
+
+    # ... normales Portal-Rendering
+```
+
+**Bewusste Schwäche:** Dynamische IPs (Mobilnetz-Wechsel Home-Office →
+Smartphone) führen zu False-Positives. Deshalb: Erste 3 IP-Mismatches
+werden nur **gezählt und geloggt**, nicht sofort hart blockiert.
+Erst ab 3 Mismatches wird das Ticket revoked. Compromise zwischen
+Usability und Security.
+
+**Was NICHT geblockt wird:**
+- User wechselt vom Smartphone (Mobilnetz-IP) zum WLAN-Gerät
+  → zählt als 1 Mismatch, geht durch
+- User benutzt VPN und toggelt es
+  → zählt als Mismatch, nach 3 blockiert (akzeptabel)
+
+**Was geblockt wird:**
+- Angreifer mit Mailbox-Zugriff aus anderem Netzwerk als der echte User
+  → spätestens beim 3. Zugriff-Versuch geblockt, alle bis dahin sichtbar
+  in `wb.license.event` mit IP, User-Agent, Timestamp
+
 ### Layer 5: Encryption-at-Rest
 
 **Activation-Code-Verschlüsselung für Portal-Anzeige:**
@@ -142,35 +189,60 @@ Problem: Der Code muss im Portal angezeigt werden können. Er ist aber
 nur als bcrypt-Hash in der DB. bcrypt ist **einweg**, also kann er
 nicht zurück-entschlüsselt werden.
 
-**Lösung:** Fernet-Encryption beim Ticket-Create.
+**Lösung:** Fernet-Encryption beim Ticket-Create (fixiert durch DECISION #48).
 
 ```python
+import os
 from cryptography.fernet import Fernet
 
-def encrypt_code_for_ticket(code: str) -> bytes:
-    fernet_key = env['ir.config_parameter'].sudo().get_param(
+def _get_fernet_key(env) -> bytes:
+    """Lädt Fernet-Key mit ENV-Präferenz, Fallback auf ir.config_parameter.
+
+    ENV-Variable ist bevorzugt, weil sie NICHT in DB-Backups enthalten ist.
+    Das schützt gegen "DB-Leak kompromittiert alle Tickets".
+    """
+    key = os.environ.get('WB_SUBSCRIPTION_FERNET_KEY')
+    if key:
+        return key.encode('utf-8')
+    key = env['ir.config_parameter'].sudo().get_param(
         'wb_subscription.fernet_key')
-    f = Fernet(fernet_key)
+    if not key:
+        raise UserError(_(
+            "Fernet-Key nicht konfiguriert. Bitte ENV-Variable "
+            "WB_SUBSCRIPTION_FERNET_KEY setzen oder ir.config_parameter "
+            "'wb_subscription.fernet_key' pflegen."))
+    return key.encode('utf-8')
+
+def encrypt_code_for_ticket(env, code: str) -> bytes:
+    f = Fernet(_get_fernet_key(env))
     return f.encrypt(code.encode('utf-8'))
 
-def decrypt_code_from_ticket(ciphertext: bytes) -> str:
-    fernet_key = env['ir.config_parameter'].sudo().get_param(
-        'wb_subscription.fernet_key')
-    f = Fernet(fernet_key)
+def decrypt_code_from_ticket(env, ciphertext: bytes) -> str:
+    f = Fernet(_get_fernet_key(env))
     return f.decrypt(ciphertext).decode('utf-8')
 ```
 
 **Wichtig für Fernet-Key:**
 - **Niemals in Git.**
-- Speicherung in `ir.config_parameter` mit Read-Zugriff nur für
-  `group_wb_subscription_manager`
+- **Default beim Install:** Modul generiert Key automatisch und speichert ihn in
+  `ir.config_parameter` `wb_subscription.fernet_key` (via `post_init_hook`).
+  Das ist **Plug-and-play**, aber der Key landet im DB-Backup.
+- **Empfohlen für Produktion:** ENV-Variable `WB_SUBSCRIPTION_FERNET_KEY` —
+  nicht in DB-Backup, nicht in DB-Dump. Wenn gesetzt, wird sie bevorzugt;
+  `ir.config_parameter` wird dann ignoriert.
+- **Migration nach ENV:** siehe README.rst Abschnitt "High-Security-Option"
+- **Access-Control:** Der Parameter in `ir.config_parameter` ist über die
+  Gruppe `group_wb_subscription_manager` abgesichert
 - Generierung: `Fernet.generate_key()` (URL-safe base64 von 32 Bytes)
 - Rotation: alle 12 Monate oder nach vermutetem Leak
+- **Nach erfolgreicher Activation:** `ticket.encrypted_code = False` setzen
+  (siehe DECISION #48b) — minimiert die Menge an aktiven Ciphertexts
 
 **Was bei Fernet-Key-Leak passiert:**
 - Alle noch nicht consumed Tickets sind kompromittiert
 - Alle Pending-Activations müssen manuell überprüft werden
 - Neuer Fernet-Key generieren, alten invalidieren
+- Alle Tickets mit `state != 'consumed'` revoken + Kunden neuen Ticket-Link senden
 
 ### Layer 6: Audit-Logging
 
@@ -301,12 +373,12 @@ _logger.warning(f"Failed activation: wrong_code for license {license.id}")
 - **Telegram-Bot-Token in ir.config_parameter**, nicht in Code
 - **Chat-IDs pro User** speichern, nicht global-default
 
-### wb_elster_reports
+### wb_elster_reports *(historisch — Produkt wurde 2026-04-24 verworfen)*
 
-- **USt-IDs DSGVO-konform** behandeln (Zugriffskontrolle)
-- **XML-Dateien verschlüsselt speichern** (ir.attachment mit mimetype)
-- **Keine automatischen Uploads an elster.de** (zu riskant ohne Zert-Auth)
-- **Log-Level bei XML-Generation INFO** (keine Inhalte!)
+- USt-IDs DSGVO-konform behandeln (Zugriffskontrolle)
+- XML-Dateien verschlüsselt speichern (ir.attachment mit mimetype)
+- Keine automatischen Uploads an elster.de (zu riskant ohne Zert-Auth)
+- Log-Level bei XML-Generation INFO (keine Inhalte!)
 
 ---
 

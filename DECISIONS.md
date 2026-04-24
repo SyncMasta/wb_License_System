@@ -118,6 +118,17 @@ explizite Tobias-Anweisung. Bei Zweifeln: fragen statt umplanen.
 
 ---
 
+## Ticket-Code-Speicherung (v1.5)
+
+| # | Entscheidung | Begründung |
+|---|---|---|
+| 48 | Activation-Code wird beim Ticket-Create mit **Fernet (symmetric)** verschlüsselt und in `wb.activation.ticket.encrypted_code` abgelegt | Code ist nach Erzeugung nur als bcrypt-Hash in `wb.license.key` (einweg). Für Portal-Anzeige nach OTP-Verify muss er rekonstruierbar sein — nur Fernet-Encrypt erfüllt das, ohne den Hash aufzugeben |
+| 48a | Fernet-Key wird beim **Install automatisch in `ir.config_parameter`** generiert (`post_init_hook`). ENV-Variable `WB_SUBSCRIPTION_FERNET_KEY` bleibt als High-Security-Override; wenn gesetzt, wird sie bevorzugt | Plug-and-play-UX — Install funktioniert ohne manuellen Server-Eingriff. ENV bleibt die bessere Wahl (nicht im DB-Backup) und ist im README.rst dokumentiert. Der Hook ist idempotent: läuft nur beim ersten Install, nicht bei Updates — sonst würde Key-Rotation alle Pending-Tickets entwerten |
+| 48b | `encrypted_code` wird **gelöscht sobald Ticket-State `consumed`** erreicht | Minimiert Angriffsfenster — nach Activation gibt es keinen wiederherstellbaren Code mehr |
+| 48c | Ticket an **erste aufrufende IP gebunden** (beim GET `/activate/<ticket>` festgepinnt) | Gegen Link-Forwarding. Send-OTP und Verify-OTP nur von derselben IP |
+
+---
+
 ## Offene Punkte für später
 
 - EULA-Text vom Anwalt prüfen lassen (300-600 €)
@@ -134,10 +145,12 @@ Details siehe `ARCHITECTURE.md` Kapitel 11.
 
 | Code | Produkt | Status |
 |---|---|---|
-| ELST | ELSTER UStVA & ZM Reports | In Entwicklung (v1.0 Skelett steht) |
-| DATV | DATEV Export | Geplant |
-| DSGV | DSGVO Auskunft | Geplant |
-| TELE | TELnyx Tools | Geplant |
+| TEST | Test-/Demo-Produkt für Entwicklung der Lizenz-Plattform | Reserviert |
+| TELE | Telnyx-Integration (Voice + SMS) für Odoo VoIP | Geplant (erstes reales Produkt nach Lizenz-Plattform) |
+| DATV | DATEV Export | Konzeptionell, nicht priorisiert |
+| DSGV | DSGVO Auskunft | Konzeptionell, nicht priorisiert |
+
+**Historisch:** `ELST` (ELSTER UStVA/ZM) wurde 2026-04-24 verworfen — nicht weiter verfolgt. Das MVP-Skelett (`wb_elster_reports/`) bleibt als interner Prototyp archiviert.
 
 ---
 

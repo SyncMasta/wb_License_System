@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="wb_rate_limit_entry_view_list" model="ir.ui.view">
+        <field name="name">wb.rate.limit.entry.list</field>
+        <field name="model">wb.rate.limit.entry</field>
+        <field name="arch" type="xml">
+            <list create="false">
+                <field name="bucket_key"/>
+                <field name="endpoint"/>
+                <field name="count"/>
+                <field name="window_start"/>
+                <field name="window_seconds"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="wb_rate_limit_entry_action" model="ir.actions.act_window">
+        <field name="name">Rate-Limit-Buckets</field>
+        <field name="res_model">wb.rate.limit.entry</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Keine aktiven Rate-Limit-Buckets.</p>
+            <p>Hier erscheinen Einträge sobald öffentliche API-Endpoints Traffic bekommen.
+               Stündlicher Cron löscht abgelaufene Einträge.</p>
+        </field>
+    </record>
+
+</odoo>

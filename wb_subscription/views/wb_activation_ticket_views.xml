@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="wb_activation_ticket_view_list" model="ir.ui.view">
+        <field name="name">wb.activation.ticket.list</field>
+        <field name="model">wb.activation.ticket</field>
+        <field name="arch" type="xml">
+            <list create="false" decoration-success="state == 'consumed'"
+                  decoration-danger="state in ('expired', 'revoked')"
+                  decoration-warning="state == 'awaiting_otp'">
+                <field name="name"/>
+                <field name="license_id"/>
+                <field name="state"/>
+                <field name="email"/>
+                <field name="otp_sent_at"/>
+                <field name="otp_attempts"/>
+                <field name="ip_mismatch_count"/>
+                <field name="expires_at"/>
+                <field name="create_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="wb_activation_ticket_view_form" model="ir.ui.view">
+        <field name="name">wb.activation.ticket.form</field>
+        <field name="model">wb.activation.ticket</field>
+        <field name="arch" type="xml">
+            <form create="false">
+                <header>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,awaiting_otp,code_revealed,consumed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="license_id"/>
+                            <field name="email"/>
+                            <field name="expires_at" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="bound_ip" readonly="1"/>
+                            <field name="last_accessed_ip" readonly="1"/>
+                            <field name="ip_mismatch_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="OTP-Status">
+                        <group>
+                            <field name="otp_sent_at" readonly="1"/>
+                            <field name="otp_valid_until" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="otp_attempts" readonly="1"/>
+                            <field name="otp_max_attempts" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Code-Anzeige" invisible="state != 'code_revealed'">
+                        <field name="code_revealed_at" readonly="1"/>
+                        <field name="code_hidden_at" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="wb_activation_ticket_action" model="ir.actions.act_window">
+        <field name="name">Activation-Tickets</field>
+        <field name="res_model">wb.activation.ticket</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>
