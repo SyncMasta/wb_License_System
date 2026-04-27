@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="wb_license_migrate_wizard_view_form" model="ir.ui.view">
+        <field name="name">wb.license.migrate.wizard.form</field>
+        <field name="model">wb.license.migrate.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Lizenz-Migration beantragen">
+                <sheet>
+                    <div class="alert alert-warning" role="alert">
+                        <p><strong>Hinweis:</strong> Migration ist 1x pro Jahr möglich und muss manuell
+                           von WISSEN BERATUNG freigegeben werden (normalerweise 1-2 Werktage).</p>
+                        <p>Öffnen Sie diesen Wizard bitte auf der <strong>neuen</strong> Odoo-Instanz —
+                           wir lesen die aktuelle Domain und DB-UUID automatisch aus.</p>
+                    </div>
+                    <group>
+                        <field name="product_code"/>
+                        <field name="new_domain"/>
+                        <field name="new_db_uuid" readonly="1"/>
+                        <field name="contact_email"/>
+                    </group>
+                    <group string="Begründung">
+                        <field name="reason" nolabel="1"
+                               placeholder="Warum der Umzug? z.B. 'Neuer Hosting-Provider', 'Firmen-Reorganisation'..."/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_request_migration" type="object"
+                            string="Migration beantragen" class="btn-primary"/>
+                    <button special="cancel" string="Abbrechen"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="wb_license_migrate_wizard_action" model="ir.actions.act_window">
+        <field name="name">Migration beantragen</field>
+        <field name="res_model">wb.license.migrate.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

@@ -108,3 +108,10 @@ class WbLicenseTrialRequest(models.Model):
                 domain=rec.domain,
                 details={'trial_request_id': rec.id},
             )
+            license._send_template('wb_subscription.mail_template_trial_activated')
+            license._send_telegram(
+                "🆕 Trial gestartet: {key} ({company}, {email})",
+                key=license.name,
+                company=rec.company_name or '',
+                email=rec.contact_email or '',
+            )

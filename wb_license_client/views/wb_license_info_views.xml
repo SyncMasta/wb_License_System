@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="wb_license_info_view_list" model="ir.ui.view">
+        <field name="name">wb.license.info.list</field>
+        <field name="model">wb.license.info</field>
+        <field name="arch" type="xml">
+            <list create="false"
+                  decoration-success="state == 'active'"
+                  decoration-warning="state == 'grace'"
+                  decoration-danger="state in ('expired')"
+                  decoration-muted="state == 'unlicensed'"
+                  decoration-info="state == 'unknown'">
+                <field name="product_code"/>
+                <field name="key_masked"/>
+                <field name="state"/>
+                <field name="valid_to"/>
+                <field name="days_remaining"/>
+                <field name="last_server_check"/>
+                <field name="is_valid"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="wb_license_info_view_form" model="ir.ui.view">
+        <field name="name">wb.license.info.form</field>
+        <field name="model">wb.license.info</field>
+        <field name="arch" type="xml">
+            <form create="false">
+                <header>
+                    <button name="action_open_activate_wizard" type="object"
+                            string="Lizenz aktivieren" class="btn-primary"
+                            invisible="state != 'unlicensed'"/>
+                    <button name="action_force_ping" type="object"
+                            string="Jetzt prüfen"
+                            invisible="state == 'unlicensed'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="active,grace,expired"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="product_code" readonly="1"/></h1>
+                        <h3><field name="key_masked" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <group string="Laufzeit">
+                            <field name="valid_from" readonly="1"/>
+                            <field name="valid_to" readonly="1"/>
+                            <field name="grace_until" readonly="1"/>
+                            <field name="days_remaining" readonly="1"/>
+                        </group>
+                        <group string="Server-Sync">
+                            <field name="last_server_check" readonly="1"/>
+                            <field name="last_check_success" readonly="1"/>
+                            <field name="last_error_message" readonly="1"/>
+                            <field name="is_valid" readonly="1"/>
+                            <field name="effective_min_cache_age_days" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="user_message" readonly="1" nolabel="1"/>
+                    </group>
+                    <group string="Raw Server Response" groups="base.group_system">
+                        <field name="server_response_raw" readonly="1" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="wb_license_info_action" model="ir.actions.act_window">
+        <field name="name">WB Lizenzen</field>
+        <field name="res_model">wb.license.info</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Keine WB-Lizenzen konfiguriert.</p>
+            <p>Installieren Sie ein WB-Produkt-Modul und aktivieren Sie Ihre Lizenz
+               über den Wizard in den Einstellungen.</p>
+        </field>
+    </record>
+
+</odoo>

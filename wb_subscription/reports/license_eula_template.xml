@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        EULA-PDF-Wrapper.
+
+        Inhalt kommt aus product.template.wb_eula_template_id.body_html,
+        damit Tobias (oder Anwalt) den Text in der Odoo-UI pflegen kann
+        ohne Code-Änderung. Bei Produkten ohne Template zeigt der
+        Wrapper einen Platzhalter.
+
+        WICHTIG vor Launch: EULA-Text juristisch prüfen lassen
+        (DECISIONS.md #37, siehe ARCHITECTURE.md 11.1).
+    -->
+
+    <template id="report_license_eula_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <div class="wb_eula_page">
+                    <header class="wb_eula_header">
+                        <h1 class="wb_eula_title">End-User License Agreement</h1>
+                        <div class="wb_eula_subtitle">
+                            Endbenutzer-Lizenzvertrag für <t t-out="o.product_id.name"/>
+                        </div>
+                        <div class="wb_eula_meta">
+                            Lizenzschlüssel: <code t-out="o.name"/>
+                            <span class="wb_eula_meta_sep">·</span>
+                            Stand: <t t-out="o.issue_date and o.issue_date.strftime('%d.%m.%Y')"/>
+                        </div>
+                    </header>
+
+                    <section class="wb_eula_body">
+                        <t t-if="o.product_id.product_tmpl_id.wb_eula_template_id">
+                            <t t-out="o.product_id.product_tmpl_id.wb_eula_template_id._render_field(
+                                'body_html', [o.id], compute_lang=True)[o.id]"/>
+                        </t>
+                        <t t-else="">
+                            <div class="alert alert-warning">
+                                <strong>EULA-Text noch nicht hinterlegt.</strong>
+                                <p>
+                                    Für das Produkt "<t t-out="o.product_id.name"/>" ist noch
+                                    keine EULA-Vorlage gepflegt. Ein Administrator kann unter
+                                    Produkt → WB Lizenz → EULA-Template eine mail.template
+                                    zuordnen, deren body_html hier als EULA erscheint.
+                                </p>
+                            </div>
+                        </t>
+                    </section>
+
+                    <footer class="wb_eula_footer">
+                        <div class="wb_eula_footer_line"/>
+                        <div class="wb_eula_footer_text">
+                            <span t-out="o.company_id.name"/> ·
+                            <span t-out="o.company_id.email"/> ·
+                            EULA-Status: Entwurf (juristische Prüfung ausstehend)
+                        </div>
+                    </footer>
+
+                </div>
+            </t>
+        </t>
+    </template>
+
+</odoo>

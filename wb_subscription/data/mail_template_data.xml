@@ -1,0 +1,407 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            Alle Templates folgen dem gleichen Schema:
+            - Subject mit "[WISSEN BERATUNG]"-Prefix
+            - body_html in Tobias' Stil: direkt, pragmatisch, anti-fluff
+            - lang aus partner_id.lang
+            - Zertifikat / EULA als Anhang nur wo dokumentiert
+            - Activation-Code wird NIE in einer Mail gerendert (DECISION #16, #39)
+
+            Tobias kann die Texte später in der Odoo-UI feintunen.
+        -->
+
+        <!-- =============================================== -->
+        <!-- Activation-Flow                                 -->
+        <!-- =============================================== -->
+
+        <record id="mail_template_payment_received" model="mail.template">
+            <field name="name">WB: Kauf bestätigt + Zertifikat</field>
+            <field name="model_id" ref="model_wb_license_key"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">[WISSEN BERATUNG] Ihr Lizenzschlüssel für {{ object.product_id.name }}</field>
+            <field name="email_from">{{ object.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.partner_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                    <p>Guten Tag <t t-out="object.partner_id.name or ''"/>,</p>
+                    <p>vielen Dank für Ihren Kauf von <strong t-out="object.product_id.name"/>.</p>
+                    <p>Ihre Lizenz ist eingerichtet:</p>
+                    <ul>
+                        <li>Lizenzschlüssel: <code t-out="object.name"/></li>
+                        <li>Laufzeit: <t t-out="object.valid_from"/> – <t t-out="object.valid_to"/></li>
+                        <li>Zertifikat: im Anhang</li>
+                    </ul>
+                    <p>
+                        <strong>Nächster Schritt — Lizenz aktivieren:</strong><br/>
+                        Sie erhalten in einer separaten E-Mail einen Link zum Aktivierungs-Portal.
+                        Aus Sicherheitsgründen wird der Aktivierungs-Code nicht per E-Mail versendet.
+                    </p>
+                    <p>Bei Fragen: support@wissen-beratung.de</p>
+                    <p>Viele Grüße<br/>Tobias Wissen<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <record id="mail_template_activation_instructions" model="mail.template">
+            <field name="name">WB: Activation-Anleitung (Ticket-Link)</field>
+            <field name="model_id" ref="model_wb_license_key"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">[WISSEN BERATUNG] Aktivierung in 2 Schritten — {{ object.product_id.name }}</field>
+            <field name="email_from">{{ object.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.partner_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                    <p>Guten Tag <t t-out="object.partner_id.name or ''"/>,</p>
+                    <p>Ihr Aktivierungs-Code für <strong t-out="object.product_id.name"/> liegt zum Abruf bereit.</p>
+                    <p>
+                        <strong>Klicken Sie auf den Ticket-Link aus der dazugehörigen E-Mail</strong>
+                        (separate Nachricht). Im Portal:
+                    </p>
+                    <ol>
+                        <li>Wir senden einen 6-stelligen Bestätigungs-Code an Ihre E-Mail</li>
+                        <li>Sie geben den Code im Portal ein</li>
+                        <li>Ihr Aktivierungs-Code wird für 10 Minuten angezeigt</li>
+                        <li>Diesen Code in Ihrer Odoo-Instanz eingeben</li>
+                    </ol>
+                    <p>Lizenzschlüssel: <code t-out="object.name"/></p>
+                    <p>Bei Fragen: support@wissen-beratung.de</p>
+                    <p>Viele Grüße<br/>Tobias Wissen<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <record id="mail_template_activation_otp" model="mail.template">
+            <field name="name">WB: Activation-OTP (Portal)</field>
+            <field name="model_id" ref="model_wb_activation_ticket"/>
+            <field name="subject">[WISSEN BERATUNG] Ihr Bestätigungs-Code</field>
+            <field name="email_from">{{ object.license_id.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                    <p>Ihr 6-stelliger Bestätigungs-Code lautet:</p>
+                    <p style="font-size: 24pt; letter-spacing: 4px; font-weight: bold; padding: 12px; background: #f0f0f0; text-align: center;">
+                        <t t-out="ctx.get('otp_plain', '')"/>
+                    </p>
+                    <p>Der Code ist 10 Minuten gültig. Geben Sie ihn im Portal ein um Ihren Aktivierungs-Code abzurufen.</p>
+                    <p>Wenn Sie diese E-Mail nicht erwartet haben: ignorieren Sie sie. Es ist nichts passiert.</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+
+        <record id="mail_template_activation_reminder_7d" model="mail.template">
+            <field name="name">WB: Activation-Reminder Tag 7</field>
+            <field name="model_id" ref="model_wb_license_key"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">[WISSEN BERATUNG] Erinnerung: Lizenz {{ object.product_id.name }} noch nicht aktiviert</field>
+            <field name="email_from">{{ object.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.partner_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                    <p>Guten Tag <t t-out="object.partner_id.name or ''"/>,</p>
+                    <p>Ihre Lizenz <code t-out="object.name"/> liegt seit 7 Tagen zur Aktivierung bereit.</p>
+                    <p>
+                        Bitte folgen Sie dem Ticket-Link aus der ursprünglichen Aktivierungs-E-Mail.
+                        Falls Sie den Link verlegt haben, melden Sie sich bei support@wissen-beratung.de.
+                    </p>
+                    <p>Der Aktivierungs-Code ist <t t-out="object.activation_expires_at"/> gültig.</p>
+                    <p>Viele Grüße<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <record id="mail_template_activation_reminder_30d" model="mail.template">
+            <field name="name">WB: Activation-Reminder Tag 30</field>
+            <field name="model_id" ref="model_wb_license_key"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">[WISSEN BERATUNG] Letzte Erinnerung: Lizenz {{ object.product_id.name }} aktivieren</field>
+            <field name="email_from">{{ object.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.partner_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                    <p>Guten Tag <t t-out="object.partner_id.name or ''"/>,</p>
+                    <p>Ihre Lizenz <code t-out="object.name"/> ist seit 30 Tagen nicht aktiviert.</p>
+                    <p>
+                        Der Aktivierungs-Code läuft am <t t-out="object.activation_expires_at"/> ab.
+                        Danach ist eine Reaktivierung nur über den Support möglich.
+                    </p>
+                    <p>Brauchen Sie Unterstützung? Antworten Sie auf diese E-Mail oder schreiben Sie an support@wissen-beratung.de.</p>
+                    <p>Viele Grüße<br/>Tobias Wissen<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <!-- =============================================== -->
+        <!-- Trial-Flow                                      -->
+        <!-- =============================================== -->
+
+        <record id="mail_template_trial_activated" model="mail.template">
+            <field name="name">WB: Trial aktiviert</field>
+            <field name="model_id" ref="model_wb_license_key"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">[WISSEN BERATUNG] Ihr Trial für {{ object.product_id.name }} ist aktiv</field>
+            <field name="email_from">{{ object.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.partner_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                    <p>Guten Tag <t t-out="object.partner_id.name or ''"/>,</p>
+                    <p>Ihr 7-Tage-Trial für <strong t-out="object.product_id.name"/> ist aktiv.</p>
+                    <p>Lizenzschlüssel: <code t-out="object.name"/></p>
+                    <p>Trial-Ende: <strong t-out="object.valid_to"/></p>
+                    <p>
+                        Geben Sie den Schlüssel in Ihrer Odoo-Instanz unter
+                        Einstellungen → WB Lizenzen ein. Trial-Keys brauchen keinen
+                        separaten Aktivierungs-Code.
+                    </p>
+                    <p>Bei Fragen: support@wissen-beratung.de</p>
+                    <p>Viele Grüße<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <record id="mail_template_trial_ending_soon" model="mail.template">
+            <field name="name">WB: Trial endet in 2 Tagen</field>
+            <field name="model_id" ref="model_wb_license_key"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">[WISSEN BERATUNG] Ihr Trial für {{ object.product_id.name }} endet bald</field>
+            <field name="email_from">{{ object.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.partner_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                    <p>Guten Tag <t t-out="object.partner_id.name or ''"/>,</p>
+                    <p>Ihr Trial endet am <strong t-out="object.valid_to"/>.</p>
+                    <p>
+                        Wenn Sie das Modul auch danach nutzen möchten, können Sie den Trial
+                        direkt in einen Jahres-Abo umwandeln. Ein kurzer Reply genügt.
+                    </p>
+                    <p>Viele Grüße<br/>Tobias Wissen<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <record id="mail_template_trial_expired" model="mail.template">
+            <field name="name">WB: Trial abgelaufen</field>
+            <field name="model_id" ref="model_wb_license_key"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">[WISSEN BERATUNG] Ihr Trial ist abgelaufen — wie geht es weiter?</field>
+            <field name="email_from">{{ object.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.partner_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                    <p>Guten Tag <t t-out="object.partner_id.name or ''"/>,</p>
+                    <p>Ihr Trial für <t t-out="object.product_id.name"/> ist abgelaufen.</p>
+                    <p>
+                        Falls das Modul für Sie passt, melden Sie sich gerne — wir richten
+                        Ihnen einen regulären Lizenzschlüssel ein.
+                    </p>
+                    <p>support@wissen-beratung.de</p>
+                    <p>Viele Grüße<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <!-- =============================================== -->
+        <!-- Renewal-Flow                                    -->
+        <!-- =============================================== -->
+
+        <record id="mail_template_renewal_reminder_60d" model="mail.template">
+            <field name="name">WB: Renewal-Reminder 60 Tage</field>
+            <field name="model_id" ref="model_wb_license_key"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">[WISSEN BERATUNG] Lizenz-Verlängerung {{ object.product_id.name }} (60 Tage)</field>
+            <field name="email_from">{{ object.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.partner_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                    <p>Guten Tag <t t-out="object.partner_id.name or ''"/>,</p>
+                    <p>
+                        kurze Info: Ihre Lizenz für <t t-out="object.product_id.name"/>
+                        läuft am <strong t-out="object.valid_to"/> aus.
+                    </p>
+                    <p>
+                        Im Dezember senden wir Ihnen automatisch die Renewal-Rechnung
+                        für das Folgejahr. Wenn Sie nicht verlängern möchten, antworten
+                        Sie einfach auf diese Mail.
+                    </p>
+                    <p>Viele Grüße<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <record id="mail_template_renewal_reminder_30d" model="mail.template">
+            <field name="name">WB: Renewal-Reminder 30 Tage</field>
+            <field name="model_id" ref="model_wb_license_key"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">[WISSEN BERATUNG] Lizenz {{ object.product_id.name }} läuft bald aus</field>
+            <field name="email_from">{{ object.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.partner_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                    <p>Guten Tag <t t-out="object.partner_id.name or ''"/>,</p>
+                    <p>
+                        Ihre Lizenz <t t-out="object.product_id.name"/> läuft in 30 Tagen
+                        ab (<t t-out="object.valid_to"/>).
+                    </p>
+                    <p>
+                        Die Renewal-Rechnung wird im Dezember automatisch erstellt.
+                        Bitte sorgen Sie für rechtzeitige Begleichung — bei überfälliger
+                        Rechnung wird die Lizenz nach Ablauf der Mahnstufen gesperrt.
+                    </p>
+                    <p>Viele Grüße<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <!-- =============================================== -->
+        <!-- Grace / Expired                                 -->
+        <!-- =============================================== -->
+
+        <record id="mail_template_grace_started" model="mail.template">
+            <field name="name">WB: Grace-Period gestartet</field>
+            <field name="model_id" ref="model_wb_license_key"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">[WISSEN BERATUNG] Wichtig: Lizenz {{ object.product_id.name }} wird in Kürze deaktiviert</field>
+            <field name="email_from">{{ object.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.partner_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                    <p>Guten Tag <t t-out="object.partner_id.name or ''"/>,</p>
+                    <p>
+                        eine offene Rechnung führt dazu, dass Ihre Lizenz
+                        <code t-out="object.name"/> in der Grace-Period ist.
+                    </p>
+                    <p>
+                        Bitte begleichen Sie die offene Forderung bis zum
+                        <strong t-out="object.grace_until"/>.
+                        Andernfalls wird die Lizenz danach automatisch gesperrt
+                        und Feature-kritische Funktionen sind nicht mehr verfügbar.
+                    </p>
+                    <p>support@wissen-beratung.de</p>
+                    <p>Viele Grüße<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <record id="mail_template_license_expired" model="mail.template">
+            <field name="name">WB: Lizenz abgelaufen</field>
+            <field name="model_id" ref="model_wb_license_key"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">[WISSEN BERATUNG] Ihre Lizenz {{ object.product_id.name }} ist abgelaufen</field>
+            <field name="email_from">{{ object.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.partner_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                    <p>Guten Tag <t t-out="object.partner_id.name or ''"/>,</p>
+                    <p>Ihre Lizenz <code t-out="object.name"/> ist abgelaufen.</p>
+                    <p>
+                        Feature-kritische Funktionen sind ab sofort gesperrt.
+                        Bestehende Daten bleiben lesbar.
+                    </p>
+                    <p>
+                        Möchten Sie die Lizenz reaktivieren? Bitte melden Sie sich:
+                        support@wissen-beratung.de
+                    </p>
+                    <p>Viele Grüße<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <record id="mail_template_license_revoked" model="mail.template">
+            <field name="name">WB: Lizenz gesperrt</field>
+            <field name="model_id" ref="model_wb_license_key"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">[WISSEN BERATUNG] Ihre Lizenz {{ object.product_id.name }} wurde gesperrt</field>
+            <field name="email_from">{{ object.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.partner_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                    <p>Guten Tag <t t-out="object.partner_id.name or ''"/>,</p>
+                    <p>Ihre Lizenz <code t-out="object.name"/> wurde gesperrt.</p>
+                    <p>Bei Fragen melden Sie sich bitte zeitnah: support@wissen-beratung.de</p>
+                    <p>Viele Grüße<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <!-- =============================================== -->
+        <!-- Migration                                       -->
+        <!-- =============================================== -->
+
+        <record id="mail_template_migration_requested" model="mail.template">
+            <field name="name">WB: Migration eingereicht (Bestätigung)</field>
+            <field name="model_id" ref="model_wb_license_migration_request"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">[WISSEN BERATUNG] Migrations-Antrag {{ object.name }} eingegangen</field>
+            <field name="email_from">{{ user.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.contact_email or object.partner_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                    <p>Guten Tag <t t-out="object.partner_id.name or ''"/>,</p>
+                    <p>
+                        Ihr Antrag <strong t-out="object.name"/> auf Lizenz-Umzug ist eingegangen
+                        und wird in 1–2 Werktagen bearbeitet.
+                    </p>
+                    <p>Sie erhalten eine separate E-Mail sobald die Entscheidung vorliegt.</p>
+                    <p>Viele Grüße<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <record id="mail_template_migration_approved" model="mail.template">
+            <field name="name">WB: Migration genehmigt</field>
+            <field name="model_id" ref="model_wb_license_migration_request"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">[WISSEN BERATUNG] Migration {{ object.name }} genehmigt</field>
+            <field name="email_from">{{ user.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.contact_email or object.partner_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                    <p>Guten Tag <t t-out="object.partner_id.name or ''"/>,</p>
+                    <p>Der Umzug Ihrer Lizenz auf <strong t-out="object.new_domain"/> wurde genehmigt.</p>
+                    <p>
+                        Beim nächsten Ping aus der neuen Instanz wird der Status auf 'aktiv' wechseln.
+                        Ein aktualisiertes Zertifikat erhalten Sie im Anhang.
+                    </p>
+                    <p>Viele Grüße<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+        <record id="mail_template_migration_rejected" model="mail.template">
+            <field name="name">WB: Migration abgelehnt</field>
+            <field name="model_id" ref="model_wb_license_migration_request"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">[WISSEN BERATUNG] Migration {{ object.name }} abgelehnt</field>
+            <field name="email_from">{{ user.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.contact_email or object.partner_id.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222;">
+                    <p>Guten Tag <t t-out="object.partner_id.name or ''"/>,</p>
+                    <p>Ihr Migrations-Antrag <strong t-out="object.name"/> wurde abgelehnt.</p>
+                    <p t-if="object.review_note"><strong>Begründung:</strong> <t t-out="object.review_note"/></p>
+                    <p>Bei Rückfragen: support@wissen-beratung.de</p>
+                    <p>Viele Grüße<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

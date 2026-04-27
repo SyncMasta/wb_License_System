@@ -153,7 +153,12 @@ class WbActivationTicket(models.Model):
         )
 
     def send_otp(self, ip):
-        """Generiert neuen OTP, hasht ihn, versendet per Email."""
+        """Generiert neuen OTP, hasht ihn, versendet per Email-Template.
+
+        Der OTP-Klartext wird via Context an das Template gegeben — er
+        landet damit kurzfristig im mail.mail Body, aber NICHT im DB-Feld
+        (nur der Hash).
+        """
         self.ensure_one()
         self._check_alive()
         if self.bound_ip and self.bound_ip != ip:
@@ -167,6 +172,18 @@ class WbActivationTicket(models.Model):
             'otp_valid_until': fields.Datetime.now() + timedelta(minutes=OTP_TTL_MINUTES),
             'otp_attempts': 0,
         })
+        template = self.env.ref(
+            'wb_subscription.mail_template_activation_otp',
+            raise_if_not_found=False,
+        )
+        if template:
+            try:
+                template.with_context(otp_plain=otp).send_mail(
+                    self.id, force_send=True,
+                )
+            except Exception as e:
+                _logger.exception(
+                    "[wb_subscription] OTP-Mail-Versand fehlgeschlagen: %s", e)
         self.env['wb.license.event'].log_event(
             self.license_id, 'otp_sent',
             ip_address=ip,

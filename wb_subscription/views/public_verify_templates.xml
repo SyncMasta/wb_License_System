@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="public_verify_landing" name="Public Verify Landing (mit reCAPTCHA)">
+        <t t-call="wb_subscription.portal_layout_minimal">
+            <h1>Lizenz-Verifikation</h1>
+            <p>
+                Wir prüfen den Lizenzschlüssel <code t-out="key"/>.
+            </p>
+            <div id="wb_verify_loading" class="wb_portal_meta">
+                Bitte warten — Verifikation läuft …
+            </div>
+            <div id="wb_verify_result" style="display:none"/>
+            <div id="wb_verify_error" class="wb_portal_error" style="display:none"/>
+
+            <script t-att-src="'https://www.google.com/recaptcha/api.js?render=' + recaptcha_site_key"/>
+
+            <script>
+                (function() {
+                    var siteKey = "<t t-out="recaptcha_site_key"/>";
+                    var key = "<t t-out="key"/>";
+
+                    function showError(msg) {
+                        document.getElementById('wb_verify_loading').style.display = 'none';
+                        var err = document.getElementById('wb_verify_error');
+                        err.textContent = msg;
+                        err.style.display = '';
+                    }
+
+                    function showResult(data) {
+                        document.getElementById('wb_verify_loading').style.display = 'none';
+                        var box = document.getElementById('wb_verify_result');
+                        var validBadge = data.is_valid
+                            ? '<span style="color:#27ae60;font-weight:bold">✓ Gültig</span>'
+                            : '<span style="color:#c0392b;font-weight:bold">✗ Nicht gültig</span>';
+                        box.innerHTML = ''
+                            + '&lt;p&gt;Status: ' + validBadge + ' (' + (data.state_label || data.state) + ')&lt;/p&gt;'
+                            + '&lt;p&gt;Produkt: &lt;strong&gt;' + (data.product_name || '-') + '&lt;/strong&gt;&lt;/p&gt;'
+                            + '&lt;p&gt;Lizenznehmer: ' + (data.partner_anonymous || '-') + '&lt;/p&gt;'
+                            + '&lt;p&gt;Laufzeit: ' + (data.valid_from || '-') + ' bis ' + (data.valid_to || '-') + '&lt;/p&gt;'
+                            + (data.certificate_number ? '&lt;p class="wb_portal_meta"&gt;Zertifikat-Nr: ' + data.certificate_number + '&lt;/p&gt;' : '');
+                        box.style.display = '';
+                    }
+
+                    function runVerify() {
+                        grecaptcha.ready(function() {
+                            grecaptcha.execute(siteKey, {action: 'license_verify'}).then(function(token) {
+                                fetch('/license/verify/' + encodeURIComponent(key) + '/check', {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/json'},
+                                    body: JSON.stringify({jsonrpc: '2.0', params: {recaptcha_token: token}}),
+                                })
+                                .then(function(r) { return r.json(); })
+                                .then(function(payload) {
+                                    var result = payload.result || {};
+                                    if (result.error === 'CAPTCHA_FAILED') {
+                                        showError('Verifikation fehlgeschlagen — bitte Seite neu laden.');
+                                    } else if (result.error === 'TOO_MANY_REQUESTS') {
+                                        showError('Zu viele Anfragen. Bitte später erneut versuchen.');
+                                    } else if (result.error === 'KEY_NOT_FOUND') {
+                                        showError('Lizenzschlüssel nicht bekannt.');
+                                    } else if (result.status === 'ok') {
+                                        showResult(result.data);
+                                    } else {
+                                        showError('Unbekannter Fehler.');
+                                    }
+                                })
+                                .catch(function() {
+                                    showError('Server-Fehler — bitte später erneut versuchen.');
+                                });
+                            });
+                        });
+                    }
+
+                    if (window.grecaptcha) {
+                        runVerify();
+                    } else {
+                        var checkInterval = setInterval(function() {
+                            if (window.grecaptcha) {
+                                clearInterval(checkInterval);
+                                runVerify();
+                            }
+                        }, 100);
+                    }
+                })();
+            </script>
+        </t>
+    </template>
+
+    <template id="public_verify_result" name="Public Verify Result (Direct, ohne Captcha)">
+        <t t-call="wb_subscription.portal_layout_minimal">
+            <h1>Lizenz-Verifikation</h1>
+            <p>Lizenzschlüssel: <code t-out="key"/></p>
+            <p t-if="is_valid">
+                Status:
+                <span style="color:#27ae60;font-weight:bold">✓ Gültig</span>
+                (<t t-out="state_label"/>)
+            </p>
+            <p t-else="">
+                Status:
+                <span style="color:#c0392b;font-weight:bold">✗ Nicht gültig</span>
+                (<t t-out="state_label"/>)
+            </p>
+            <p>Produkt: <strong t-out="product_name"/></p>
+            <p>Lizenznehmer: <t t-out="partner_anonymous"/></p>
+            <p>
+                Laufzeit:
+                <t t-out="valid_from or '-'"/> bis
+                <t t-out="valid_to or '-'"/>
+            </p>
+            <p t-if="certificate_number" class="wb_portal_meta">
+                Zertifikat-Nr: <t t-out="certificate_number"/>
+            </p>
+        </t>
+    </template>
+
+    <template id="public_verify_not_found" name="Public Verify Not Found">
+        <t t-call="wb_subscription.portal_layout_minimal">
+            <h1>Lizenz nicht gefunden</h1>
+            <div class="wb_portal_error">
+                Der Lizenzschlüssel <code t-out="key"/> ist uns nicht bekannt.
+            </div>
+            <p>
+                Wenn Sie diesen Schlüssel von einer Lieferantenrechnung oder einem
+                Zertifikat haben, prüfen Sie bitte die Schreibweise (Bindestriche,
+                Groß-/Kleinschreibung). Bei Fragen: support@wissen-beratung.de
+            </p>
+        </t>
+    </template>
+
+    <template id="public_verify_rate_limited" name="Public Verify Rate Limited">
+        <t t-call="wb_subscription.portal_layout_minimal">
+            <h1>Zu viele Anfragen</h1>
+            <div class="wb_portal_warn">
+                Sie haben in der letzten Stunde zu viele Verifikations-Anfragen gestellt.
+                Bitte warten Sie etwa eine Stunde und versuchen es erneut.
+            </div>
+        </t>
+    </template>
+
+</odoo>

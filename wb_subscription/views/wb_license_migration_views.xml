@@ -29,6 +29,9 @@
                     <button name="action_reject" type="object" string="Ablehnen"
                             invisible="state != 'pending'"
                             confirm="Migration ablehnen? Der Kunde bekommt eine Benachrichtigung."/>
+                    <button name="action_cancel" type="object" string="Stornieren"
+                            invisible="state != 'pending'"
+                            confirm="Antrag stornieren ohne Rückmeldung an Kunde?"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="pending,approved,completed"/>
                 </header>

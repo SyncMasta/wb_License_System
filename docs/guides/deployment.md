@@ -458,3 +458,162 @@ oder in ENV-Variablen via `systemd`-Service-File.
 Für Notfälle: aktuelles DB-Backup + Modul-Backup immer aktuell halten.
 Mit einem Full-Backup kann man s02 binnen 30 Minuten auf einem
 neuen Server wieder hochziehen.
+
+---
+
+## Erst-Installation der Lizenz-Plattform (wb_subscription + wb_license_client)
+
+Schritt-für-Schritt für s02 nach Sprint 1–8.
+
+### 1. Python-Dependencies installieren (einmalig)
+
+```bash
+ssh root@s02
+sudo -u odoo19 /opt/odoo19/venv/bin/pip install bcrypt cryptography
+```
+
+### 2. Beide Module hochladen
+
+Vom Workspace aus:
+
+```bash
+cd "Odoo Addons/wb_License_System"
+tar -czf /tmp/wb_subscription.tar.gz wb_subscription/
+tar -czf /tmp/wb_license_client.tar.gz wb_license_client/
+scp /tmp/wb_subscription.tar.gz /tmp/wb_license_client.tar.gz root@s02:/tmp/
+```
+
+### 3. Auf s02 entpacken + installieren
+
+```bash
+ssh root@s02
+cd /opt/odoo19/custom_addons/
+tar -xzf /tmp/wb_subscription.tar.gz
+tar -xzf /tmp/wb_license_client.tar.gz
+chown -R odoo19:odoo19 wb_subscription/ wb_license_client/
+find wb_subscription wb_license_client -name __pycache__ -exec rm -rf {} +
+
+systemctl stop odoo19
+sudo -u odoo19 /opt/odoo19/venv/bin/python3.12 /opt/odoo19/odoo-bin \
+  -c /etc/odoo19.conf -i wb_subscription,wb_license_client \
+  -d Main --stop-after-init
+systemctl start odoo19
+```
+
+Beim ersten Start generiert `wb_subscription` automatisch einen Fernet-Key
+und legt ihn unter `ir.config_parameter` `wb_subscription.fernet_key` ab.
+
+### 4. System-Parameter konfigurieren
+
+In Odoo: **Settings → Technical → Parameters → System Parameters**.
+
+| Parameter | Wert | Pflicht |
+|---|---|---|
+| `wb_subscription.fernet_key` | (auto-generiert beim Install) | ✅ |
+| `wb_subscription.recaptcha_site_key` | von google.com/recaptcha (v3) | für Public-Verify |
+| `wb_subscription.recaptcha_secret_key` | von google.com/recaptcha (v3) | für Public-Verify |
+| `wb_subscription.webshop_api_key` | langer Random-String, in Webseite einbauen | für Order-Endpoint |
+| `wb_subscription.telegram_token` | aus BotFather | für Tobias-Alerts |
+| `wb_subscription.telegram_chat_id` | Tobias' Chat-ID | für Tobias-Alerts |
+
+Optional Rate-Limit-Overrides:
+
+| Parameter | Default | Format |
+|---|---|---|
+| `wb_subscription.rate_limit_check` | 100/3600 | `<max>/<seconds>` |
+| `wb_subscription.rate_limit_activate` | 5/3600 | wie oben |
+| `wb_subscription.rate_limit_trial` | 1/86400 | wie oben |
+
+### 5. Fernet-Key in ENV verschieben (empfohlen)
+
+Default landet der Fernet-Key in der DB — ENV-Variante ist besser
+geschützt vor DB-Leak.
+
+```bash
+# 1. Aktuellen Key auslesen (in Odoo: Settings → System Parameters)
+#    Den Wert von wb_subscription.fernet_key kopieren
+
+# 2. systemd-Service erweitern
+sudo systemctl edit odoo19
+# Füge ein:
+# [Service]
+# Environment="WB_SUBSCRIPTION_FERNET_KEY=<kopierter_key>"
+
+sudo systemctl daemon-reload
+sudo systemctl restart odoo19
+
+# 3. In Odoo: System Parameter wb_subscription.fernet_key löschen
+#    (ENV wird ab jetzt bevorzugt geladen)
+```
+
+### 6. Erstes Lizenz-Produkt anlegen
+
+In Odoo: **WB Lizenzen → Lizenz-Produkte → Erstellen**
+
+| Feld | Beispiel |
+|---|---|
+| Name | Telnyx-Integration |
+| Verkaufspreis | 199.00 € |
+| Tab "WB Lizenz" → Ist Lizenz-Produkt | ✓ |
+| Technischer Code | `TELE` |
+| Odoo-Modul-Name | `wb_telnyx_voip` |
+| Erlaubte Instanzen | 1 |
+| Trial-Tage | 7 |
+| Activation-Frist | 90 |
+
+### 7. Smoke-Test
+
+1. **Lizenz manuell anlegen:**
+   WB Lizenzen → Lizenzen → Neu mit `state=issued`,
+   beliebigem Partner, Lizenz-Produkt aus Schritt 6.
+   System generiert Public Key automatisch.
+
+2. **Activation-Code generieren:**
+   Auf der Lizenz-Form: Field `activation_hash` ist gefüllt.
+   Über Python-Shell den Code generieren (für Test):
+   ```python
+   gen = env['wb.key.generator']
+   code = gen.generate_activation_code()
+   license = env['wb.license.key'].browse(LICENSE_ID)
+   license.activation_hash = gen.hash_activation_code(code)
+   ticket = env['wb.activation.ticket'].create({
+       'license_id': license.id,
+       'email': license.partner_id.email,
+       'encrypted_code': gen.encrypt_code(code),
+   })
+   print('Code:', code, 'Ticket:', ticket.name)
+   ```
+
+3. **Portal-Flow durchspielen:**
+   `https://wissen-beratung.de/activate/<ticket>` aufrufen,
+   OTP anfordern, OTP eingeben, Code wird angezeigt.
+
+4. **Public-Verify testen:**
+   `https://wissen-beratung.de/license/verify/<key>` —
+   sollte mit reCAPTCHA-Challenge laden, dann Lizenz-Daten zeigen.
+
+5. **Tests laufen lassen:**
+   ```bash
+   sudo -u odoo19 /opt/odoo19/venv/bin/python3.12 /opt/odoo19/odoo-bin \
+     -c /etc/odoo19.conf -d Main \
+     --test-tags wb_subscription --stop-after-init
+   ```
+
+### 8. Cron-Status prüfen
+
+In Odoo: **Settings → Technical → Scheduled Actions** —
+es sollten 9 WB-Crons aktiv sein:
+
+- WB Subscription: License State Update
+- WB Subscription: Activation Reminders
+- WB Subscription: Renewal Reminders
+- WB Subscription: Trial Reminders
+- WB Subscription: Ticket Cleanup
+- WB Subscription: Rate-Limit Cleanup
+- WB Subscription: Daily Telegram-Summary
+- WB Subscription: Dezember-Renewal-Invoices
+- WB License Client: Daily Ping
+
+### 9. Dashboard öffnen
+
+WB Lizenzen → Dashboard — sollte 0 Lizenzen, 0,00 € MRR zeigen.

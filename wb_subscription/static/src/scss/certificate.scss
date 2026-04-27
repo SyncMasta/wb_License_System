@@ -1,0 +1,322 @@
+// Lizenzzertifikat — Print-Layout
+// Design-Prinzipien (siehe ARCHITECTURE.md 7.1):
+// - Weißer Hintergrund durchgängig
+// - Navy #1D3C6E nur für Überschriften und Trennlinien
+// - Cyan #00C8E8 nur als sparsamer Akzent (Key-Box-Rahmen)
+// - 1 Seite, klares Layout, viel Weißraum
+
+$wb-navy: #1D3C6E;
+$wb-blue: #1A8BC4;
+$wb-cyan: #00C8E8;
+$wb-text: #222222;
+$wb-text-muted: #888888;
+
+.wb_cert_page {
+    background: #ffffff;
+    color: $wb-text;
+    font-family: Georgia, "Times New Roman", serif;
+    padding: 30mm 20mm 20mm 20mm;
+    min-height: 257mm;
+    display: flex;
+    flex-direction: column;
+}
+
+.wb_cert_header {
+    text-align: center;
+    margin-bottom: 20mm;
+}
+
+.wb_cert_company {
+    font-size: 11pt;
+    color: $wb-text-muted;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8mm;
+}
+
+.wb_cert_title {
+    font-size: 22pt;
+    font-weight: bold;
+    color: $wb-navy;
+    margin: 0 0 6mm 0;
+    letter-spacing: 1px;
+}
+
+.wb_cert_meta {
+    font-size: 10pt;
+    color: $wb-text-muted;
+
+    &_item {
+        margin: 0 8mm;
+    }
+
+    &_label {
+        color: $wb-navy;
+        font-weight: bold;
+        margin-right: 4px;
+    }
+}
+
+.wb_cert_section {
+    margin-bottom: 15mm;
+
+    &_title {
+        font-size: 14pt;
+        color: $wb-navy;
+        margin: 0 0 4mm 0;
+        padding-bottom: 2mm;
+        border-bottom: 1px solid $wb-navy;
+        letter-spacing: 0.5px;
+    }
+}
+
+.wb_cert_partner {
+    font-size: 12pt;
+    line-height: 1.6;
+
+    &_name {
+        font-weight: bold;
+        font-size: 13pt;
+        margin-bottom: 2mm;
+    }
+
+    &_meta {
+        color: $wb-text-muted;
+        font-size: 10pt;
+        margin-top: 2mm;
+    }
+}
+
+.wb_cert_dl {
+    display: grid;
+    grid-template-columns: 50mm 1fr;
+    gap: 3mm 6mm;
+    font-size: 11pt;
+
+    dt {
+        color: $wb-text-muted;
+        font-weight: normal;
+    }
+
+    dd {
+        margin: 0;
+        color: $wb-text;
+        font-weight: normal;
+    }
+}
+
+.wb_cert_key_section {
+    margin: 15mm 0;
+    text-align: center;
+}
+
+.wb_cert_key_label {
+    font-size: 10pt;
+    color: $wb-text-muted;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4mm;
+}
+
+.wb_cert_key_box {
+    display: inline-block;
+    padding: 8mm 14mm;
+    border: 2px solid $wb-cyan;
+    border-radius: 2mm;
+    background: #ffffff;
+
+    code {
+        font-family: "Courier New", Courier, monospace;
+        font-size: 18pt;
+        font-weight: bold;
+        letter-spacing: 2px;
+        color: $wb-navy;
+        background: none;
+    }
+}
+
+.wb_cert_key_note {
+    font-size: 9pt;
+    color: $wb-text-muted;
+    max-width: 120mm;
+    margin: 5mm auto 0 auto;
+    line-height: 1.5;
+    font-style: italic;
+}
+
+.wb_cert_verify {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 10mm;
+
+    &_label {
+        font-size: 9pt;
+        color: $wb-text-muted;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+
+    &_url {
+        font-family: "Courier New", Courier, monospace;
+        font-size: 9pt;
+        color: $wb-text;
+        margin-top: 1mm;
+        word-break: break-all;
+    }
+}
+
+.wb_cert_qr {
+    img {
+        width: 30mm;
+        height: 30mm;
+    }
+}
+
+.wb_cert_footer {
+    margin-top: 10mm;
+
+    &_line {
+        height: 0.5pt;
+        background: $wb-navy;
+        margin-bottom: 3mm;
+    }
+
+    &_text {
+        font-size: 8pt;
+        color: $wb-text-muted;
+        text-align: center;
+    }
+}
+
+
+// EULA — separates Layout, nüchterner als das Zertifikat
+// (keine farbigen Akzente, nur Lesbarkeit)
+
+.wb_eula_page {
+    background: #ffffff;
+    color: $wb-text;
+    font-family: Georgia, "Times New Roman", serif;
+    padding: 20mm 25mm;
+    font-size: 10pt;
+    line-height: 1.55;
+}
+
+.wb_eula_header {
+    text-align: center;
+    margin-bottom: 12mm;
+    padding-bottom: 6mm;
+    border-bottom: 1px solid $wb-navy;
+}
+
+.wb_eula_title {
+    font-size: 18pt;
+    color: $wb-navy;
+    margin: 0 0 3mm 0;
+}
+
+.wb_eula_subtitle {
+    font-size: 12pt;
+    color: $wb-text-muted;
+    margin-bottom: 5mm;
+}
+
+.wb_eula_meta {
+    font-size: 9pt;
+    color: $wb-text-muted;
+    font-family: "Courier New", Courier, monospace;
+
+    code {
+        background: none;
+        color: $wb-text;
+        font-weight: bold;
+    }
+
+    &_sep {
+        margin: 0 6px;
+    }
+}
+
+.wb_eula_body {
+    h1, h2, h3, h4 {
+        color: $wb-navy;
+        margin-top: 6mm;
+    }
+
+    h2 {
+        font-size: 13pt;
+        border-bottom: 0.5pt solid $wb-navy;
+        padding-bottom: 1mm;
+    }
+
+    h3 {
+        font-size: 11pt;
+    }
+
+    p {
+        margin: 0 0 3mm 0;
+        text-align: justify;
+    }
+
+    ul, ol {
+        margin: 3mm 0;
+        padding-left: 8mm;
+    }
+
+    li {
+        margin-bottom: 2mm;
+    }
+
+    .alert {
+        border: 1px solid #e0c068;
+        background: #fdf5d9;
+        padding: 4mm 6mm;
+        border-radius: 1mm;
+        margin: 4mm 0;
+    }
+}
+
+.wb_eula_footer {
+    margin-top: 15mm;
+    page-break-inside: avoid;
+
+    &_line {
+        height: 0.5pt;
+        background: $wb-navy;
+        margin-bottom: 2mm;
+    }
+
+    &_text {
+        font-size: 8pt;
+        color: $wb-text-muted;
+        text-align: center;
+    }
+}
+
+
+// Rechnungs-Erweiterung: Lizenz-Details pro Rechnungs-Zeile
+
+.wb_invoice_license_details {
+    margin-top: 2mm;
+    padding: 2mm 4mm;
+    background: #f8f9fa;
+    border-left: 2px solid $wb-cyan;
+    font-size: 9pt;
+    color: $wb-text;
+
+    &_label {
+        color: $wb-text-muted;
+        margin-right: 2mm;
+    }
+
+    &_key {
+        font-family: "Courier New", Courier, monospace;
+        font-weight: bold;
+    }
+
+    &_item {
+        display: inline-block;
+        margin-right: 6mm;
+    }
+}

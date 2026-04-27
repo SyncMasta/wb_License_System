@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="action_report_license_eula" model="ir.actions.report">
+        <field name="name">EULA</field>
+        <field name="model">wb.license.key</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">wb_subscription.report_license_eula_document</field>
+        <field name="report_file">wb_subscription.report_license_eula_document</field>
+        <field name="paperformat_id" ref="paperformat_wb_certificate"/>
+        <field name="print_report_name">('EULA_' + object.product_id.wb_technical_code + '_' + object.name)</field>
+    </record>
+
+</odoo>

@@ -13,6 +13,12 @@
                     <field name="wb_active_license_count" widget="statinfo"
                            string="Aktive Lizenzen"/>
                 </button>
+                <button name="action_view_wb_migrations" type="object"
+                        class="oe_stat_button" icon="fa-exchange"
+                        invisible="wb_migration_count == 0">
+                    <field name="wb_pending_migration_count" widget="statinfo"
+                           string="Pending Migrations"/>
+                </button>
             </div>
         </field>
     </record>

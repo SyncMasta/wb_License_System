@@ -1,4 +1,5 @@
 from . import wb_key_generator
+from . import wb_telegram_notifier
 from . import wb_license_tag
 from . import wb_rate_limit_entry
 from . import wb_license_event
@@ -9,4 +10,7 @@ from . import wb_license_trial
 from . import wb_notification_log
 from . import product_template
 from . import sale_subscription
+from . import sale_order
 from . import res_partner
+from . import account_move
+from . import wb_dashboard

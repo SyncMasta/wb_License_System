@@ -19,6 +19,14 @@ class ResPartner(models.Model):
         compute='_compute_wb_license_count',
         string='Aktive Lizenzen',
     )
+    wb_migration_count = fields.Integer(
+        compute='_compute_wb_migration_count',
+        string='Anzahl Migrationen',
+    )
+    wb_pending_migration_count = fields.Integer(
+        compute='_compute_wb_migration_count',
+        string='Pending Migrationen',
+    )
 
     @api.depends('wb_license_key_ids.state')
     def _compute_wb_license_count(self):
@@ -26,6 +34,15 @@ class ResPartner(models.Model):
             partner.wb_license_count = len(partner.wb_license_key_ids)
             partner.wb_active_license_count = len(
                 partner.wb_license_key_ids.filtered(lambda l: l.state == 'active')
+            )
+
+    def _compute_wb_migration_count(self):
+        Migration = self.env['wb.license.migration.request']
+        for partner in self:
+            migrations = Migration.search([('partner_id', '=', partner.id)])
+            partner.wb_migration_count = len(migrations)
+            partner.wb_pending_migration_count = len(
+                migrations.filtered(lambda m: m.state == 'pending')
             )
 
     def action_view_wb_licenses(self):
@@ -38,4 +55,15 @@ class ResPartner(models.Model):
             'view_mode': 'list,form',
             'domain': [('partner_id', '=', self.id)],
             'context': {'default_partner_id': self.id},
+        }
+
+    def action_view_wb_migrations(self):
+        """Smart-Button-Action: öffnet Migrations-Liste für diesen Partner."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': f"Migrationen von {self.name}",
+            'res_model': 'wb.license.migration.request',
+            'view_mode': 'list,form',
+            'domain': [('partner_id', '=', self.id)],
         }

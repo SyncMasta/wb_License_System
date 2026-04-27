@@ -14,3 +14,5 @@ access_wb_license_trial_request_manager,wb.license.trial.request manager,model_w
 access_wb_notification_log_user,wb.notification.log user,model_wb_notification_log,group_wb_subscription_user,1,0,0,0
 access_wb_notification_log_manager,wb.notification.log manager,model_wb_notification_log,group_wb_subscription_manager,1,1,1,0
 access_wb_rate_limit_entry_manager,wb.rate.limit.entry manager,model_wb_rate_limit_entry,group_wb_subscription_manager,1,1,1,1
+access_wb_dashboard_user,wb.dashboard user,model_wb_dashboard,group_wb_subscription_user,1,1,1,1
+access_wb_dashboard_manager,wb.dashboard manager,model_wb_dashboard,group_wb_subscription_manager,1,1,1,1

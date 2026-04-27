@@ -2,34 +2,64 @@
 WB Subscription & License Platform
 =======================================
 
-:Status: Sprint 1 (v19.0.1.0.0) — Core-Grundlage, nicht für Produktion
+:Status: Sprint 1–8 abgeschlossen (v19.0.1.0.0) — Funktional komplett, vor Produktion smoke-testen
 :License: OPL-1
 :Author: WISSEN BERATUNG (Tobias Wissen)
 
 Produkt-agnostisches Vertriebs-Backend für WISSEN BERATUNG Odoo-Module.
 
-Was Sprint 1 liefert
-=====================
+Funktionsumfang (Sprint 1–8)
+=============================
 
-* Datenmodelle: ``wb.license.key``, ``wb.license.event``, ``wb.license.tag``,
-  ``wb.activation.ticket``, ``wb.license.migration.request``,
-  ``wb.license.trial.request``, ``wb.notification.log``, ``wb.rate.limit.entry``
-* Kryptographie-Helfer: ``wb.key.generator`` (Key, Code, bcrypt, Fernet, Ticket, OTP, Fingerprint)
-* Erweiterungen auf ``product.template``, ``sale.subscription``, ``res.partner``
-* Admin-UI: Listen, Form, Menu, Smart-Button auf Partner
-* Security: Gruppen ``user`` + ``manager``, Record-Rules, ACL
-* Tests: ``test_key_generator.py``
+**Datenmodelle**
+  ``wb.license.key`` (State-Machine mit 7 States), ``wb.license.event`` (Audit-Log),
+  ``wb.license.tag``, ``wb.activation.ticket`` (Fernet-encrypted, IP-binding),
+  ``wb.license.migration.request`` (Approve/Reject/Cancel), ``wb.license.trial.request``,
+  ``wb.notification.log``, ``wb.rate.limit.entry``, ``wb.dashboard``
 
-Was **noch NICHT** drin ist (kommt in späteren Sprints)
-========================================================
+**Kryptographie**
+  bcrypt für Activation-Codes (12 Runden), Fernet für Ticket-Code-Storage,
+  SHA256-Fingerprint für Instanz-Bindung, Auto-Generate Fernet-Key beim Install
 
-* HTTP-Controllers (``/api/license/check``, ``/api/license/activate``, Portal-Routes)
-* Mail-Templates + Cron-Jobs (Sprint 4)
-* PDF-Reports: Zertifikat, EULA, Rechnungs-Erweiterung (Sprint 3)
-* Trial-Form-Controller + reCAPTCHA (Sprint 5)
-* Admin-Dashboard mit MRR/ARR (Sprint 6)
-* Public-Verify-Page (Sprint 7)
-* Migration-Wizard-UI im Client-Modul (Sprint 8)
+**HTTP-API**
+  ``/api/license/check|activate|migrate`` (CORS *), ``/api/license/trial``,
+  ``/api/wb_subscription/order`` (X-API-Key, CORS *.wissen-beratung.de),
+  Portal-Routes ``/activate/<token>`` mit Email-OTP, Public-Verify-Page mit reCAPTCHA v3
+
+**Notifications**
+  16 Mail-Templates (Activation, Trial, Renewal, Grace, Expired, Migration, Revoke),
+  Telegram-Daily-Summary, lokaler Telegram-Notifier (standalone, kein Coupling
+  an wb_odoo_automations)
+
+**PDF-Reports**
+  Lizenzzertifikat (weißer Hintergrund, Navy/Cyan-Akzente, QR-Code), EULA-Wrapper,
+  Rechnungs-Erweiterung pro Lizenz-Zeile
+
+**Crons**
+  License-State-Update (täglich), Activation-Reminders (7d/30d), Renewal-Reminders
+  (60d/30d), Ticket-Cleanup, Rate-Limit-Cleanup, Daily-Telegram-Summary,
+  Dezember-Renewal-Invoice-Generator (Drafts mit Idempotenz)
+
+**Admin-UI**
+  Dashboard mit MRR/ARR/14 KPIs, Pivot/Graph/Kanban auf Lizenzen, Smart-Buttons
+  auf Partner (Lizenzen + Migrationen), "Lizenz-Produkte" als gefilterte Action
+
+**Sicherheit (DECISIONS #38–48)**
+  Activation-Code nur als bcrypt-Hash, Fernet-Encryption nur temporär im Ticket,
+  Burn-on-Consume, IP-Binding bei 3 Mismatches → Revoke, Rate-Limits pro Endpoint,
+  reCAPTCHA v3 auf Public-Verify, Anonymisierung Lizenznehmer
+
+**Tests**
+  ``test_key_generator.py`` (17 Tests), ``test_license_activation.py`` (10 Tests),
+  ``test_ticket_workflow.py`` (11 Tests), ``test_dashboard.py`` (5 Tests)
+
+Was noch offen ist
+===================
+
+* Stripe-Integration für Order-Endpoint (Sprint 5 lieferte Order-Anlage,
+  Stripe-Checkout-URL muss separat verdrahtet werden)
+* EULA-Texte juristisch prüfen lassen (DECISION #37, ~300–600 €)
+* Smoke-Test auf s02 mit echtem Webshop-Flow + Telnyx-Modul als Test-Konsument
 
 Dependencies
 =============

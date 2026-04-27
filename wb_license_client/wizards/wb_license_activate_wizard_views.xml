@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="wb_license_activate_wizard_view_form" model="ir.ui.view">
+        <field name="name">wb.license.activate.wizard.form</field>
+        <field name="model">wb.license.activate.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Lizenz aktivieren">
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        <field name="info_message" nolabel="1" readonly="1"/>
+                    </div>
+                    <group>
+                        <field name="product_code" placeholder="z.B. TELE"/>
+                        <field name="key" placeholder="WB-XXXX-xxxxxxxxXX"/>
+                        <field name="activation_code"
+                               placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_activate" type="object"
+                            string="Aktivieren" class="btn-primary"/>
+                    <button special="cancel" string="Abbrechen"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="wb_license_activate_wizard_action" model="ir.actions.act_window">
+        <field name="name">Lizenz aktivieren</field>
+        <field name="res_model">wb.license.activate.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

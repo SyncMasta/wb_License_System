@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="wb_dashboard_view_form" model="ir.ui.view">
+        <field name="name">wb.dashboard.form</field>
+        <field name="model">wb.dashboard</field>
+        <field name="arch" type="xml">
+            <form string="WB Dashboard" create="false" edit="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>WB Lizenz-Plattform — Übersicht</h1>
+                    </div>
+
+                    <group string="Recurring Revenue">
+                        <group>
+                            <field name="mrr" widget="monetary"/>
+                            <field name="arr" widget="monetary"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="trial_to_paid_30d_count"/>
+                        </group>
+                    </group>
+
+                    <group string="Lizenz-Status">
+                        <group>
+                            <field name="license_active_count" string="Aktiv"/>
+                            <field name="license_trial_count" string="Trial"/>
+                            <field name="license_grace_count" string="Grace"/>
+                        </group>
+                        <group>
+                            <field name="license_issued_pending_count"
+                                   string="Issued (warten auf Aktivierung)"/>
+                            <field name="license_expired_count" string="Expired"/>
+                        </group>
+                    </group>
+
+                    <group string="Aktion erforderlich">
+                        <group>
+                            <field name="pending_migrations_count"/>
+                            <field name="pending_tickets_count"/>
+                        </group>
+                        <group>
+                            <field name="expiring_30d_count"/>
+                            <field name="expiring_60d_count"/>
+                        </group>
+                    </group>
+
+                    <group string="Sicherheits-Auffälligkeiten (letzte 24h)">
+                        <group>
+                            <field name="activation_failed_24h_count"/>
+                            <field name="failed_otp_24h_count"/>
+                        </group>
+                    </group>
+
+                    <footer>
+                        <button name="action_open_dashboard" type="object"
+                                string="Aktualisieren" class="btn-primary"/>
+                    </footer>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="wb_dashboard_action" model="ir.actions.server">
+        <field name="name">WB Dashboard öffnen</field>
+        <field name="model_id" ref="model_wb_dashboard"/>
+        <field name="binding_model_id" ref="model_wb_dashboard"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_dashboard()</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Rechnungs-Erweiterung: Pro Lizenz-Produkt-Zeile werden zusätzlich
+        Lizenzschlüssel, gebundene Domain und Leistungszeitraum angezeigt.
+
+        Wir erweitern den Standard-Invoice-Report (account.report_invoice_document)
+        und hängen einen Block an die Beschreibung der Zeile an — aber NUR wenn
+        die Zeile auf ein Lizenz-Produkt verweist (wb_is_license_product).
+
+        WICHTIG: Der Activation-Code wird NIE auf der Rechnung gezeigt
+        (DECISIONS.md #39, siehe wb_subscription.md:5.4).
+    -->
+
+    <template id="report_invoice_document_wb_license"
+              inherit_id="account.report_invoice_document">
+
+        <xpath expr="//td[@name='account_invoice_line_name']" position="inside">
+            <t t-if="line.product_id.wb_is_license_product and line.wb_license_ids">
+                <div class="wb_invoice_license_details">
+                    <t t-foreach="line.wb_license_ids" t-as="license">
+                        <div>
+                            <span class="wb_invoice_license_details_item">
+                                <span class="wb_invoice_license_details_label">
+                                    Lizenzschlüssel:
+                                </span>
+                                <span class="wb_invoice_license_details_key"
+                                      t-out="license.name"/>
+                            </span>
+                            <span class="wb_invoice_license_details_item"
+                                  t-if="license.bound_domain">
+                                <span class="wb_invoice_license_details_label">
+                                    Domain:
+                                </span>
+                                <t t-out="license.bound_domain"/>
+                            </span>
+                            <span class="wb_invoice_license_details_item">
+                                <span class="wb_invoice_license_details_label">
+                                    Laufzeit:
+                                </span>
+                                <t t-out="license.valid_from and license.valid_from.strftime('%d.%m.%Y')"/>
+                                &#8211;
+                                <t t-out="license.valid_to and license.valid_to.strftime('%d.%m.%Y')"/>
+                            </span>
+                        </div>
+                    </t>
+                </div>
+            </t>
+        </xpath>
+
+    </template>
+
+</odoo>

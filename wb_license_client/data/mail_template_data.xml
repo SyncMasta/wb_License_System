@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <record id="mail_template_grace_started_local" model="mail.template">
+            <field name="name">WB License Client: Grace gestartet</field>
+            <field name="model_id" ref="model_wb_license_info"/>
+            <field name="subject">[WISSEN BERATUNG] Lizenz-Warnung: {{ object.product_code }}</field>
+            <field name="email_from">{{ user.company_id.email or '' }}</field>
+            <field name="email_to">{{ user.company_id.email or user.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div>
+                    <p>Hallo,</p>
+                    <p>Ihre Lizenz für <strong t-out="object.product_code"/> befindet sich in der <strong>Grace-Period</strong>, weil eine Rechnung überfällig ist.</p>
+                    <p>Bitte begleichen Sie die offene Rechnung bis zum <strong t-out="object.grace_until or 'Grace-Ende'"/>, um Unterbrechungen zu vermeiden.</p>
+                    <p>Bei Fragen: support@wissen-beratung.de</p>
+                    <p>Viele Grüße<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+
+        <record id="mail_template_expired_local" model="mail.template">
+            <field name="name">WB License Client: Lizenz abgelaufen</field>
+            <field name="model_id" ref="model_wb_license_info"/>
+            <field name="subject">[WISSEN BERATUNG] Lizenz abgelaufen: {{ object.product_code }}</field>
+            <field name="email_from">{{ user.company_id.email or '' }}</field>
+            <field name="email_to">{{ user.company_id.email or user.email or '' }}</field>
+            <field name="body_html" type="html">
+                <div>
+                    <p>Hallo,</p>
+                    <p>Ihre Lizenz für <strong t-out="object.product_code"/> ist <strong>abgelaufen</strong>.</p>
+                    <p>Feature-kritische Funktionen sind bis zur Verlängerung gesperrt. Bestehende Daten bleiben lesbar.</p>
+                    <p>Für eine Verlängerung kontaktieren Sie bitte support@wissen-beratung.de.</p>
+                    <p>Viele Grüße<br/>WISSEN BERATUNG</p>
+                </div>
+            </field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+
+    </data>
+</odoo>

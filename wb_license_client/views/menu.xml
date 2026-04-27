@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_wb_license_client_root"
+              name="WB Lizenzen"
+              parent="base.menu_administration"
+              sequence="50"
+              groups="base.group_system"/>
+
+    <menuitem id="menu_wb_license_client_infos"
+              name="Lizenz-Status"
+              parent="menu_wb_license_client_root"
+              action="wb_license_info_action"
+              sequence="10"/>
+
+    <menuitem id="menu_wb_license_client_activate"
+              name="Lizenz aktivieren"
+              parent="menu_wb_license_client_root"
+              action="wb_license_activate_wizard_action"
+              sequence="20"/>
+
+    <menuitem id="menu_wb_license_client_migrate"
+              name="Migration beantragen"
+              parent="menu_wb_license_client_root"
+              action="wb_license_migrate_wizard_action"
+              sequence="30"/>
+
+</odoo>

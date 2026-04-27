@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="portal_layout_minimal" name="WB Portal Minimal Layout">
+        <html>
+            <head>
+                <meta charset="utf-8"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <title>WISSEN BERATUNG · Lizenz-Aktivierung</title>
+                <style>
+                    body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+                           background: #f5f7fa; margin: 0; padding: 0; color: #222; }
+                    .wb_portal { max-width: 540px; margin: 60px auto; background: #fff;
+                                  padding: 40px 36px; border-radius: 8px;
+                                  box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+                    .wb_portal h1 { color: #1D3C6E; font-size: 22px; margin-top: 0; }
+                    .wb_portal h2 { color: #1D3C6E; font-size: 16px; margin-top: 30px; }
+                    .wb_portal p { line-height: 1.6; }
+                    .wb_portal_logo { color: #888; letter-spacing: 2px; font-size: 11px;
+                                       text-transform: uppercase; margin-bottom: 6px; }
+                    .wb_portal_btn { display: inline-block; background: #1A8BC4; color: #fff;
+                                       padding: 12px 24px; border-radius: 4px; text-decoration: none;
+                                       border: none; font-size: 14px; cursor: pointer; }
+                    .wb_portal_btn:hover { background: #156fa0; }
+                    .wb_portal_input { width: 100%; padding: 10px 12px; border: 1px solid #ccc;
+                                        border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+                    .wb_portal_otp_input { font-size: 22px; letter-spacing: 8px; text-align: center;
+                                            font-family: monospace; }
+                    .wb_portal_code { font-family: monospace; font-size: 20px; font-weight: bold;
+                                       color: #1D3C6E; letter-spacing: 2px;
+                                       padding: 18px 24px; background: #f0f7fc; border: 2px solid #00C8E8;
+                                       border-radius: 4px; text-align: center; word-break: break-all; }
+                    .wb_portal_error { background: #ffe5e5; border-left: 3px solid #c0392b;
+                                        padding: 10px 14px; margin: 16px 0; color: #6e1818; }
+                    .wb_portal_warn { background: #fdf5d9; border-left: 3px solid #e0c068;
+                                       padding: 10px 14px; margin: 16px 0; color: #5a4a10; }
+                    .wb_portal_meta { color: #888; font-size: 12px; }
+                    .wb_portal_footer { text-align: center; color: #888; font-size: 11px; margin-top: 40px; }
+                </style>
+            </head>
+            <body>
+                <div class="wb_portal">
+                    <div class="wb_portal_logo">WISSEN BERATUNG</div>
+                    <t t-out="0"/>
+                </div>
+                <div class="wb_portal_footer">
+                    Bei Fragen: support@wissen-beratung.de
+                </div>
+            </body>
+        </html>
+    </template>
+
+    <template id="portal_activation_landing" name="Activation Landing">
+        <t t-call="wb_subscription.portal_layout_minimal">
+            <h1>Lizenz-Aktivierung</h1>
+            <p>
+                Sie sind dabei, den Aktivierungs-Code für Ihre Lizenz
+                <strong t-out="ticket.license_id.product_id.name"/> abzurufen.
+            </p>
+            <p>
+                Aus Sicherheitsgründen senden wir einen 6-stelligen Bestätigungs-Code
+                an Ihre hinterlegte E-Mail-Adresse:
+            </p>
+            <p>
+                <strong t-out="email_masked"/>
+            </p>
+            <form t-att-action="'/activate/' + ticket.name + '/send-otp'" method="POST">
+                <button type="submit" class="wb_portal_btn">Bestätigungs-Code senden</button>
+            </form>
+            <p class="wb_portal_meta">
+                Ticket-Gültigkeit: 72 Stunden ab Erstellung. Pro Ticket sind maximal
+                5 OTP-Eingabeversuche möglich.
+            </p>
+        </t>
+    </template>
+
+    <template id="portal_activation_otp_form" name="Activation OTP Form">
+        <t t-call="wb_subscription.portal_layout_minimal">
+            <h1>Bestätigungs-Code eingeben</h1>
+            <p>
+                Wir haben einen 6-stelligen Code an
+                <strong t-out="email_masked"/> gesendet.
+            </p>
+            <p>Der Code ist 10 Minuten gültig.</p>
+            <t t-if="error">
+                <div class="wb_portal_error" t-out="error"/>
+            </t>
+            <form t-att-action="'/activate/' + ticket.name + '/verify-otp'" method="POST">
+                <input type="text" name="otp" maxlength="6" pattern="[0-9]{6}"
+                       autocomplete="off" autofocus="1"
+                       class="wb_portal_input wb_portal_otp_input"/>
+                <p>
+                    <button type="submit" class="wb_portal_btn">Bestätigen</button>
+                </p>
+            </form>
+            <p class="wb_portal_meta">
+                Verbleibende Versuche:
+                <t t-out="ticket.otp_max_attempts - ticket.otp_attempts"/>
+                / <t t-out="ticket.otp_max_attempts"/>
+            </p>
+        </t>
+    </template>
+
+    <template id="portal_activation_code_reveal" name="Activation Code Reveal">
+        <t t-call="wb_subscription.portal_layout_minimal">
+            <h1>Ihr Aktivierungs-Code</h1>
+            <p>
+                Aktivierungs-Code für <strong t-out="product_name"/>
+                (Lizenzschlüssel <code t-out="license_key"/>):
+            </p>
+            <div class="wb_portal_code" t-out="activation_code"/>
+            <div class="wb_portal_warn">
+                <strong>Wichtig:</strong> Dieser Code wird <strong>nur einmal</strong> angezeigt.
+                Er ist 10 Minuten sichtbar — kopieren Sie ihn jetzt und geben Sie ihn in
+                Ihrer Odoo-Instanz unter <em>Einstellungen → WB Lizenzen → Aktivieren</em> ein.
+            </div>
+            <h2>Nächste Schritte</h2>
+            <ol>
+                <li>Code oben kopieren</li>
+                <li>In der Odoo-Instanz: Einstellungen → WB Lizenzen → "Lizenz aktivieren"</li>
+                <li>Lizenzschlüssel und Code eingeben → Aktivieren</li>
+            </ol>
+        </t>
+    </template>
+
+    <template id="portal_ticket_invalid" name="Ticket Invalid">
+        <t t-call="wb_subscription.portal_layout_minimal">
+            <h1>Ticket nicht verfügbar</h1>
+            <div class="wb_portal_error">
+                <t t-out="reason"/>
+            </div>
+            <p>
+                Falls Sie Hilfe benötigen, senden Sie eine E-Mail an
+                <strong>support@wissen-beratung.de</strong> und nennen Sie Ihre
+                Bestell-Nr oder den Lizenzschlüssel.
+            </p>
+        </t>
+    </template>
+
+</odoo>

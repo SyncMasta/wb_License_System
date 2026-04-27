@@ -7,6 +7,12 @@
               web_icon="wb_subscription,static/description/icon.png"
               groups="wb_subscription.group_wb_subscription_user"/>
 
+    <menuitem id="menu_wb_subscription_dashboard"
+              name="Dashboard"
+              parent="menu_wb_subscription_root"
+              action="wb_dashboard_action"
+              sequence="5"/>
+
     <menuitem id="menu_wb_subscription_licenses"
               name="Lizenzen"
               parent="menu_wb_subscription_root"
@@ -31,6 +37,12 @@
               action="wb_activation_ticket_action"
               sequence="40"
               groups="wb_subscription.group_wb_subscription_manager"/>
+
+    <menuitem id="menu_wb_subscription_products"
+              name="Lizenz-Produkte"
+              parent="menu_wb_subscription_root"
+              action="wb_license_product_action"
+              sequence="50"/>
 
     <menuitem id="menu_wb_subscription_ops"
               name="Betrieb"

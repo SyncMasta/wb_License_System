@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="report_license_certificate_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-if="not o.certificate_number" t-call="web.internal_layout">
+                    <div class="alert alert-danger">
+                        Zertifikat-Nummer fehlt. Bitte erst über den Button "PDF generieren" die Nummer vergeben.
+                    </div>
+                </t>
+                <div class="wb_cert_page">
+
+                    <header class="wb_cert_header">
+                        <div class="wb_cert_company"
+                             t-out="o.company_id.name"/>
+                        <h1 class="wb_cert_title">LIZENZBESTÄTIGUNG / LICENSE</h1>
+                        <div class="wb_cert_meta">
+                            <span class="wb_cert_meta_item">
+                                <span class="wb_cert_meta_label">Zertifikat-Nr.:</span>
+                                <t t-out="o.certificate_number"/>
+                            </span>
+                            <span class="wb_cert_meta_item">
+                                <span class="wb_cert_meta_label">Ausstelldatum:</span>
+                                <t t-out="o.issue_date and o.issue_date.strftime('%d.%m.%Y')"/>
+                            </span>
+                        </div>
+                    </header>
+
+                    <section class="wb_cert_section">
+                        <h2 class="wb_cert_section_title">Lizenznehmer</h2>
+                        <div class="wb_cert_partner">
+                            <div class="wb_cert_partner_name" t-out="o.partner_id.name"/>
+                            <div t-if="o.partner_id.street" t-out="o.partner_id.street"/>
+                            <div t-if="o.partner_id.zip or o.partner_id.city">
+                                <t t-out="o.partner_id.zip"/>
+                                <t t-out="o.partner_id.city"/>
+                            </div>
+                            <div t-if="o.partner_id.country_id" t-out="o.partner_id.country_id.name"/>
+                            <div t-if="o.partner_id.vat" class="wb_cert_partner_meta">
+                                USt-ID: <t t-out="o.partner_id.vat"/>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="wb_cert_section">
+                        <h2 class="wb_cert_section_title">Lizenz</h2>
+                        <dl class="wb_cert_dl">
+                            <dt>Produkt</dt>
+                            <dd t-out="o.product_id.name"/>
+                            <dt>Lizenztyp</dt>
+                            <dd>
+                                <t t-if="o.state == 'trial'">7-Tage-Trial</t>
+                                <t t-elif="o.state == 'active'">Jahresabonnement</t>
+                                <t t-elif="o.state == 'grace'">Jahresabonnement (Grace)</t>
+                                <t t-else="">
+                                    <t t-out="dict(o._fields['state'].selection).get(o.state, o.state)"/>
+                                </t>
+                            </dd>
+                            <dt>Laufzeit</dt>
+                            <dd>
+                                <t t-out="o.valid_from and o.valid_from.strftime('%d.%m.%Y')"/>
+                                &#8211;
+                                <t t-out="o.valid_to and o.valid_to.strftime('%d.%m.%Y')"/>
+                            </dd>
+                            <dt>Erlaubte Instanzen</dt>
+                            <dd t-out="o.instance_limit"/>
+                            <t t-if="o.bound_domain">
+                                <dt>Gebunden an</dt>
+                                <dd t-out="o.bound_domain"/>
+                            </t>
+                        </dl>
+                    </section>
+
+                    <section class="wb_cert_key_section">
+                        <div class="wb_cert_key_label">Lizenzschlüssel</div>
+                        <div class="wb_cert_key_box">
+                            <code t-out="o.name"/>
+                        </div>
+                        <div class="wb_cert_key_note">
+                            Der Aktivierungs-Code wurde Ihnen separat über den
+                            Portal-Download zugestellt. Er wird niemals per E-Mail versendet.
+                        </div>
+                    </section>
+
+                    <section class="wb_cert_verify">
+                        <div class="wb_cert_verify_text">
+                            <div class="wb_cert_verify_label">Online-Verifikation</div>
+                            <div class="wb_cert_verify_url" t-out="o._get_verify_url()"/>
+                        </div>
+                        <div class="wb_cert_qr">
+                            <img t-att-src="'/report/barcode/?type=QR&amp;value=' + o._get_verify_url() + '&amp;width=120&amp;height=120'"
+                                 alt="QR-Code zur Verifikation"/>
+                        </div>
+                    </section>
+
+                    <footer class="wb_cert_footer">
+                        <div class="wb_cert_footer_line"/>
+                        <div class="wb_cert_footer_text">
+                            <span t-out="o.company_id.name"/> · <span t-out="o.company_id.email"/>
+                        </div>
+                    </footer>
+
+                </div>
+            </t>
+        </t>
+    </template>
+
+</odoo>

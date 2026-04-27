@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
+    <record id="wb_license_product_action" model="ir.actions.act_window">
+        <field name="name">Lizenz-Produkte</field>
+        <field name="res_model">product.template</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="domain">[('wb_is_license_product', '=', True)]</field>
+        <field name="context">{'default_wb_is_license_product': True}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Noch keine Lizenz-Produkte angelegt.</p>
+            <p>Lege ein neues Produkt an und aktiviere im Tab "WB Lizenz" das Häkchen
+               "Ist Lizenz-Produkt". Vergib einen 4-stelligen technischen Code
+               (z.B. <code>TELE</code> für Telnyx).</p>
+        </field>
+    </record>
+
     <record id="product_template_form_view_wb_license" model="ir.ui.view">
         <field name="name">product.template.form.wb.license</field>
         <field name="model">product.template</field>

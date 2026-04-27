@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_wb_license_info_user,wb.license.info user read,model_wb_license_info,base.group_user,1,0,0,0
+access_wb_license_info_admin,wb.license.info admin,model_wb_license_info,base.group_system,1,1,1,1
+access_wb_license_activate_wizard,activate wizard,model_wb_license_activate_wizard,base.group_system,1,1,1,1
+access_wb_license_migrate_wizard,migrate wizard,model_wb_license_migrate_wizard,base.group_system,1,1,1,1

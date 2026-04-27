@@ -1,0 +1,45 @@
+.wb_license_banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    z-index: 1040;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+
+    &--danger {
+        background-color: #e74c3c;
+        color: #ffffff;
+    }
+
+    &--warning {
+        background-color: #f39c12;
+        color: #ffffff;
+    }
+
+    &--info {
+        background-color: #7f8c8d;
+        color: #ffffff;
+    }
+
+    &__text {
+        flex: 1;
+        padding-right: 1rem;
+    }
+
+    &__dismiss {
+        background: transparent;
+        border: none;
+        color: inherit;
+        font-size: 1.25rem;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0 0.5rem;
+        opacity: 0.7;
+
+        &:hover {
+            opacity: 1;
+        }
+    }
+}

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="res_config_settings_view_form_wb_license" model="ir.ui.view">
+        <field name="name">res.config.settings.form.wb.license</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="WB Lizenzen" string="WB Lizenzen" name="wb_license_client"
+                     groups="base.group_system">
+                    <block title="Server-Verbindung" name="wb_license_server">
+                        <setting string="Lizenz-Server"
+                                 help="URL des WB-Lizenz-Servers. Default nicht ändern.">
+                            <field name="wb_license_server_url" placeholder="https://wissen-beratung.de"/>
+                        </setting>
+                        <setting string="Debug-Modus"
+                                 help="Server-Responses als Notification anzeigen. Nur für Support/Diagnose.">
+                            <field name="wb_license_debug_mode"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
