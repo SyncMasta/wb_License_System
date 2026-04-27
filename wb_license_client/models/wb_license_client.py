@@ -38,9 +38,12 @@ DEFAULT_SERVER_URL = 'https://wissen-beratung.de'
 KEY_PARAM_PREFIX = 'wb_license_client.key_'
 SERVER_URL_PARAM = 'wb_license_client.server_url'
 DEBUG_PARAM = 'wb_license_client.debug_mode'
+INSTALL_REGISTRY_OPT_OUT_PARAM = 'wb_license_client.disable_install_registry'
 DEFAULT_CHECK_TIMEOUT = 10
 DEFAULT_ACTIVATE_TIMEOUT = 15
+DEFAULT_ANNOUNCE_TIMEOUT = 5
 DEFAULT_MIN_CACHE_AGE_DAYS = 30
+INSTALL_ANNOUNCE_THROTTLE_HOURS = 24
 
 
 class WbLicenseClient(models.AbstractModel):
@@ -70,6 +73,7 @@ class WbLicenseClient(models.AbstractModel):
 
         if not key:
             info.write({'state': 'unlicensed', 'key': False})
+            self._maybe_announce_install(info, product_code)
             return info
 
         needs_refresh = (
@@ -142,6 +146,81 @@ class WbLicenseClient(models.AbstractModel):
                 "oder support@wissen-beratung.de kontaktieren."
             ) % status)
         return data
+
+    @api.model
+    def register_install(self, product_code):
+        """Meldet diese Odoo-Instanz als Install bei wissen-beratung.de an.
+
+        Wird aus zwei Pfaden gerufen:
+        1. ``_post_init_hook`` von Produkt-Modulen — explizit beim Install.
+        2. ``check_license`` — Fallback wenn (noch) kein Key gespeichert ist
+           und der letzte Announce > 24h zurückliegt.
+
+        Best-effort: Fehler werden geloggt, aber nie geworfen — ein
+        unerreichbarer Lizenz-Server darf den Module-Install nicht crashen.
+        Opt-out via ``ir.config_parameter`` ``wb_license_client.disable_install_registry=True``.
+
+        :param product_code: 4-Char Produkt-Code (z.B. 'TELE')
+        :return: True wenn Announce erfolgreich, False sonst
+        """
+        if self._install_registry_disabled():
+            return False
+
+        info = self._get_or_create_info(product_code)
+        return self._announce_install(info, product_code)
+
+    @api.model
+    def _maybe_announce_install(self, info, product_code):
+        """Throttled Announce-Call aus check_license heraus.
+
+        Nur einmal pro 24h pro (product_code, company), damit der täglich
+        polling check_license keinen Hammer auf den Server wirft.
+        """
+        if self._install_registry_disabled():
+            return False
+        last = info.last_install_announce_at
+        if last and last > fields.Datetime.now() - timedelta(
+                hours=INSTALL_ANNOUNCE_THROTTLE_HOURS):
+            return False
+        return self._announce_install(info, product_code)
+
+    @api.model
+    def _announce_install(self, info, product_code):
+        """Internal HTTP-Call /api/license/announce. Best-effort."""
+        payload = {
+            'product_code': product_code,
+            'domain': self._get_domain(),
+            'db_uuid': self._get_db_uuid(),
+            'client_version': self._get_module_version(),
+            'email': self.env.user.email or '',
+        }
+        if not payload['domain'] or not payload['db_uuid']:
+            _logger.info(
+                "[wb_license_client] Announce für %s übersprungen — "
+                "keine domain/db_uuid verfügbar.", product_code)
+            return False
+        try:
+            data, status = self._do_request(
+                '/api/license/announce', payload, timeout=DEFAULT_ANNOUNCE_TIMEOUT,
+            )
+        except Exception as e:
+            _logger.warning(
+                "[wb_license_client] Announce für %s fehlgeschlagen: %s",
+                product_code, e)
+            return False
+        if status == 200 and data and data.get('status') == 'ok':
+            info.sudo().write({'last_install_announce_at': fields.Datetime.now()})
+            return True
+        _logger.info(
+            "[wb_license_client] Announce für %s lief durch, Server-Antwort: "
+            "status=%s data=%s", product_code, status, data)
+        return False
+
+    @api.model
+    def _install_registry_disabled(self):
+        param = self.env['ir.config_parameter'].sudo().get_param(
+            INSTALL_REGISTRY_OPT_OUT_PARAM)
+        return str(param).lower() in ('1', 'true', 'yes')
 
     @api.model
     def _get_or_create_info(self, product_code):

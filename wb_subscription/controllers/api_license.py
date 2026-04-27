@@ -132,6 +132,38 @@ class ApiLicenseController(http.Controller):
             }
         return result
 
+    @http.route('/api/license/announce',
+                type='json', auth='public', methods=['POST'],
+                csrf=False, cors=CORS_ANY)
+    def announce_install(self, **kw):
+        """Lead-Registry — wird vom Client beim Install/Boot eines unlizenzierten
+        Produkt-Addons aufgerufen. Trägt (product_code, domain, db_uuid) ein
+        bzw. updated last_seen_at + announce_count.
+
+        Rate-Limit: 20/h pro IP. Höher als /activate, weil pro Install-Boot
+        und parallel mehrerer Produkt-Addons mehrere Calls eingehen können.
+        """
+        if not _check_rate_limit(_client_ip(), 'announce', 20, 3600):
+            return {'error': 'TOO_MANY_REQUESTS'}
+
+        product_code = (kw.get('product_code') or '').strip().upper()
+        domain = (kw.get('domain') or '').strip()
+        db_uuid = (kw.get('db_uuid') or '').strip()
+
+        if not product_code or len(product_code) != 4:
+            return {'error': 'INVALID_PRODUCT_CODE'}
+        if not domain or not db_uuid:
+            return {'error': 'MISSING_BINDING_DATA'}
+
+        request.env['wb.license.install'].sudo().announce(
+            product_code, domain, db_uuid,
+            contact_email=(kw.get('email') or '').strip() or None,
+            client_version=(kw.get('client_version') or '').strip() or None,
+            ip=_client_ip(),
+            user_agent=_client_ua(),
+        )
+        return {'status': 'ok'}
+
     @http.route('/api/license/migrate',
                 type='json', auth='public', methods=['POST'],
                 csrf=False, cors=CORS_ANY)

@@ -706,6 +706,56 @@ def action_export_xml(self):
     # ...
 ```
 
+### Install-Announce (Lead-Registry)
+
+Damit der WB-Server schon **vor** dem Kauf weiß, welche Kunden-Instanzen
+ein Produkt-Addon installiert haben, sollte jedes Produkt-Modul einen
+`_post_init_hook` registrieren, der einmalig `register_install()`
+aufruft:
+
+**Manifest:**
+```python
+{
+    'name': 'WB Telnyx SMS',
+    ...
+    'depends': ['wb_license_client', ...],
+    'post_init_hook': '_wb_telnyx_post_init',
+}
+```
+
+**`__init__.py`:**
+```python
+import logging
+from . import models, controllers
+
+_logger = logging.getLogger(__name__)
+
+
+def _wb_telnyx_post_init(env):
+    """Meldet diesen Install bei wissen-beratung.de an (Lead-Registry).
+
+    Best-effort: Fehler werden vom Client geschluckt — Server-Ausfall
+    darf den Module-Install nicht crashen. Opt-out via
+    ir.config_parameter 'wb_license_client.disable_install_registry'.
+    """
+    try:
+        env['wb.license.client'].register_install('TELE')
+    except Exception as e:
+        _logger.warning("[wb_telnyx] register_install failed: %s", e)
+```
+
+Auf dem Server entsteht dadurch ein `wb.license.install`-Eintrag mit
+`(product_code='TELE', domain, db_uuid, state='unlicensed')`. Bei der
+späteren Activation (`activate_with_code`) wird der Eintrag
+automatisch mit der erzeugten `wb.license.key` verknüpft und auf
+`state='converted'` gesetzt — so bleibt sichtbar wie viele Tage zwischen
+Install und Kauf lagen.
+
+**Fallback:** Falls der Hook beim Install nicht durchlief (Server down,
+keine Internet-Verbindung), wird der Announce-Call zusätzlich aus
+`check_license()` heraus angestoßen, sobald eine gated-Methode aufgerufen
+wird. Throttle: 1×/24h pro Produkt-Code.
+
 ### Welche Methoden müssen gated sein?
 
 Nur **feature-kritische** Operationen, nicht jede Read-Operation:

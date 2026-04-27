@@ -33,5 +33,11 @@
             <field name="domain_force">['|', ('license_id.company_id', 'in', company_ids), ('license_id', '=', False)]</field>
         </record>
 
+        <record id="wb_license_install_company_rule" model="ir.rule">
+            <field name="name">wb.license.install: Multi-Company</field>
+            <field name="model_id" ref="model_wb_license_install"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
     </data>
 </odoo>

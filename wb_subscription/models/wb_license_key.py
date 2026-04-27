@@ -400,6 +400,14 @@ class WbLicenseKey(models.Model):
             ip_address=ip, user_agent=user_agent,
             domain=domain, db_uuid=db_uuid,
         )
+        if self.product_code:
+            install = self.env['wb.license.install'].sudo().search([
+                ('product_code', '=', self.product_code),
+                ('domain', '=', domain),
+                ('db_uuid', '=', db_uuid),
+            ], limit=1)
+            if install:
+                install.mark_converted(self)
         return {'status': 'ok'}
 
     def _compute_certificate_ids(self):

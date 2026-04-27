@@ -19,6 +19,12 @@
                             <field name="wb_license_debug_mode"/>
                         </setting>
                     </block>
+                    <block title="Datenschutz" name="wb_license_privacy">
+                        <setting string="Install-Registry deaktivieren"
+                                 help="Sendet beim Install eines unlizenzierten Addons KEIN Announce-Signal an wissen-beratung.de. Default: aus.">
+                            <field name="wb_license_disable_install_registry"/>
+                        </setting>
+                    </block>
                 </app>
             </xpath>
         </field>

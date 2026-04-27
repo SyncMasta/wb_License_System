@@ -73,6 +73,11 @@ class WbLicenseInfo(models.Model):
         string='Raw Server Response (JSON)',
         help="Für Debugging — letzte Rohantwort vom Server.",
     )
+    last_install_announce_at = fields.Datetime(
+        string='Letztes Install-Announce',
+        help="Zeitpunkt des letzten /api/license/announce-Calls. Drosselt "
+             "den Fallback in check_license auf 1×/Tag.",
+    )
 
     effective_min_cache_age_days = fields.Integer(
         string='Min Cache-Age (Tage)',

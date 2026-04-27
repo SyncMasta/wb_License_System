@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="wb_license_install_view_list" model="ir.ui.view">
+        <field name="name">wb.license.install.list</field>
+        <field name="model">wb.license.install</field>
+        <field name="arch" type="xml">
+            <list string="Installierte Addons (Lead-Liste)"
+                  create="false"
+                  decoration-success="state == 'converted'"
+                  decoration-muted="state == 'churned'"
+                  decoration-info="state == 'unlicensed'">
+                <field name="product_code"/>
+                <field name="product_id" optional="show"/>
+                <field name="domain"/>
+                <field name="contact_email" optional="show"/>
+                <field name="partner_id" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'converted'"
+                       decoration-muted="state == 'churned'"
+                       decoration-info="state == 'unlicensed'"/>
+                <field name="first_seen_at"/>
+                <field name="last_seen_at"/>
+                <field name="announce_count"/>
+                <field name="license_id" optional="show"/>
+                <field name="days_until_conversion" optional="hide"/>
+                <field name="client_version" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="wb_license_install_view_form" model="ir.ui.view">
+        <field name="name">wb.license.install.form</field>
+        <field name="model">wb.license.install</field>
+        <field name="arch" type="xml">
+            <form create="false">
+                <header>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="unlicensed,converted,churned"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="display_name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Identifikation">
+                            <field name="product_code"/>
+                            <field name="product_id" readonly="1"/>
+                            <field name="domain"/>
+                            <field name="db_uuid"/>
+                            <field name="client_version"/>
+                        </group>
+                        <group string="Kontakt &amp; Konversion">
+                            <field name="contact_email"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="license_id" readonly="1"/>
+                            <field name="converted_at" readonly="1"/>
+                            <field name="days_until_conversion" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Telemetrie">
+                            <field name="first_seen_at" readonly="1"/>
+                            <field name="last_seen_at" readonly="1"/>
+                            <field name="announce_count" readonly="1"/>
+                        </group>
+                        <group string="Letzter Ping">
+                            <field name="last_seen_ip" readonly="1"/>
+                            <field name="last_seen_user_agent" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="wb_license_install_view_search" model="ir.ui.view">
+        <field name="name">wb.license.install.search</field>
+        <field name="model">wb.license.install</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="product_code"/>
+                <field name="domain"/>
+                <field name="contact_email"/>
+                <field name="db_uuid"/>
+                <field name="partner_id"/>
+                <filter name="filter_unlicensed" string="Unlizenziert (Leads)"
+                        domain="[('state', '=', 'unlicensed')]"/>
+                <filter name="filter_converted" string="Konvertiert"
+                        domain="[('state', '=', 'converted')]"/>
+                <filter name="filter_churned" string="Churned"
+                        domain="[('state', '=', 'churned')]"/>
+                <separator/>
+                <filter name="group_state" string="Gruppen: Status"
+                        context="{'group_by': 'state'}"/>
+                <filter name="group_product" string="Gruppen: Produkt"
+                        context="{'group_by': 'product_code'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="wb_license_install_action" model="ir.actions.act_window">
+        <field name="name">Installierte Addons</field>
+        <field name="res_model">wb.license.install</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="wb_license_install_view_search"/>
+        <field name="context">{'search_default_filter_unlicensed': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">
+                Noch keine Installs gemeldet.
+            </p><p>
+                Hier landen alle Kunden-Odoo-Instanzen, in denen ein
+                WB-Produkt-Addon installiert wurde — auch wenn (noch) keine
+                Lizenz gekauft ist. Beim späteren Kauf wird der Eintrag
+                automatisch mit der erzeugten Lizenz verknüpft.
+            </p>
+        </field>
+    </record>
+
+</odoo>

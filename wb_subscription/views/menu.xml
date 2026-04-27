@@ -25,6 +25,12 @@
               action="wb_license_trial_action"
               sequence="20"/>
 
+    <menuitem id="menu_wb_subscription_installs"
+              name="Installierte Addons"
+              parent="menu_wb_subscription_root"
+              action="wb_license_install_action"
+              sequence="25"/>
+
     <menuitem id="menu_wb_subscription_migrations"
               name="Migrationen"
               parent="menu_wb_subscription_root"

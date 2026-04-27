@@ -55,6 +55,7 @@ Siehe ARCHITECTURE.md v1.5 für Details.
         'views/wb_activation_ticket_views.xml',
         'views/wb_license_migration_views.xml',
         'views/wb_license_trial_views.xml',
+        'views/wb_license_install_views.xml',
         'views/wb_notification_log_views.xml',
         'views/wb_rate_limit_entry_views.xml',
         'views/product_template_views.xml',

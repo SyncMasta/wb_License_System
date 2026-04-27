@@ -72,6 +72,16 @@
             <field name="active" eval="True"/>
         </record>
 
+        <record id="ir_cron_install_churn" model="ir.cron">
+            <field name="name">WB Subscription: Install-Registry Churn</field>
+            <field name="model_id" ref="model_wb_license_install"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_mark_churned()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+
         <record id="ir_cron_december_renewal" model="ir.cron">
             <field name="name">WB Subscription: Dezember-Renewal-Invoices</field>
             <field name="model_id" ref="model_sale_order"/>

@@ -7,6 +7,7 @@ from . import wb_license_key
 from . import wb_activation_ticket
 from . import wb_license_migration
 from . import wb_license_trial
+from . import wb_license_install
 from . import wb_notification_log
 from . import product_template
 from . import sale_order

@@ -129,6 +129,19 @@ explizite Tobias-Anweisung. Bei Zweifeln: fragen statt umplanen.
 
 ---
 
+## Install-Registry (Lead-Liste)
+
+| # | Entscheidung | Begründung |
+|---|---|---|
+| 49 | Neuer Endpoint **`/api/license/announce`** auf `wb_subscription`. Nimmt `(product_code, domain, db_uuid, client_version, email)` und upserted in das neue Model `wb.license.install` | Lead-Liste der ungekauften Installs — wer hat das Addon installiert aber noch keine Lizenz aktiviert. Wird beim späteren Kauf via Match `(product_code, domain, db_uuid)` automatisch in `state='converted'` umgesetzt und mit der `wb.license.key` verknüpft |
+| 49a | Aufruf-Strategie: **`_post_init_hook` pro Produkt-Modul** (explizit beim Install) **+ Fallback in `check_license()`** (throttled 1×/24h, falls Hook nicht durchlief) | Ein Hook ist explizit und sofortig — der Fallback fängt Server-Down beim Install ab. Doppelt hält besser, kostet nichts (HTTP-Call ist best-effort) |
+| 49b | Email mitsenden: ja, `env.user.email` des Admin-Accounts | Ohne Kontakt ist die Lead-Liste nur ein Domain-Verzeichnis. Mit Email kann WB tatsächlich nachfassen |
+| 49c | Opt-out via `ir.config_parameter` `wb_license_client.disable_install_registry=True`, sichtbar in Settings → WB Lizenzen → Datenschutz | DSGVO-konforme Wahlmöglichkeit für datenschutz-paranoide Kunden. Default: aus (also Announce aktiv) |
+| 49d | Best-Effort: Announce-Fehler werden geschluckt, NIE als UserError geworfen | Server-Ausfall darf einen Module-Install nicht crashen. Lead-Tracking ist nice-to-have, nicht business-critical |
+| 49e | Churn-Cron: Installs ohne Announce seit 60 Tagen → `state='churned'` | Lead-Hygiene. Gefiltert aus der Default-Liste, bleibt aber für Reporting erhalten |
+
+---
+
 ## Offene Punkte für später
 
 - EULA-Text vom Anwalt prüfen lassen (300-600 €)
