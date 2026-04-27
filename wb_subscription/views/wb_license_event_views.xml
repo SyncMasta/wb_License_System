@@ -57,8 +57,8 @@
                 <field name="domain"/>
                 <filter name="failures" string="Nur Fehler"
                         domain="[('event_type', 'in', ['activation_failed', 'otp_failed', 'ticket_ip_mismatch'])]"/>
-                <filter name="today" string="Heute"
-                        domain="[('timestamp', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter name="last_24h" string="Letzte 24h"
+                        domain="[('timestamp', '&gt;=', (datetime.datetime.now() - datetime.timedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S'))]"/>
                 <group expand="0" string="Gruppieren nach">
                     <filter name="group_type" string="Event-Typ" context="{'group_by': 'event_type'}"/>
                     <filter name="group_license" string="Lizenz" context="{'group_by': 'license_id'}"/>

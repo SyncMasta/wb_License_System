@@ -174,8 +174,7 @@
                 <filter name="revoked" string="Revoked" domain="[('state', '=', 'revoked')]"/>
                 <separator/>
                 <filter name="expiring_soon" string="Läuft in 30 Tagen ab"
-                        domain="[('valid_to', '&lt;=', (context_today() + relativedelta(days=30)).strftime('%Y-%m-%d')),
-                                 ('state', 'in', ['active', 'grace'])]"/>
+                        domain="[('is_expiring_soon', '=', True)]"/>
                 <group expand="0" string="Gruppieren nach">
                     <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
                     <filter name="group_product" string="Produkt" context="{'group_by': 'product_id'}"/>

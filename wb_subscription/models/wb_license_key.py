@@ -123,6 +123,13 @@ class WbLicenseKey(models.Model):
     migration_ids = fields.One2many('wb.license.migration.request', 'license_id', string='Migrationen')
     ticket_ids = fields.One2many('wb.activation.ticket', 'license_id', string='Tickets')
 
+    is_expiring_soon = fields.Boolean(
+        compute='_compute_is_expiring_soon',
+        search='_search_is_expiring_soon',
+        string='Läuft bald ab (≤30d)',
+        help="True wenn valid_to in den nächsten 30 Tagen liegt und Lizenz aktiv/grace ist.",
+    )
+
     notified_activation_7d_at = fields.Datetime(
         string='7-Tage-Reminder gesendet',
         copy=False,
@@ -197,6 +204,30 @@ class WbLicenseKey(models.Model):
         for rec in self:
             parts = [rec.product_id.name or 'Unknown', rec.partner_id.name or '', f"({rec.name})" if rec.name else '']
             rec.display_name = ' — '.join(p for p in parts if p).strip()
+
+    def _compute_is_expiring_soon(self):
+        today = fields.Date.today()
+        threshold = today + timedelta(days=30)
+        for rec in self:
+            rec.is_expiring_soon = bool(
+                rec.valid_to
+                and today <= rec.valid_to <= threshold
+                and rec.state in ('active', 'grace')
+            )
+
+    def _search_is_expiring_soon(self, operator, value):
+        if operator not in ('=', '!=') or not isinstance(value, bool):
+            return []
+        today = fields.Date.today()
+        threshold = today + timedelta(days=30)
+        positive_domain = [
+            ('valid_to', '>=', today),
+            ('valid_to', '<=', threshold),
+            ('state', 'in', ['active', 'grace']),
+        ]
+        if (operator == '=' and value) or (operator == '!=' and not value):
+            return positive_domain
+        return ['!'] + ['&', '&'] + positive_domain
 
     @api.depends('partner_id', 'partner_id.followup_status', 'state')
     def _compute_grace_until(self):
