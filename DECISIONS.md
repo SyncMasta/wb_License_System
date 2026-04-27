@@ -162,6 +162,7 @@ Details siehe `ARCHITECTURE.md` Kapitel 11.
 | TELE | Telnyx-Integration (Voice + SMS) für Odoo VoIP | Geplant (erstes reales Produkt nach Lizenz-Plattform) |
 | DATV | DATEV Export | Konzeptionell, nicht priorisiert |
 | DSGV | DSGVO Auskunft | Konzeptionell, nicht priorisiert |
+| BITW | Bitwarden for Odoo (Pro): Auto-Provisioning, Plan-Detection, Cross-Company-Sharing, Compliance | In Implementierung (`wb_bitwarden_pro`, 34,95 €/Monat/Tenant) |
 
 **Historisch:** `ELST` (ELSTER UStVA/ZM) wurde 2026-04-24 verworfen — nicht weiter verfolgt. Das MVP-Skelett (`wb_elster_reports/`) bleibt als interner Prototyp archiviert.
 
