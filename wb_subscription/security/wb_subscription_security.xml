@@ -2,21 +2,21 @@
 <odoo>
     <data noupdate="0">
 
-        <record id="module_category_wb_subscription" model="ir.module.category">
-            <field name="name">WISSEN BERATUNG Lizenz-Plattform</field>
-            <field name="description">Zugriff auf Lizenz-Verwaltung, Abo-Management und zugehörige Dokumente.</field>
-            <field name="sequence">50</field>
-        </record>
+        <!--
+            Hinweis: In Odoo 19 wurde res.groups.category_id durch das
+            Modell res.groups.privilege ersetzt. Wir lassen die
+            Kategorisierung hier weg — Gruppen erscheinen in der
+            User-Settings-Ansicht unter "Other". Optional kann eine
+            res.groups.privilege spaeter nachgerüstet werden.
+        -->
 
         <record id="group_wb_subscription_user" model="res.groups">
-            <field name="name">Benutzer</field>
-            <field name="category_id" ref="module_category_wb_subscription"/>
+            <field name="name">WB Subscription / Benutzer</field>
             <field name="comment">Darf Lizenzen und Events lesen, Trial-Anfragen bearbeiten. Keine Änderungen an Keys.</field>
         </record>
 
         <record id="group_wb_subscription_manager" model="res.groups">
-            <field name="name">Manager</field>
-            <field name="category_id" ref="module_category_wb_subscription"/>
+            <field name="name">WB Subscription / Manager</field>
             <field name="implied_ids" eval="[(4, ref('group_wb_subscription_user'))]"/>
             <field name="comment">Vollzugriff auf Lizenz-Plattform inkl. Manueller Revoke, Reactivate, Fernet-Key-Verwaltung.</field>
         </record>
