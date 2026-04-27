@@ -9,7 +9,6 @@ from . import wb_license_migration
 from . import wb_license_trial
 from . import wb_notification_log
 from . import product_template
-from . import sale_subscription
 from . import sale_order
 from . import res_partner
 from . import account_move

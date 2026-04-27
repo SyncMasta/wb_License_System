@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <record id="sale_subscription_form_view_wb_license" model="ir.ui.view">
-        <field name="name">sale.subscription.form.wb.license</field>
-        <field name="model">sale.subscription</field>
-        <field name="inherit_id" ref="sale_subscription.sale_subscription_view_form"/>
+    <record id="sale_order_form_view_wb_license" model="ir.ui.view">
+        <field name="name">sale.order.form.wb.license</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
             <xpath expr="//notebook" position="inside">
-                <page string="WB Lizenzen" name="wb_licenses" invisible="not wb_is_license_sub">
+                <page string="WB Lizenzen" name="wb_licenses"
+                      invisible="not wb_is_license_sub">
                     <field name="wb_license_key_ids" readonly="1">
                         <list>
                             <field name="name"/>
@@ -20,7 +21,7 @@
                     </field>
                 </page>
             </xpath>
-            <xpath expr="//sheet" position="inside">
+            <xpath expr="//field[@name='partner_id']" position="after">
                 <field name="wb_is_license_sub" invisible="1"/>
             </xpath>
         </field>

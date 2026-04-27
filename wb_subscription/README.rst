@@ -93,7 +93,7 @@ ist — folgt dem Odoo-Standard, kein Provider-Coupling.
 Dependencies
 =============
 
-* Odoo 19 Enterprise (nutzt ``sale_subscription`` und ``account_followup``)
+* Odoo 19 Enterprise (nutzt ``sale_management``, ``sale_subscription`` und ``account_followup``)
 * Python: ``bcrypt``, ``cryptography``
 
 Installation

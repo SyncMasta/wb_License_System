@@ -83,10 +83,13 @@ class WbLicenseKey(models.Model):
         required=True,
         tracking=True,
     )
-    subscription_id = fields.Many2one(
-        'sale.subscription',
-        string='Abo',
+    sale_order_id = fields.Many2one(
+        'sale.order',
+        string='Abo / Order',
         ondelete='set null',
+        help="Sale-Order, aus der die Lizenz erzeugt wurde. "
+             "In Odoo 19 EE ist die Subscription gleichzeitig die Order "
+             "(is_subscription=True). Bei Trials NULL.",
     )
 
     state = fields.Selection(
@@ -246,7 +249,7 @@ class WbLicenseKey(models.Model):
 
         Der Activation-Code wird NUR im RAM gehalten, als bcrypt gehasht
         und dann verworfen. Für die spätere Portal-Anzeige muss er beim
-        Caller (sale.subscription._wb_issue_license_keys) parallel an das
+        Caller (sale.order._wb_issue_license_keys) parallel an das
         Ticket übergeben werden (Fernet-encrypted).
         """
         for vals in vals_list:

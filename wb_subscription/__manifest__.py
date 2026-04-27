@@ -15,7 +15,7 @@ Funktionen:
 - Portal-Ticket-Flow mit Email-OTP für Code-Auslieferung
 - Trial-System (7 Tage, Lead-Capture)
 - Migration-Workflow (Domain-Umzug mit Approval)
-- Integration mit sale.subscription, product.product, account_followup
+- Integration mit sale.order (Subscriptions in Odoo 19), product.product, account_followup
 - Audit-Log aller License-Events
 - Admin-Dashboard mit MRR/ARR
 
@@ -28,6 +28,7 @@ Siehe ARCHITECTURE.md v1.5 für Details.
         'base',
         'mail',
         'product',
+        'sale_management',
         'sale_subscription',
         'account',
         'account_followup',
@@ -57,7 +58,7 @@ Siehe ARCHITECTURE.md v1.5 für Details.
         'views/wb_notification_log_views.xml',
         'views/wb_rate_limit_entry_views.xml',
         'views/product_template_views.xml',
-        'views/sale_subscription_views.xml',
+        'views/sale_order_views.xml',
         'views/res_partner_views.xml',
         'views/portal_templates.xml',
         'views/public_verify_templates.xml',

@@ -33,18 +33,30 @@ class SaleOrder(models.Model):
 
     wb_license_key_ids = fields.One2many(
         'wb.license.key',
-        compute='_compute_wb_license_key_ids',
+        'sale_order_id',
         string='WB-Lizenzschlüssel',
     )
+    wb_is_license_sub = fields.Boolean(
+        compute='_compute_wb_is_license_sub',
+        store=True,
+        help="True wenn ≥1 Order-Line ein Lizenz-Produkt referenziert.",
+    )
+    wb_license_count = fields.Integer(
+        compute='_compute_wb_license_count',
+        string='Anzahl Lizenzen',
+    )
 
-    @api.depends('order_line.product_id')
-    def _compute_wb_license_key_ids(self):
-        Key = self.env['wb.license.key']
+    @api.depends('order_line.product_id.wb_is_license_product')
+    def _compute_wb_is_license_sub(self):
         for order in self:
-            order.wb_license_key_ids = Key.search([
-                ('subscription_id', 'in', order.subscription_ids.ids
-                 if 'subscription_ids' in order._fields else [order.id]),
-            ])
+            order.wb_is_license_sub = any(
+                line.product_id.wb_is_license_product for line in order.order_line
+            )
+
+    @api.depends('wb_license_key_ids')
+    def _compute_wb_license_count(self):
+        for order in self:
+            order.wb_license_count = len(order.wb_license_key_ids)
 
     def _wb_compute_valid_to(self):
         """Anteilige Erstlaufzeit bis 31.12. (DECISION #4).
@@ -99,7 +111,7 @@ class SaleOrder(models.Model):
             key = Key.create({
                 'product_id': line.product_id.id,
                 'partner_id': self.partner_id.id,
-                'subscription_id': self._wb_get_subscription_id(),
+                'sale_order_id': self.id,
                 'state': 'issued',
                 'valid_from': valid_from,
                 'valid_to': valid_to,
@@ -137,65 +149,48 @@ class SaleOrder(models.Model):
 
             del activation_code
 
-    def _wb_get_subscription_id(self):
-        """Findet die Subscription die zu dieser Order gehört.
-
-        In Odoo 19 EE: sale.order kann gleichzeitig sale.subscription sein
-        (Single-Inheritance). Falls nicht: subscription_ids M2M.
-        """
-        self.ensure_one()
-        if 'is_subscription' in self._fields and self.is_subscription:
-            return self.id
-        if 'subscription_ids' in self._fields and self.subscription_ids:
-            return self.subscription_ids[0].id
-        return False
-
     @api.model
     def _cron_generate_renewal_invoices(self):
         """Cron 01.12., 06:00 UTC — generiert Draft-Renewal-Rechnungen.
 
-        Pro aktiver Subscription mit auto_renew=True und wb_is_license_sub
+        Pro sale.order mit is_subscription=True und wb_is_license_sub=True
         wird ein account.move (Draft) erstellt für die nächste Periode.
         Tobias gibt die Drafts dann manuell frei (DECISION #30).
 
-        Idempotent: Wenn schon eine Draft-Rechnung für die gleiche
-        Subscription + Periode existiert, wird keine neue erzeugt.
+        Idempotent: Wenn schon eine Draft-Rechnung im Zieljahr für diese
+        Order existiert, wird keine neue erzeugt.
+
+        Nutzt Odoo 19 EE Standard: sale.order ist die Subscription
+        (kein separates sale.subscription-Modell mehr).
         """
         from datetime import date
-
-        Subscription = self.env['sale.subscription'] if 'sale.subscription' in self.env else None
-        if not Subscription:
-            _logger.info(
-                "[wb_subscription] sale.subscription Model nicht verfügbar — "
-                "Dezember-Renewal-Cron übersprungen.")
-            return
 
         today = fields.Date.today()
         target_year = today.year + 1 if today.month == 12 else today.year
 
-        domain = [('wb_is_license_sub', '=', True)]
-        if 'auto_renew' in Subscription._fields:
-            domain.append(('auto_renew', '=', True))
-        if 'state' in Subscription._fields:
-            domain.append(('state', 'in', ['open', 'progress', 'pending']))
+        domain = [('wb_is_license_sub', '=', True), ('state', '=', 'sale')]
+        if 'is_subscription' in self._fields:
+            domain.append(('is_subscription', '=', True))
+        if 'subscription_state' in self._fields:
+            domain.append(('subscription_state', 'in', ['3_progress', '4_paused']))
 
-        subs = self.env['sale.subscription'].sudo().search(domain)
+        orders = self.search(domain)
         created = 0
-        for sub in subs:
+        for order in orders:
             existing = self.env['account.move'].sudo().search([
                 ('move_type', '=', 'out_invoice'),
                 ('state', '=', 'draft'),
-                ('partner_id', '=', sub.partner_id.id),
+                ('partner_id', '=', order.partner_id.id),
                 ('invoice_date', '>=', date(target_year, 1, 1)),
                 ('invoice_date', '<=', date(target_year, 12, 31)),
-                ('invoice_line_ids.product_id', 'in', sub.order_line.mapped('product_id').ids),
+                ('invoice_line_ids.product_id', 'in', order.order_line.mapped('product_id').ids),
             ], limit=1)
             if existing:
                 continue
             try:
                 move = self.env['account.move'].sudo().create({
                     'move_type': 'out_invoice',
-                    'partner_id': sub.partner_id.id,
+                    'partner_id': order.partner_id.id,
                     'invoice_date': date(target_year, 1, 1),
                     'invoice_line_ids': [
                         (0, 0, {
@@ -204,7 +199,7 @@ class SaleOrder(models.Model):
                             'name': f"{line.product_id.name} — Renewal {target_year}",
                             'price_unit': line.price_unit,
                         })
-                        for line in sub.order_line
+                        for line in order.order_line
                         if line.product_id.wb_is_license_product
                     ],
                 })
@@ -213,7 +208,7 @@ class SaleOrder(models.Model):
             except Exception as e:
                 _logger.exception(
                     "[wb_subscription] Renewal-Invoice-Generation für %s fehlgeschlagen: %s",
-                    sub.name, e)
+                    order.name, e)
 
         _logger.info(
             "[wb_subscription] Dezember-Renewal-Cron: %d Draft-Rechnungen erzeugt für %d",
