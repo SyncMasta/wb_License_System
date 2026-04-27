@@ -29,6 +29,7 @@ class AccountMoveLine(models.Model):
         'wb.license.key',
         compute='_compute_wb_license_ids',
         string='WB-Lizenzen',
+        groups='wb_subscription.group_wb_subscription_user',
         help="Lizenzschlüssel, die zu dieser Rechnungszeile gehören. "
              "Wird über die verknüpfte Sale Order → Subscription ermittelt.",
     )
@@ -54,6 +55,7 @@ class AccountMove(models.Model):
         'wb.license.key',
         compute='_compute_wb_license_ids',
         string='WB-Lizenzen auf Rechnung',
+        groups='wb_subscription.group_wb_subscription_user',
     )
     wb_has_license_lines = fields.Boolean(
         compute='_compute_wb_license_ids',

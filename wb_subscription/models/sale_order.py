@@ -35,6 +35,7 @@ class SaleOrder(models.Model):
         'wb.license.key',
         'sale_order_id',
         string='WB-Lizenzschlüssel',
+        groups='wb_subscription.group_wb_subscription_user',
     )
     wb_is_license_sub = fields.Boolean(
         compute='_compute_wb_is_license_sub',
@@ -44,6 +45,7 @@ class SaleOrder(models.Model):
     wb_license_count = fields.Integer(
         compute='_compute_wb_license_count',
         string='Anzahl Lizenzen',
+        groups='wb_subscription.group_wb_subscription_user',
     )
 
     @api.depends('order_line.product_id.wb_is_license_product')

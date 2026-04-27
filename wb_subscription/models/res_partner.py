@@ -10,22 +10,27 @@ class ResPartner(models.Model):
         'wb.license.key',
         'partner_id',
         string='WB-Lizenzen',
+        groups='wb_subscription.group_wb_subscription_user',
     )
     wb_license_count = fields.Integer(
         compute='_compute_wb_license_count',
         string='Anzahl Lizenzen',
+        groups='wb_subscription.group_wb_subscription_user',
     )
     wb_active_license_count = fields.Integer(
         compute='_compute_wb_license_count',
         string='Aktive Lizenzen',
+        groups='wb_subscription.group_wb_subscription_user',
     )
     wb_migration_count = fields.Integer(
         compute='_compute_wb_migration_count',
         string='Anzahl Migrationen',
+        groups='wb_subscription.group_wb_subscription_user',
     )
     wb_pending_migration_count = fields.Integer(
         compute='_compute_wb_migration_count',
         string='Pending Migrationen',
+        groups='wb_subscription.group_wb_subscription_user',
     )
 
     @api.depends('wb_license_key_ids.state')
