@@ -1,10 +1,23 @@
-"""Payment-Hook: sale.order → wb.license.key + wb.activation.ticket + Mails.
+"""sale.order Erweiterungen + License-Issuance-Logik.
 
-Wird in `_action_confirm` aufgerufen, sobald die Bestellung bestätigt
-ist (typisch nach Stripe-Payment-Webhook). Die Lizenz wird im State 'issued'
-angelegt; der Activation-Code wird Fernet-encrypted im Ticket abgelegt
-(siehe DECISION #48). Klartext verbleibt nur kurz im RAM, um die zwei
-Mails zu versenden, und wird danach verworfen.
+Lizenz-Erzeugung läuft NICHT auf sale.order._action_confirm, sondern erst
+wenn die zugehörige Rechnung als bezahlt markiert ist — siehe
+account_move.py. So folgt der Bestell-/Zahlungs-Flow dem Odoo-Standard:
+
+  1. Bestellung wird angelegt (Webseite POST oder manuell)
+  2. Tobias bestätigt sale.order → Rechnung-Draft entsteht
+  3. Rechnung wird versendet (mit Standard-Payment-Link)
+  4. Kunde zahlt über den Link (Stripe / SEPA / was auch immer in Odoo
+     als Payment-Provider konfiguriert ist)
+  5. Zahlungseingang setzt account.move.payment_state = 'paid'
+  6. account.move.write hook → _wb_issue_license_keys auf der zugehörigen Order
+
+Damit ist wb_subscription frei von Stripe-spezifischem Code (DECISION #7:
+Odoo-Standards nutzen). Tobias kann Provider wechseln ohne dieses Modul anzufassen.
+
+Klartext-Activation-Code lebt nur im RAM zwischen Generate und Mail-Versand,
+wird danach mit `del` verworfen. In der DB steht nur der bcrypt-Hash + der
+Fernet-encrypted Code im Ticket (siehe DECISION #48).
 """
 
 import logging
@@ -44,18 +57,15 @@ class SaleOrder(models.Model):
             eoy = date(today.year + 1, 12, 31)
         return eoy
 
-    def _action_confirm(self):
-        """Override: nach Standard-Confirm wird Lizenz erzeugt für Lizenz-Lines."""
-        result = super()._action_confirm()
-        for order in self:
-            order._wb_issue_license_keys()
-        return result
-
     def _wb_issue_license_keys(self):
-        """Erzeugt für jede Lizenz-Zeile genau einen wb.license.key.
+        """Erzeugt für jede unbearbeitete Lizenz-Zeile einen wb.license.key.
 
-        Idempotent: wenn schon ein Key für (order, product) existiert,
-        wird kein neuer angelegt.
+        Idempotent: Wenn für (order_line, product) bereits ein Key existiert,
+        wird übersprungen — Mehrfach-Aufruf bei mehreren Zahlungseingängen
+        oder Webhook-Replays ist sicher.
+
+        Wird ausgelöst durch account.move.write wenn payment_state auf
+        'paid' oder 'in_payment' wechselt — siehe account_move.py.
         """
         self.ensure_one()
         Key = self.env['wb.license.key'].sudo()
@@ -65,12 +75,17 @@ class SaleOrder(models.Model):
         for line in self.order_line:
             if not line.product_id.wb_is_license_product:
                 continue
+
             existing = Key.search([
                 ('partner_id', '=', self.partner_id.id),
                 ('product_id', '=', line.product_id.id),
-                ('subscription_id.order_id', '=', self.id) if 'subscription_id' in Key._fields else ('partner_id', '=', self.partner_id.id),
+                ('valid_from', '>=', fields.Date.context_today(self) - timedelta(days=7)),
             ], limit=1)
             if existing:
+                _logger.info(
+                    "[wb_subscription] Lizenz für Order %s / Produkt %s existiert "
+                    "bereits (%s) — skip Erzeugung",
+                    self.name, line.product_id.display_name, existing.name)
                 continue
 
             valid_from = fields.Date.context_today(self)
@@ -94,7 +109,7 @@ class SaleOrder(models.Model):
                 'company_id': self.company_id.id,
             })
 
-            ticket = Ticket.create({
+            Ticket.create({
                 'license_id': key.id,
                 'email': self.partner_id.email or '',
                 'encrypted_code': gen.encrypt_code(activation_code),

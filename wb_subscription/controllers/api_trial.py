@@ -106,8 +106,17 @@ class ApiTrialController(http.Controller):
         Authentifizierung über X-API-Key Header gegen
         ir.config_parameter wb_subscription.webshop_api_key.
 
-        Erzeugt res.partner (oder matched per Email) + sale.order.
-        Stripe-Checkout-URL wird zurückgegeben (wenn Stripe-Provider konfiguriert).
+        Flow nach DECISION #7 (Odoo-Standards nutzen):
+        1. Erzeugt res.partner (oder matched per Email)
+        2. Erzeugt sale.order im Draft-State
+        3. Tobias prüft + bestätigt manuell in Odoo
+        4. Rechnung wird über Standard-Flow versendet (mit Payment-Link
+           des konfigurierten Payment-Providers)
+        5. Kunde zahlt → account.move.payment_state='paid' → Lizenz wird
+           automatisch erzeugt (siehe account_move.py write-Hook)
+
+        KEINE Stripe-spezifische Logik in diesem Modul. Provider wird in
+        Odoo unter Sales → Configuration → Payment Providers eingerichtet.
         """
         api_key_header = request.httprequest.headers.get('X-API-Key', '')
         configured_key = request.env['ir.config_parameter'].sudo().get_param(
@@ -163,5 +172,9 @@ class ApiTrialController(http.Controller):
             'order_id': order.id,
             'order_name': order.name,
             'partner_id': partner.id,
-            'message': 'Bestellung angelegt. Sie erhalten in Kürze eine Bestätigung per Email.',
+            'message': (
+                'Bestellung angelegt. Sie erhalten die Rechnung mit Zahlungs-Link '
+                'per E-Mail. Nach Zahlungseingang wird Ihre Lizenz automatisch '
+                'eingerichtet und die Aktivierungs-Anleitung verschickt.'
+            ),
         }

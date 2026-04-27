@@ -1,9 +1,20 @@
 # WB Subscription & License Platform — Architektur
 
-**Version:** 1.5
-**Datum:** 24.04.2026
+**Version:** 1.6
+**Datum:** 27.04.2026
 **Autor:** Tobias Wissen (WISSEN BERATUNG)
 **Status:** Freigegeben für Umsetzung
+
+**Änderungen in v1.6 (27.04.2026):**
+- **License-Issuance entkoppelt von Order-Confirm:** Lizenz wird jetzt
+  beim Zahlungseingang erzeugt (`account.move.payment_state` → `paid`),
+  nicht mehr bei `sale.order._action_confirm`. Begründung: Folgt
+  Odoo-Standard, kein Stripe-spezifischer Code im Modul, Tobias kann
+  Provider wechseln ohne wb_subscription anzufassen.
+- Order-Endpoint gibt **keine** Stripe-Checkout-URL mehr zurück,
+  sondern nur `order_id` mit Hinweis "Rechnung folgt per Mail". Der
+  Standard-Rechnungs-Flow von Odoo (mit Payment-Link aus dem
+  konfigurierten Provider) übernimmt den Rest.
 
 **Änderungen in v1.5 (24.04.2026):**
 - **Review-Fixes vor Sprint 1** eingearbeitet:
@@ -907,15 +918,21 @@ def _compute_grace_status(self):
    → CORS-Whitelist für wissen-beratung.de
    → Controller legt direkt an:
      - res.partner (anlegen oder matchen via E-Mail)
-     - sale.order mit wb_product
-   → Stripe-Checkout-URL zurück
+     - sale.order (Draft-State)
+   → Response: order_id + Hinweis "Rechnung folgt per E-Mail"
+   → KEINE Provider-spezifische URL — Folge: kein Stripe-Coupling im Modul
 
-3. Kunde zahlt → Stripe-Webhook → Odoo
-   → account.payment verbucht
-   → invoice generiert & matched
+3. Tobias bestätigt sale.order in Odoo (oder Auto-Confirm-Regel greift)
+   → Standard-Rechnung wird als Draft erzeugt
+   → Versand der Rechnung mit Payment-Link aus dem konfigurierten
+     Payment-Provider (Stripe/SEPA/Sofortüberweisung — egal welcher)
 
-4. Payment-Hook:
-   → sale.subscription erstellt (valid_from=heute, valid_to=31.12.)
+4. Kunde zahlt über den Link
+   → Provider-Webhook → Odoo registriert account.payment
+   → account.move.payment_state wechselt auf 'paid' / 'in_payment'
+
+5. account.move.write Hook fängt den State-Wechsel ab:
+   → ruft sale.order._wb_issue_license_keys() auf
    → wb.license.key generiert:
      - state = 'issued'  (NEU: noch nicht aktiviert!)
      - Public Key: WB-ELST-a3f28c919K
@@ -933,18 +950,18 @@ def _compute_grace_status(self):
    → Telegram an Tobias: "💰 Neuer Kauf: Müller GmbH, ELSTER, 199€"
    → Activation-Code wird nach DB-Speicherung aus Server-RAM gelöscht
 
-5. Kunde klickt Ticket-Link in Email
+6. Kunde klickt Ticket-Link in Email
    → Portal-Seite: /activate/<ticket_token>
    → Portal fordert Email-OTP
    → Server sendet 6-stellige OTP an hinterlegte Email (10 Min gültig)
    → Kunde gibt OTP ein
    → Portal zeigt Activation-Code für 10 Minuten
 
-6. Kunde öffnet Odoo-Instanz → "Lizenz aktivieren"-Wizard
+7. Kunde öffnet Odoo-Instanz → "Lizenz aktivieren"-Wizard
    → Gibt Public Key + Activation Code ein
    → Client-Modul POSTet /api/license/activate
 
-7. Server:
+8. Server:
    → Prüft Format beider Werte
    → Lädt Key aus DB (activation_hash vorhanden)
    → bcrypt.checkpw(code, activation_hash) → True
@@ -953,13 +970,13 @@ def _compute_grace_status(self):
    → state: 'issued' → 'active'
    → Event 'activation' geloggt
 
-8. Cron 7 Tage später:
+9. Cron 7 Tage später:
    → Wenn state='issued' (nicht aktiviert):
      → Mail wb_activation_reminder_7d
 
-9. Cron 30 Tage später:
-   → Wenn state='issued':
-     → Mail wb_activation_reminder_30d + Telegram an Tobias
+10. Cron 30 Tage später:
+    → Wenn state='issued':
+      → Mail wb_activation_reminder_30d + Telegram an Tobias
 
 10. Cron 90 Tage später:
     → Wenn state='issued':
@@ -1127,7 +1144,8 @@ Geringe Anpassung durch Activation-Code:
 | 1.2 | 23.04.2026 | Code-Auslieferung via Portal-Ticket + Email-OTP (Kanal-Trennung). Key-Format: Checksum direkt an UUID angehängt (17 statt 19 Zeichen). |
 | 1.3 | 23.04.2026 | Mahn-/Grace-Logik aus `account_followup` abgeleitet statt hart codiert. Zahlungsziel via `account.payment.term` pflegbar pro Kunde. Design: weißer Hintergrund durchgängig. |
 | 1.4 | 23.04.2026 | Bestell-Flow: direkter Odoo-Controller statt n8n-Zwischenschritt. Weniger Komponenten, weniger Fehlerquellen. |
-| **1.5** | **24.04.2026** | **Review-Fixes vor Sprint 1: DECISION #48 (Fernet) fixiert, IP-Binding für Tickets, wb.license.info persistent, unknown-Gating entschärft (30d), Rate-Limit-Model, CORS differenziert. Strategie: Lizenz-Plattform vor erstem Produkt, ELSTER verworfen, TELE geplant.** |
+| 1.5 | 24.04.2026 | Review-Fixes vor Sprint 1: DECISION #48 (Fernet) fixiert, IP-Binding für Tickets, wb.license.info persistent, unknown-Gating entschärft (30d), Rate-Limit-Model, CORS differenziert. Strategie: Lizenz-Plattform vor erstem Produkt, ELSTER verworfen, TELE geplant. |
+| **1.6** | **27.04.2026** | **License-Issuance vom Order-Confirm entkoppelt — fired jetzt erst bei `account.move.payment_state='paid'`. Order-Endpoint gibt keine Provider-URL zurück. Komplettes Stripe-Decoupling, folgt Odoo-Standards (DECISION #7).** |
 
 ---
 

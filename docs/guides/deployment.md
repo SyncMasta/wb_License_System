@@ -617,3 +617,23 @@ es sollten 9 WB-Crons aktiv sein:
 ### 9. Dashboard öffnen
 
 WB Lizenzen → Dashboard — sollte 0 Lizenzen, 0,00 € MRR zeigen.
+
+### 10. Payment-Provider konfigurieren
+
+Lizenzen werden **nicht** beim Order-Confirm erzeugt sondern beim
+Zahlungseingang (`account.move.payment_state` → `paid`/`in_payment`).
+Der Order-Endpoint selbst kennt keinen Stripe-Code (DECISION #7).
+
+In Odoo: **Sales → Configuration → Payment Providers**
+
+* Stripe einrichten (oder den Provider deiner Wahl) — muss aktiv sein,
+  damit Rechnungen einen Payment-Link enthalten
+* Im Customer-Portal-Test prüfen, dass eine Test-Rechnung den
+  "Pay Now"-Button zeigt
+* Webhook-URL des Providers in Odoo eintragen, damit der Zahlungseingang
+  automatisch zurückgemeldet wird
+
+Welcher Provider — egal. wb_subscription läuft über den Standard-
+``account.move.write``-Hook, der reagiert sobald die Rechnung als bezahlt
+markiert ist (egal ob via Stripe-Webhook, manuelle Buchung,
+SEPA-Lastschrift-Match oder Sofortüberweisung).

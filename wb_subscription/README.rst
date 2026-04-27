@@ -56,10 +56,39 @@ Funktionsumfang (Sprint 1–8)
 Was noch offen ist
 ===================
 
-* Stripe-Integration für Order-Endpoint (Sprint 5 lieferte Order-Anlage,
-  Stripe-Checkout-URL muss separat verdrahtet werden)
+* Payment-Provider in Odoo konfigurieren (Sales → Configuration →
+  Payment Providers). Stripe / SEPA / Sofortüberweisung — egal welcher,
+  läuft über den Odoo-Standard-Rechnungs-Flow. wb_subscription enthält
+  KEINEN Provider-spezifischen Code.
 * EULA-Texte juristisch prüfen lassen (DECISION #37, ~300–600 €)
 * Smoke-Test auf s02 mit echtem Webshop-Flow + Telnyx-Modul als Test-Konsument
+
+Bestell- und Zahlungs-Flow
+===========================
+
+Der Order-Endpoint legt die Bestellung an, **erzeugt aber noch keine
+Lizenz**. Die Lizenz wird erst erzeugt wenn der Zahlungseingang gebucht
+ist — folgt dem Odoo-Standard, kein Provider-Coupling.
+
+::
+
+    1. Webseite POST /api/wb_subscription/order
+       → res.partner + sale.order (Draft) angelegt
+       → Response: order_id + Hinweis "Rechnung folgt per Mail"
+
+    2. Tobias bestätigt Order in Odoo (oder Auto-Confirm-Regel greift)
+       → Rechnung-Draft wird erzeugt
+
+    3. Rechnung wird versendet (Standard-Mail mit Payment-Link)
+       → Kunde sieht Link zum Customer-Portal von Odoo
+
+    4. Kunde zahlt über den Link
+       → account.payment wird angelegt
+       → account.move.payment_state ändert sich auf 'paid' (oder 'in_payment')
+
+    5. account.move.write Hook fängt das ab
+       → ruft sale.order._wb_issue_license_keys() auf
+       → Lizenz + Activation-Code + Ticket + Cert-PDF + 2 Mails + Telegram
 
 Dependencies
 =============
