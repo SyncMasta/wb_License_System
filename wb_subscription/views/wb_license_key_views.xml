@@ -166,20 +166,17 @@
                 <field name="product_id"/>
                 <field name="bound_domain"/>
                 <field name="tag_ids"/>
-                <filter name="active" string="Aktiv" domain="[('state', '=', 'active')]"/>
-                <filter name="trial" string="Trial" domain="[('state', '=', 'trial')]"/>
-                <filter name="issued" string="Issued (nicht aktiviert)" domain="[('state', '=', 'issued')]"/>
-                <filter name="grace" string="Grace" domain="[('state', '=', 'grace')]"/>
-                <filter name="expired" string="Expired" domain="[('state', 'in', ['expired', 'cancelled'])]"/>
-                <filter name="revoked" string="Revoked" domain="[('state', '=', 'revoked')]"/>
-                <separator/>
-                <filter name="expiring_soon" string="Läuft in 30 Tagen ab"
+                <filter name="filter_active" string="Aktiv" domain="[('state', '=', 'active')]"/>
+                <filter name="filter_trial" string="Trial" domain="[('state', '=', 'trial')]"/>
+                <filter name="filter_issued" string="Issued (nicht aktiviert)" domain="[('state', '=', 'issued')]"/>
+                <filter name="filter_grace" string="Grace" domain="[('state', '=', 'grace')]"/>
+                <filter name="filter_expired" string="Expired" domain="[('state', 'in', ['expired', 'cancelled'])]"/>
+                <filter name="filter_revoked" string="Revoked" domain="[('state', '=', 'revoked')]"/>
+                <filter name="filter_expiring_soon" string="Läuft in 30 Tagen ab"
                         domain="[('is_expiring_soon', '=', True)]"/>
-                <group expand="0" string="Gruppieren nach">
-                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
-                    <filter name="group_product" string="Produkt" context="{'group_by': 'product_id'}"/>
-                    <filter name="group_partner" string="Kunde" context="{'group_by': 'partner_id'}"/>
-                </group>
+                <filter name="group_state" string="Gruppen: Status" context="{'group_by': 'state'}"/>
+                <filter name="group_product" string="Gruppen: Produkt" context="{'group_by': 'product_id'}"/>
+                <filter name="group_partner" string="Gruppen: Kunde" context="{'group_by': 'partner_id'}"/>
             </search>
         </field>
     </record>
