@@ -270,11 +270,14 @@ class WbLicenseClient(models.AbstractModel):
             'X-WB-Domain': self._get_domain() or '',
         }
         try:
-            response = requests.post(url, json=payload, headers=headers, timeout=timeout)
+            envelope = {'jsonrpc': '2.0', 'method': 'call', 'params': payload}
+            response = requests.post(url, json=envelope, headers=headers, timeout=timeout)
             try:
                 data = response.json()
             except ValueError:
                 data = None
+            if isinstance(data, dict) and 'result' in data:
+                data = data['result']
             return data, response.status_code
         except requests.Timeout:
             _logger.warning("[wb_license_client] Timeout beim Call %s", endpoint)
