@@ -120,11 +120,14 @@ class WbKeyGenerator(models.AbstractModel):
 
     @api.model
     def _get_fernet_key(self):
-        """Lädt Fernet-Key: ENV-Variable bevorzugt, sonst ir.config_parameter.
+        """Lädt den aktuellen (primären) Fernet-Key als bytes.
 
-        ENV-Variable ist bevorzugt, weil sie NICHT in DB-Backups landet —
-        schützt gegen "DB-Leak kompromittiert alle Pending-Tickets".
-        Siehe DECISION #48a.
+        Reihenfolge:
+        1. ENV ``WB_SUBSCRIPTION_FERNET_KEY``
+        2. ``ir.config_parameter`` ``wb_subscription.fernet_key``
+
+        ENV ist bevorzugt, weil sie NICHT in DB-Backups landet — siehe
+        DECISION #48a. Für Rotation siehe ``_get_fernet()``.
         """
         key = os.environ.get('WB_SUBSCRIPTION_FERNET_KEY')
         if key:
@@ -141,15 +144,38 @@ class WbKeyGenerator(models.AbstractModel):
         return key.encode('utf-8')
 
     @api.model
+    def _get_fernet(self):
+        """Liefert ``MultiFernet`` für Encrypt + Decrypt mit Rotations-Support
+        (Sprint 2 / L-H2).
+
+        Encryption nutzt immer den ersten (aktuellen) Key. Decryption
+        probiert den aktuellen plus alle History-Keys aus
+        ``WB_SUBSCRIPTION_FERNET_KEY_HISTORY`` (ENV, komma-separiert).
+
+        Roll-out neuer Key:
+        1. Alten Key in ``WB_SUBSCRIPTION_FERNET_KEY_HISTORY`` aufnehmen.
+        2. Neuen Key in ``WB_SUBSCRIPTION_FERNET_KEY`` setzen.
+        3. Service neu laden — alle bestehenden Tickets bleiben decryptbar.
+        """
+        from cryptography.fernet import Fernet, MultiFernet
+        keys = [Fernet(self._get_fernet_key())]
+        history = (os.environ.get('WB_SUBSCRIPTION_FERNET_KEY_HISTORY') or '').strip()
+        if history:
+            for raw in history.split(','):
+                raw = raw.strip()
+                if raw:
+                    keys.append(Fernet(raw.encode('utf-8')))
+        return MultiFernet(keys)
+
+    @api.model
     def encrypt_code(self, plaintext):
         """Fernet-Encryption für temporäre Ticket-Code-Speicherung.
 
         Nur für wb.activation.ticket.encrypted_code verwenden.
         Wird nach Ticket-Consume gelöscht (DECISION #48b).
+        Encrypt nutzt immer den aktuellen (ersten) Key.
         """
-        from cryptography.fernet import Fernet
-        f = Fernet(self._get_fernet_key())
-        return f.encrypt(plaintext.encode('utf-8'))
+        return self._get_fernet().encrypt(plaintext.encode('utf-8'))
 
     @api.model
     def decrypt_code(self, ciphertext):
@@ -157,17 +183,21 @@ class WbKeyGenerator(models.AbstractModel):
 
         Ergebnis darf nur im RAM an das Portal-Template übergeben werden —
         nicht in Session persistiert, nicht geloggt.
+
+        Decrypt versucht den aktuellen Key plus alle History-Keys, damit
+        Tickets nach Key-Rotation noch lesbar bleiben (L-H2).
         """
-        from cryptography.fernet import Fernet, InvalidToken
+        from cryptography.fernet import InvalidToken
         if not ciphertext:
             raise UserError(_("Kein verschlüsselter Code im Ticket vorhanden."))
-        f = Fernet(self._get_fernet_key())
         try:
-            return f.decrypt(ciphertext).decode('utf-8')
+            return self._get_fernet().decrypt(ciphertext).decode('utf-8')
         except InvalidToken:
             raise UserError(_(
-                "Ticket-Decryption fehlgeschlagen. Möglicherweise wurde "
-                "der Fernet-Key rotiert. Bitte Support kontaktieren."))
+                "Ticket-Decryption fehlgeschlagen mit allen bekannten Keys "
+                "(aktuell + History). Bitte Support kontaktieren — entweder "
+                "ist das Ticket beschädigt oder der zugehörige Key wurde aus "
+                "der History entfernt."))
 
     @api.model
     def generate_ticket_token(self):

@@ -7,3 +7,4 @@ from . import test_lead_submission
 from . import test_activation_consents
 from . import test_module_version_check
 from . import test_portal_downloads
+from . import test_sprint2_security
