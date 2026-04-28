@@ -22,6 +22,7 @@ EVENT_TYPES = [
     ('ticket_viewed', 'Ticket-Link geöffnet'),
     ('ticket_ip_mismatch', 'Ticket-IP-Mismatch'),
     ('otp_sent', 'Email-OTP versendet'),
+    ('otp_send_failed', 'Email-OTP-Versand fehlgeschlagen'),
     ('otp_verified', 'OTP korrekt eingegeben'),
     ('otp_failed', 'OTP falsch'),
     ('code_revealed', 'Code im Portal angezeigt'),
