@@ -194,3 +194,47 @@ Details siehe `ARCHITECTURE.md` Kapitel 11.
 ### Geplant: wb_subscription + wb_license_client
 Vertriebs-Backend und Client-Library — Architektur fertig dokumentiert,
 Sprint-Plan in `ARCHITECTURE.md` Kapitel 10.
+
+---
+
+## Sicherheits-Härtung Sprint 1–5 (Security-Review 2026-04-28)
+
+Vollständiger Security-Review von `wb_subscription`, `wb_license_client`,
+`wb_bitwarden`, `wb_bitwarden_pro` mit 22 Befunden. Read-only-Recon auf
+Production hat Pre-Launch-Status bestätigt (0 ausgegebene Lizenzen) — daher
+schärfere Defaults statt Bestandskunden-freundlicher Migrationen. Gesamt-
+Snapshot: `docs/snapshots/production-snapshot-2026-04-28.md`.
+
+| # | Decision | Begründung |
+|---|---|---|
+| 60 | DB-Layer-Lizenz-Gate via `wb.license.gated.mixin` (Sprint 1, B-C3 / L-M1) | Decorators auf Methoden umgehbar via `ir.actions.server`, RPC, sudo() — Mixin auf `create/write/unlink` ist nicht umgehbar. `AccessError` statt `UserError` damit Server-Action-Inline-Python die Exception nicht still schluckt. |
+| 61 | Access-Token NICHT in DB persistieren (Sprint 2, B-C1) | Tokens sind Session-artig, gehören nicht in DB-Backups. RAM-Cache pro Worker (`WbBitwardenAccount._token_cache`) ersetzt die früheren persistenten Felder. |
+| 62 | `_safe_request()`-Wrapper mit hartem `verify=True` (Sprint 2, B-C2) | Caller können TLS-Validation nicht versehentlich abschalten. Schema-Allowlist `https://` (Cloud) bzw. `http://` (LAN-Vaultwarden mit Warning). Default-Timeout `(3, 12)` statt nacktem 15s. |
+| 63 | Fernet-Master-Keys bevorzugt aus ENV mit MultiFernet-Rotation (Sprint 2, B-H1 + L-H2) | `WB_BITWARDEN_FERNET_KEY` und `WB_SUBSCRIPTION_FERNET_KEY` als ENV bevorzugt; `..._HISTORY` als Komma-CSV alter Keys für nahtlose Rotation. ENV-Werte landen nicht in DB-Backups. |
+| 64 | `redact_secrets()`-Util in beiden Repos (Sprint 2, B-M1) | Event-Log-Excerpts werden gegen Fernet-Tokens, bcrypt-Hashes, JSON-/Form-encoded Secret-Felder gefiltert, bevor sie in `wb.bitwarden.event.log.response_excerpt` bzw. `wb.license.event.details` persistiert werden. |
+| 65 | Replay-Schutz auf `/api/license/activate` via `request_id` (Sprint 3, L-C1) | Client schickt UUID4 mit; Server cached Resultat in `wb.license.activation_request` (TTL 7 Tage). Schutz gegen DB-Clone-Replay und versehentliche Doppel-Aktivierung. Legacy-Bucket `(key, db_uuid, domain, hour)` als Fallback. |
+| 66 | Rate-Limit zweite Achse `key:` parallel zu `ip:` (Sprint 3, L-C2) | `/api/license/activate` und `/check` haben pro IP UND pro Key eigene Counter. Verhindert dass ein Angreifer mit N IPs gegen N Keys parallel scannt. |
+| 67 | `_anonymize_partner_name` strippt Rechtsform-Suffixe + Längen (Sprint 3, L-C3) | Public-Verify-Page zeigt nur noch `M…` (Initial + Ellipsis). Kein Reverse-Lookup gegen Handelsregister mehr möglich. ~30 EU/US-Suffixe (GmbH, AG, KG, Inc, LLC, Ltd, SA, BV, AB, AS, …). |
+| 68 | Portal-Download Whitelist `wb.license.key.allowed_portal_user_ids` (Sprint 3, L-C4) | Default: nur direkter Käufer-Kontakt darf Tarball laden. Whitelist-Eintrag erlaubt zusätzliche User. Sub-Kontakte mit gleichem `commercial_partner_id` können NICHT mehr fremde Lizenzen runterladen (war IDOR). |
+| 69 | `wb.license.install` PII-Felder mit `groups=manager` (Sprint 3, L-H4) | 14 Felder (Email, Name, Telefon, USt-IdNr., Adresse, IP, User-Agent, CRM-Lead, …) sind nur für Subscription-Manager sichtbar. Server-Code (Controllers, Crons) liest weiter via `.sudo()`. |
+| 70 | Setup-Wizard Rate-Limit + Audit-Log (Sprint 4, B-C4) | Max 3 Wizard-Versuche pro 24h pro User. Jeder Versuch in `wb.bitwarden.event.log` (event_type='wizard'); bei Credential-Change zusätzlich event_type='config_change' + Chatter-Eintrag — beantwortbar wer wann Bitwarden-Keys geändert hat. |
+| 71 | Cross-Company-Constraint auf `wb.bitwarden.partner.collection` (Sprint 4, B-M2) | Partner mit `company_id` A darf nicht an Bitwarden-Account mit `company_id` B gebunden werden. Future Cross-Company geht über `wb.bitwarden.share.rule`. |
+| 72 | Plan-Cron `limit=20` mit `plan_last_check`-Round-Robin (Sprint 4, B-H2) | Verhindert Cron-Blockade bei 100+ Accounts. Probe-Timeout `(3, 8)` statt nacktem 8s. |
+| 73 | Off-Boarding-Cron erzeugt `mail.activity` bei invalid Lizenz (Sprint 4, B-H3) | Compliance: Off-Boarding darf nicht unbemerkt ausfallen, sonst bleiben Ex-Mitarbeiter sichtbar in Bitwarden. Throttled — eine Activity je Account. |
+| 74 | `employee.create()` Specific-Exceptions (Sprint 4, B-H4) | `(UserError, AccessError, ValidationError, requests.RequestException)` only. Programming-Bugs (RuntimeError, IntegrityError) propagieren — Massen-Imports dürfen DB-Konsistenzfehler nicht maskieren. |
+| 75 | `_inverse_client_secret` nur mit Context-Flag (Sprint 4, B-M3) | Inline-Edit von `client_secret_display` ist No-Op ohne `wb_bitwarden_explicit_secret_change=True`. Ersetzt unicode-unsichere Bullet-Detection. Setup-Wizard nutzt direkt `_cred_set`, geht am Inverse vorbei. |
+| 76 | Clock-Anomaly-Detection im Offline-Cache (Sprint 5, L-H1) | `last_server_check > now + 60min` → `is_valid=False`. Schutz gegen System-Uhr-Manipulation und Snapshot-Rollback als Cache-Hold. `last_clock_anomaly_at`-Feld als forensischer Marker. |
+| 77 | OTP-Versand-Audit getrennt (Sprint 5, L-M2) | Neuer event_type `otp_send_failed` — Support-Anfrage „ich hab nie eine OTP bekommen" jetzt forensisch beantwortbar (Mail-Render-Fehler, Template fehlt, send_mail-Exception). |
+| 78 | Lead-Event-Log Re-Raise auf DB-Errors (Sprint 5, L-M3) | `IntegrityError`/`OperationalError` propagieren zum RPC-Caller. Logging-Layer-Fehler bleiben silent — Lead-Endpoint darf wegen kaputtem Audit-Eintrag nicht killen. |
+| 79 | Zero-Bestandskunden-Verifikation in Sprint 6 | Final-Major-Bump `19.0.2.0.0` markiert Security-Hardening-Release. EULA-Update entfällt da Pre-Launch (0 ausgegebene Lizenzen) und keine User-Facing-Verschärfungen für aktive Kunden anstehen. |
+
+**Cross-Repo-Befund während Validation gefunden (alle pre-existing, nicht durch Sprint-Code verursacht):**
+
+| Datei | Befund | Fix |
+|---|---|---|
+| `wb_bitwarden_pro/wizards/.../archive_wizard.py` | Many2many-Auto-Tabellenname >63 Zeichen | Explizites `relation='wb_bw_pc_archive_wiz_mapping_rel'` (Sprint 1) |
+| `wb_bitwarden_pro/views/wb_bitwarden_partner_collection_views.xml` | `<group string="...">` in Search-View Odoo-19-incompatible | String-Attribut entfernt, Group-Wrapper entfernt (Sprint 1) |
+| `wb_subscription/__manifest__.py` | `crm.lead`-Feld ohne `crm` in `depends` | `crm` zur Dependency-Liste (Sprint 2) |
+| Production `ir_config_parameter` | Verwaiste `wb_bitwarden.cred.4.*` von gelöschtem Account | Manueller `DELETE` auf Production + Migration für andere Tenants (Sprint 2 / B-N1) |
+
+**Test-Coverage:** 77 `security_regression`-getaggte Tests gegen alle 22+ Bypass-Vektoren, Smoke + Test-Run jeweils auf isolierter Test-DB validiert.
