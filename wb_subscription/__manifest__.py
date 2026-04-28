@@ -1,6 +1,6 @@
 {
     'name': 'WB Subscription & License Platform',
-    'version': '19.0.1.2.0',
+    'version': '19.0.1.3.0',
     'category': 'Sales/Subscriptions',
     'summary': 'Vertriebs-Backend für WISSEN BERATUNG Produkt-Module',
     'description': """
@@ -33,6 +33,7 @@ Siehe ARCHITECTURE.md v1.5 für Details.
         'account',
         'account_followup',
         'portal',
+        'crm',
     ],
     'external_dependencies': {
         'python': ['bcrypt', 'cryptography'],
