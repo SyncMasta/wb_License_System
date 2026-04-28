@@ -172,19 +172,38 @@ class WbActivationTicket(models.Model):
             'otp_valid_until': fields.Datetime.now() + timedelta(minutes=OTP_TTL_MINUTES),
             'otp_attempts': 0,
         })
+        # Sprint 5 / L-M2: Audit-Trail klar trennen — ein Event pro
+        # tatsaechlichem Outcome, statt ein 'otp_sent' das auch bei
+        # Mail-Failure feuert (frueheres Verhalten -> Support-Anfrage
+        # 'ich habe nie eine OTP bekommen' nicht beantwortbar).
+        Event = self.env['wb.license.event']
         template = self.env.ref(
             'wb_subscription.mail_template_activation_otp',
             raise_if_not_found=False,
         )
-        if template:
-            try:
-                template.with_context(otp_plain=otp).send_mail(
-                    self.id, force_send=True,
-                )
-            except Exception as e:
-                _logger.exception(
-                    "[wb_subscription] OTP-Mail-Versand fehlgeschlagen: %s", e)
-        self.env['wb.license.event'].log_event(
+        if not template:
+            Event.log_event(
+                self.license_id, 'otp_send_failed',
+                ip_address=ip,
+                details={'ticket_id': self.id, 'reason': 'template_missing'},
+            )
+            return otp
+
+        try:
+            template.with_context(otp_plain=otp).send_mail(
+                self.id, force_send=True,
+            )
+        except Exception as exc:
+            _logger.exception(
+                "[wb_subscription] OTP-Mail-Versand fehlgeschlagen: %s", exc)
+            Event.log_event(
+                self.license_id, 'otp_send_failed',
+                ip_address=ip,
+                details={'ticket_id': self.id, 'reason': str(exc)[:255]},
+            )
+            return otp
+
+        Event.log_event(
             self.license_id, 'otp_sent',
             ip_address=ip,
             details={'ticket_id': self.id},

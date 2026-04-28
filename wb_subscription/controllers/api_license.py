@@ -17,6 +17,8 @@ Sicherheits-Kritisch:
 
 import logging
 
+import psycopg2
+
 from odoo import http
 from odoo.http import request, Response
 
@@ -349,7 +351,17 @@ class ApiLicenseController(http.Controller):
                     intent, product_code, install.id,
                     install.crm_lead_id.id if install.crm_lead_id else '-'),
             )
+        except (psycopg2.IntegrityError, psycopg2.OperationalError):
+            # Sprint 5 / L-M3: DB-Konsistenzfehler nicht silently
+            # schlucken — der Aufrufer muss erfahren, dass etwas
+            # schiefläuft. Re-raise propagiert zum Odoo-RPC-Layer.
+            _logger.exception(
+                "[wb_subscription] Lead-Event-Log DB-Fehler — re-raise")
+            raise
         except Exception as exc:
+            # Logging-Layer-Fehler (Mail-Render, Selection-Mismatch ...)
+            # bleiben silent — wir wollen den Lead-Endpoint nicht wegen
+            # einem schiefgegangenen Audit-Eintrag killen.
             _logger.warning("[wb_subscription] lead event-log failed: %s", exc)
 
         return {

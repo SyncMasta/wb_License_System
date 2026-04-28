@@ -9,6 +9,14 @@ is_valid-Logik nach v1.5:
 - expired / unlicensed → False
 - unknown             → True wenn last_server_check < min_cache_age_days alt,
                         sonst False (default: 30 Tage Toleranz)
+
+Sprint 5 / L-H1 — Clock-Anomaly-Detection:
+- ``last_server_check`` wird beim Schreiben mit dem alten Wert verglichen.
+  Liegt der ALTE Wert in der Zukunft (>= now + Toleranz), wurde die Uhr
+  zurückgedreht oder ein DB-Snapshot eingespielt → Anomalie protokolliert.
+- ``_compute_is_valid`` lehnt einen Cache mit ``last_server_check > now``
+  ab, weil die System-Uhr dann manipuliert wurde — sonst koennte der
+  Kunde durch Uhr-Backwards den Cache permanent als ``frisch`` halten.
 """
 
 import logging
@@ -16,6 +24,11 @@ from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+
+# Toleranz fuer geringfuegige Clock-Drift (NTP-Resync auf Containern,
+# Test-Tenant-Boot etc.). Werte > 1h sollten nicht in legitimer Drift
+# vorkommen.
+CLOCK_DRIFT_TOLERANCE_MINUTES = 60
 
 _logger = logging.getLogger(__name__)
 
@@ -69,6 +82,16 @@ class WbLicenseInfo(models.Model):
     )
     last_check_success = fields.Boolean(default=False)
     last_error_message = fields.Char()
+    last_clock_anomaly_at = fields.Datetime(
+        string='Letzte Clock-Anomalie',
+        readonly=True,
+        help="Sprint 5 / L-H1: Zeitpunkt einer erkannten Uhr-Manipulation. "
+             "Tritt auf wenn die System-Zeit zurueckgedreht wurde oder "
+             "ein DB-Snapshot in der Zeit zurueckgespielt wurde — der "
+             "Cache wird in dem Fall als nicht-vertrauenswuerdig "
+             "behandelt (is_valid=False bis zum naechsten erfolgreichen "
+             "Server-Ping).",
+    )
     server_response_raw = fields.Text(
         string='Raw Server Response (JSON)',
         help="Für Debugging — letzte Rohantwort vom Server.",
@@ -177,10 +200,24 @@ class WbLicenseInfo(models.Model):
                 latest and installed and latest != installed
             )
 
-    @api.depends('state', 'last_server_check', 'effective_min_cache_age_days')
+    @api.depends('state', 'last_server_check', 'effective_min_cache_age_days',
+                 'last_clock_anomaly_at')
     def _compute_is_valid(self):
+        """Berechnet is_valid und blockt bei erkannter Clock-Anomalie.
+
+        Sprint 5 / L-H1: wenn ``last_server_check`` in der Zukunft liegt
+        (Uhr zurueckgedreht ODER DB-Snapshot eingespielt), wird der
+        Cache hart als ungueltig behandelt — egal welcher state.
+        Sonst koennte ein Kunde durch System-Uhr-Manipulation den
+        Cache permanent als ``frisch`` halten.
+        """
         now = fields.Datetime.now()
+        tolerance = timedelta(minutes=CLOCK_DRIFT_TOLERANCE_MINUTES)
         for rec in self:
+            if rec.last_server_check and rec.last_server_check > now + tolerance:
+                # Future-dated check → System-Uhr zurueckgedreht, kein Trust
+                rec.is_valid = False
+                continue
             if rec.state == 'active':
                 rec.is_valid = True
             elif rec.state == 'grace':
@@ -235,22 +272,42 @@ class WbLicenseInfo(models.Model):
                 rec.effective_min_cache_age_days = min_cache_age_days
 
     def apply_server_response(self, data):
-        """Trägt die Antwort eines erfolgreichen Pings in den Cache ein."""
+        """Trägt die Antwort eines erfolgreichen Pings in den Cache ein.
+
+        Sprint 5 / L-H1: prueft beim Schreiben, ob der ALTE
+        ``last_server_check`` in der Zukunft lag. Wenn ja → Anomalie
+        protokolliert (DB-Snapshot rollback oder Uhr-Manipulation).
+        """
         self.ensure_one()
         import json
         state = data.get('state') or data.get('status')
+        now = fields.Datetime.now()
+        tolerance = timedelta(minutes=CLOCK_DRIFT_TOLERANCE_MINUTES)
+        anomaly_detected = (
+            self.last_server_check
+            and self.last_server_check > now + tolerance
+        )
         vals = {
             'state': state if state in dict(STATE_SELECTION) else 'unknown',
             'valid_from': data.get('valid_from') or False,
             'valid_to': data.get('valid_to') or False,
             'grace_until': data.get('grace_until') or False,
-            'last_server_check': fields.Datetime.now(),
+            'last_server_check': now,
             'last_check_success': True,
             'last_error_message': False,
             'server_response_raw': json.dumps(data, ensure_ascii=False),
             'latest_module_version': (data.get('latest_module_version') or '').strip() or False,
             'download_url': (data.get('download_url') or '').strip() or False,
         }
+        if anomaly_detected:
+            vals['last_clock_anomaly_at'] = now
+            _logger.warning(
+                "[wb_license_client] Clock-Anomalie erkannt: vorheriger "
+                "last_server_check=%s lag in der Zukunft (now=%s). "
+                "Mögliche Ursache: System-Uhr zurueckgedreht oder "
+                "DB-Snapshot eingespielt.",
+                self.last_server_check, now,
+            )
         old_state = self.state
         self.write(vals)
         if old_state != vals['state']:
