@@ -94,14 +94,31 @@ class WbRateLimitEntry(models.Model):
 
         Skaliert notfalls auf Millionen Zeilen, weil bucket_key indexiert
         ist und wir per SQL arbeiten statt per ORM.
+
+        Sprint 3 / L-H3: alle Schritte hart in try/except. Wenn der Cron
+        eine Exception werfen würde, deaktiviert Odoo ihn nach 5 Failures
+        — das wäre ein DoS auf den Rate-Limiter selbst (Tabelle wächst
+        unbegrenzt). Logging-Failure ist OK, Cron läuft weiter.
         """
-        self.env.cr.execute(
-            "DELETE FROM wb_rate_limit_entry "
-            "WHERE window_start + (window_seconds * INTERVAL '1 second') < NOW()"
-        )
+        try:
+            self.env.cr.execute(
+                "DELETE FROM wb_rate_limit_entry "
+                "WHERE window_start + (window_seconds * INTERVAL '1 second') < NOW()"
+            )
+            removed = self.env.cr.rowcount
+        except Exception as exc:
+            # Re-raise wäre falsch — siehe Sprint-3-Plan B-H3.
+            # Stattdessen prominent loggen, der Cron darf nicht aussterben.
+            _logger.exception(
+                "[wb_subscription] Rate-Limit-Cleanup-Cron fehlgeschlagen — "
+                "Tabelle waechst weiter, Cleanup beim naechsten Lauf nochmal "
+                "versucht. Fehler: %s", exc,
+            )
+            return
+
         _logger.info(
             "[wb_subscription] Rate-Limit-Cleanup: %d expired entries removed",
-            self.env.cr.rowcount,
+            removed,
         )
 
     @api.model

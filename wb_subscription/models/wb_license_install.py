@@ -69,33 +69,54 @@ class WbLicenseInstall(models.Model):
         help="database.uuid des Kunden-Odoo (stabil über Domain-Wechsel).",
     )
 
+    # PII-Felder unter Sprint 3 / L-H4 nur für Subscription-Manager sichtbar.
+    # Server-Code (Controllers, Crons) liest weiterhin via .sudo() — die
+    # groups-Beschränkung wirkt nur an der ORM-Front (User/Portal).
     contact_email = fields.Char(
         string='Kontakt-Email',
         index=True,
+        groups='wb_subscription.group_wb_subscription_manager',
         help="Optional. Wenn der Kunde im Client einen Admin-Account "
              "hinterlegt hat, wird dessen Email mitgesendet.",
     )
     contact_name = fields.Char(
         string='Ansprechpartner',
+        groups='wb_subscription.group_wb_subscription_manager',
         help="Vom Kunden-Wizard übermittelter Name (Onboarding/Lizenz-Anfrage).",
     )
     contact_phone = fields.Char(
         string='Telefon',
+        groups='wb_subscription.group_wb_subscription_manager',
         help="Vom Kunden-Wizard übermittelte Telefonnummer.",
     )
     company_name = fields.Char(
         string='Firma (Kunde)',
+        groups='wb_subscription.group_wb_subscription_manager',
         help="Vom Kunden-Wizard übermittelter Firmenname.",
     )
     company_vat = fields.Char(
         string='USt-IdNr.',
+        groups='wb_subscription.group_wb_subscription_manager',
     )
-    company_street = fields.Char(string='Straße')
-    company_zip = fields.Char(string='PLZ')
-    company_city = fields.Char(string='Stadt')
-    company_country_code = fields.Char(string='Land (ISO)', size=2)
+    company_street = fields.Char(
+        string='Straße',
+        groups='wb_subscription.group_wb_subscription_manager',
+    )
+    company_zip = fields.Char(
+        string='PLZ',
+        groups='wb_subscription.group_wb_subscription_manager',
+    )
+    company_city = fields.Char(
+        string='Stadt',
+        groups='wb_subscription.group_wb_subscription_manager',
+    )
+    company_country_code = fields.Char(
+        string='Land (ISO)', size=2,
+        groups='wb_subscription.group_wb_subscription_manager',
+    )
     lead_notes = fields.Text(
         string='Notizen vom Kunden',
+        groups='wb_subscription.group_wb_subscription_manager',
         help="Freitext aus dem Lead-Wizard.",
     )
     lead_intent = fields.Selection(
@@ -109,6 +130,7 @@ class WbLicenseInstall(models.Model):
         string='Erzeugter CRM-Lead',
         ondelete='set null',
         readonly=True,
+        groups='wb_subscription.group_wb_subscription_manager',
         help="Verknüpfter Lead in der Sales-Pipeline. Leer wenn crm-Modul "
              "nicht installiert war zum Zeitpunkt des Lead-Eingangs.",
     )
@@ -118,6 +140,7 @@ class WbLicenseInstall(models.Model):
         compute='_compute_partner_id',
         store=True,
         index=True,
+        groups='wb_subscription.group_wb_subscription_manager',
         help="res.partner der zur contact_email passt — nur Read-Only-Hinweis.",
     )
     client_version = fields.Char(
@@ -148,8 +171,12 @@ class WbLicenseInstall(models.Model):
         default=0,
         help="Wie oft sich diese Install-Instanz schon gemeldet hat.",
     )
-    last_seen_ip = fields.Char()
-    last_seen_user_agent = fields.Char()
+    last_seen_ip = fields.Char(
+        groups='wb_subscription.group_wb_subscription_manager',
+    )
+    last_seen_user_agent = fields.Char(
+        groups='wb_subscription.group_wb_subscription_manager',
+    )
 
     state = fields.Selection(
         INSTALL_STATES,

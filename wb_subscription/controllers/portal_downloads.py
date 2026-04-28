@@ -39,9 +39,23 @@ from odoo.addons.portal.controllers.portal import CustomerPortal
 _logger = logging.getLogger(__name__)
 
 
-def _user_partner():
-    """Liefert den Stammkunden des aktuellen Portal-Users."""
-    return request.env.user.partner_id.commercial_partner_id
+def _user_can_download(user, license):
+    """True wenn ``user`` für diese Lizenz Tarballs herunterladen darf.
+
+    Sprint 3 / L-C4 — schließt Sub-Kontakt-IDOR.
+
+    * Wenn ``license.allowed_portal_user_ids`` GEFÜLLT ist:
+      nur diese User dürfen, exakte Liste, kein Fallback.
+    * Wenn LEER (Default): nur User mit ``user.partner_id == license.partner_id``
+      direkt — Sub-Kontakte mit gleichem ``commercial_partner_id`` haben
+      KEINEN Zugriff (war vorher der IDOR-Pfad).
+
+    Tobias kann pro Lizenz explizit weitere User freigeben (z.B. wenn ein
+    B2B-Kunde mehrere Mitarbeiter den Tarball laden lassen soll).
+    """
+    if license.allowed_portal_user_ids:
+        return user in license.allowed_portal_user_ids
+    return user.partner_id and user.partner_id == license.partner_id
 
 
 def _published_releases(product_tmpl):
@@ -63,31 +77,48 @@ class WbPortalDownloads(CustomerPortal):
 
     def _get_downloadable_licenses(self):
         """Lizenzen des aktuellen Customers, deren Produkt mindestens eine
-        published Release mit Tarball hat."""
-        partner = _user_partner()
-        if not partner:
+        published Release mit Tarball hat.
+
+        Sprint 3 / L-C4: Filtern via ``_user_can_download`` — kein Bulk-
+        Match auf ``commercial_partner_id`` mehr (war der IDOR-Pfad).
+        """
+        user = request.env.user
+        if not user or user._is_public():
             return request.env['wb.license.key'].sudo().browse()
-        licenses = request.env['wb.license.key'].sudo().search([
-            ('partner_id', '=', partner.id),
+        # Kandidaten: Lizenzen wo user direkter Kunde ist ODER user in
+        # Whitelist steht. Wir suchen union der beiden Domains.
+        Licenses = request.env['wb.license.key'].sudo()
+        licenses = Licenses.search([
             ('state', 'in', ('active', 'grace')),
+            '|',
+              ('partner_id', '=', user.partner_id.id),
+              ('allowed_portal_user_ids', 'in', user.id),
         ])
+        # Doppelte Sicherheits-Filterung im Code, falls ein Edge-Case
+        # ein Match liefert, das _user_can_download trotzdem ablehnen
+        # würde (z.B. Whitelist gefüllt + user nicht drin + partner_id
+        # passt zufällig nicht).
+        licenses = licenses.filtered(
+            lambda l: _user_can_download(user, l))
         return licenses.filtered(
             lambda l: bool(_published_releases(l.product_id.product_tmpl_id))
         )
 
     def _resolve_license(self, license_id):
-        """Holt die Lizenz und prüft Partner-Match + State.
+        """Holt die Lizenz und prüft Whitelist + State.
 
         Returns ein ``wb.license.key``-Recordset (1 oder leer). Falls
         Zugriff verweigert oder nicht gefunden: leeres Recordset.
         """
-        partner = _user_partner()
-        if not partner:
+        user = request.env.user
+        if not user or user._is_public():
             return request.env['wb.license.key'].sudo().browse()
         license = request.env['wb.license.key'].sudo().browse(license_id)
-        if not license.exists() or license.partner_id != partner:
+        if not license.exists():
             return request.env['wb.license.key'].sudo().browse()
         if license.state not in ('active', 'grace'):
+            return request.env['wb.license.key'].sudo().browse()
+        if not _user_can_download(user, license):
             return request.env['wb.license.key'].sudo().browse()
         return license
 

@@ -120,6 +120,17 @@ class WbLicenseKey(models.Model):
         required=True,
         tracking=True,
     )
+    allowed_portal_user_ids = fields.Many2many(
+        'res.users',
+        relation='wb_license_key_portal_user_rel',
+        column1='license_id', column2='user_id',
+        string='Zusätzliche Portal-Berechtigte',
+        help="Sprint 3 / L-C4 — Whitelist für Portal-Downloads. Wenn LEER: "
+             "nur der Käufer-Kontakt (partner_id) selbst darf herunterladen. "
+             "Wenn GEFÜLLT: nur die hier gelisteten User dürfen — Sub-"
+             "Kontakte mit demselben commercial_partner_id sind ohne "
+             "expliziten Eintrag KEIN Sicherheits-Bypass mehr.",
+    )
     sale_order_id = fields.Many2one(
         'sale.order',
         string='Abo / Order',
