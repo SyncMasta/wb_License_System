@@ -10,6 +10,8 @@ import logging
 
 from odoo import _, api, fields, models
 
+from ._redact import redact_secrets
+
 _logger = logging.getLogger(__name__)
 
 
@@ -85,6 +87,10 @@ class WbLicenseEvent(models.Model):
         details = kwargs.pop('details', None)
         if details and not isinstance(details, str):
             details = json.dumps(details, default=str, ensure_ascii=False)
+        # Sprint 2 / B-M1: details können versehentlich Secret-Patterns
+        # enthalten (z.B. wenn ein activation_code in einem Fehler-Payload
+        # landet). Vor dem Persist redacten — Audit-Log ist immutable.
+        details = redact_secrets(details)
         vals = {
             'license_id': license.id if license else False,
             'event_type': event_type,
