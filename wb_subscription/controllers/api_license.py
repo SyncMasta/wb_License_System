@@ -69,7 +69,10 @@ class ApiLicenseController(http.Controller):
         ``download_url`` zurück, damit der Client einen Banner anzeigen
         kann. Reines Datenfeld, keine automatische Auslieferung.
 
-        Rate-Limit: 100/h pro IP. Wird geloggt aber nicht in events.
+        Rate-Limit (Sprint 3 / L-C2): zwei Achsen.
+        * pro IP: 100/h (gegen breites Scanning)
+        * pro Key: 200/h (gegen Multi-IP-Scanning desselben Keys —
+          legitimer Cron 24x/Tag, da reicht 200 Headroom für Multi-Tenant)
         """
         if not _check_rate_limit(_client_ip(), 'check', 100, 3600):
             return {'error': 'TOO_MANY_REQUESTS'}
@@ -78,6 +81,11 @@ class ApiLicenseController(http.Controller):
         gen = request.env['wb.key.generator'].sudo()
         if not gen.validate_key_format(key):
             return {'error': 'INVALID_KEY_FORMAT'}
+
+        # Per-Key Rate-Limit nach Format-Validation, damit Spam-Versuche
+        # mit Junk-Strings nicht den per-Key-Counter belasten.
+        if not _check_rate_limit('key:' + key, 'check_key', 200, 3600):
+            return {'error': 'TOO_MANY_REQUESTS'}
 
         license = request.env['wb.license.key'].sudo().search([('name', '=', key)], limit=1)
         if not license:
@@ -144,8 +152,15 @@ class ApiLicenseController(http.Controller):
 
         * ``subscribe_newsletter`` — Newsletter-Opt-In
         * ``contact_email`` — Email für Newsletter und Audit-Bezug
+        * ``request_id`` — UUID4 vom Client (Sprint 3 / L-C1). Bei
+          identischer ID innerhalb 1h wird das gespeicherte Resultat
+          zurückgegeben — schützt gegen DB-Clone-Replay und
+          Doppelklick-Aktivierungen.
 
-        Rate-Limit: 5/h pro IP gegen Code-Brute-Force.
+        Rate-Limit (Sprint 3 / L-C2): zwei Achsen.
+        * pro IP: 5/h
+        * pro Key: 5/h — verhindert dass ein Angreifer mit 100 IPs gegen
+          100 verschiedene Keys parallel scannt.
         """
         if not _check_rate_limit(_client_ip(), 'activate', 5, 3600):
             return {'error': 'TOO_MANY_ATTEMPTS'}
@@ -155,6 +170,7 @@ class ApiLicenseController(http.Controller):
         domain = (kw.get('domain') or '').strip()
         db_uuid = (kw.get('db_uuid') or '').strip()
         contact_email = (kw.get('contact_email') or kw.get('email') or '').strip()
+        request_id = (kw.get('request_id') or '').strip()
 
         gen = request.env['wb.key.generator'].sudo()
         if not gen.validate_key_format(key):
@@ -163,6 +179,27 @@ class ApiLicenseController(http.Controller):
             return {'error': 'INVALID_CODE_FORMAT'}
         if not domain or not db_uuid:
             return {'error': 'MISSING_BINDING_DATA'}
+
+        # Per-Key Rate-Limit nach Format-Validation
+        if not _check_rate_limit('key:' + key, 'activate_key', 5, 3600):
+            return {'error': 'TOO_MANY_ATTEMPTS'}
+
+        # Sprint 3 / L-C1 — Replay-Schutz via request_id-Dedup.
+        # Wenn der Client eine request_id schickt: in der Dedup-Tabelle
+        # nachsehen ob wir das schon mal verarbeitet haben. Wenn ja:
+        # gespeichertes Resultat zurueckgeben (idempotent fuer
+        # Doppelklick + Sicherung gegen DB-Clone-Replay).
+        # Wenn keine request_id (alter Client): Fallback auf
+        # (key, db_uuid, domain, hour-Bucket) — verhindert dass eine
+        # geclonte DB den selben Key innerhalb derselben Stunde nochmal
+        # aktiviert.
+        ActivationReq = request.env['wb.license.activation_request'].sudo()
+        cached = ActivationReq.find_replay(
+            request_id=request_id or None,
+            key=key, domain=domain, db_uuid=db_uuid,
+        )
+        if cached is not None:
+            return cached
 
         # Pflicht-Consents — VOR DB-Lookup prüfen, damit der Code-Hash
         # nicht angetastet wird wenn der Anwender es vergessen hat.
@@ -197,13 +234,23 @@ class ApiLicenseController(http.Controller):
         if result['status'] == 'ok':
             for ticket in license.ticket_ids.filtered(lambda t: t.state in ('pending', 'awaiting_otp', 'code_revealed')):
                 ticket.action_consume()
-            return {
+            payload = {
                 'status': 'ok',
                 'state': license.state,
                 'bound_domain': license.bound_domain,
                 'valid_to': license.valid_to.isoformat() if license.valid_to else None,
             }
-        return result
+        else:
+            payload = result
+
+        # Sprint 3 / L-C1: Resultat im Dedup-Store ablegen — fuer Replay
+        # innerhalb des TTL-Fensters wird genau dieses Payload returned.
+        ActivationReq.record_result(
+            request_id=request_id or None,
+            key=key, domain=domain, db_uuid=db_uuid,
+            payload=payload,
+        )
+        return payload
 
     @http.route('/api/license/announce',
                 type='json', auth='public', methods=['POST'],

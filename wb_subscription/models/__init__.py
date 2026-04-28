@@ -2,6 +2,7 @@ from . import wb_key_generator
 from . import wb_telegram_notifier
 from . import wb_license_tag
 from . import wb_rate_limit_entry
+from . import wb_activation_request
 from . import wb_license_event
 from . import wb_license_key
 from . import wb_activation_ticket

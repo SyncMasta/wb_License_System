@@ -23,6 +23,7 @@ importiert werden:
 
 import logging
 import random
+import uuid
 from datetime import timedelta
 from functools import wraps
 
@@ -115,6 +116,13 @@ class WbLicenseClient(models.AbstractModel):
             'db_uuid': self._get_db_uuid(),
             'email': self.env.user.email or '',
             'client_version': self._get_module_version(),
+            # Sprint 3 / L-C1 — Replay-Schutz: jeder Activate-Call kriegt
+            # eine UUID4. Server speichert das Resultat in
+            # wb.license.activation_request — bei identischer ID innerhalb
+            # 7 Tagen wird der Original-Payload zurueckgegeben statt einer
+            # zweiten echten Activation. Schuetzt vor DB-Clone-Replay und
+            # versehentlichen Doppel-Submits.
+            'request_id': str(uuid.uuid4()),
         }
         if consents:
             payload.update({

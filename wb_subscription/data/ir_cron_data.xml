@@ -62,6 +62,16 @@
             <field name="active" eval="True"/>
         </record>
 
+        <record id="ir_cron_activation_request_cleanup" model="ir.cron">
+            <field name="name">WB Subscription: Activation-Request Cleanup (L-C1)</field>
+            <field name="model_id" ref="model_wb_license_activation_request"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_cleanup()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">hours</field>
+            <field name="active" eval="True"/>
+        </record>
+
         <record id="ir_cron_daily_telegram_summary" model="ir.cron">
             <field name="name">WB Subscription: Daily Telegram-Summary</field>
             <field name="model_id" ref="model_wb_dashboard"/>

@@ -63,16 +63,62 @@ def _verify_recaptcha_token(token, secret_key):
         return False, 0.0
 
 
+# Sprint 3 / L-C3 — Rechtsform-Suffixe werden vor dem Masken-Print
+# entfernt, damit kein Reverse-Lookup gegen Handelsregister möglich ist.
+# Set ist case-insensitive, ohne Punkte und Klammern; ``_is_legal_suffix``
+# normalisiert das eingehende Token entsprechend.
+_LEGAL_SUFFIX_TOKENS = frozenset({
+    # Deutschland
+    'gmbh', 'mbh', 'ag', 'ug', 'kg', 'ohg', 'ek', 'ev',
+    'haftungsbeschränkt', 'haftungsbeschraenkt',
+    # Konjunktion in Co.-Konstrukten
+    'co', '&',
+    # UK / US
+    'ltd', 'limited', 'llc',
+    'inc', 'corp', 'corporation', 'plc', 'lp', 'llp',
+    # CH / FR / ES / IT
+    'sa', 'spa', 'sas', 'sarl', 'srl',
+    # NL / SE / NO / DK / FI / AT
+    'bv', 'ab', 'as', 'aps', 'oy', 'gesmbh',
+    # AU
+    'pty',
+})
+
+
+def _is_legal_suffix(token):
+    """True wenn ``token`` eine bekannte Rechtsform ist (case-insensitive,
+    Punkte und Klammern werden vor dem Vergleich entfernt)."""
+    if not token:
+        return False
+    normalized = token.lower().strip('.,()').replace('.', '')
+    return normalized in _LEGAL_SUFFIX_TOKENS
+
+
 def _anonymize_partner_name(name):
-    """Müller GmbH → M.... GmbH. Solo-Namen → M. M..."""
+    """Liefert nur den ersten Buchstaben des eigentlichen Firmennamens
+    plus Ellipsis. Rechtsform-Suffixe und Längen-Information werden
+    entfernt (Sprint 3 / L-C3, gegen Reverse-Lookup).
+
+    Beispiele:
+        'Müller GmbH'                 → 'M…'
+        'Müller-Schmidt KG'           → 'M…'
+        'Acme Holdings GmbH & Co. KG' → 'A…'
+        'Wissen Beratung'             → 'W…'
+        'Müller'                      → 'M…'
+        ''                            → ''
+    """
     if not name:
         return ''
-    parts = name.strip().split()
-    if len(parts) == 1:
-        return f"{parts[0][0]}{'.' * min(4, max(1, len(parts[0]) - 1))}"
-    first, *rest = parts
-    suffix = ' '.join(rest)
-    return f"{first[0]}{'.' * 4} {suffix}"
+    cleaned = name.replace(',', ' ').strip()
+    if not cleaned:
+        return ''
+    tokens = cleaned.split()
+    while tokens and _is_legal_suffix(tokens[-1]):
+        tokens.pop()
+    if not tokens:
+        return '***'
+    first = tokens[0]
+    return f'{first[0]}…'
 
 
 def _build_verify_data(license):
