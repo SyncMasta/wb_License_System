@@ -10,11 +10,61 @@
                     <div class="alert alert-info" role="alert">
                         <field name="info_message" nolabel="1" readonly="1"/>
                     </div>
-                    <group>
+                    <group string="Lizenzdaten">
                         <field name="product_code" placeholder="z.B. TELE"/>
                         <field name="key" placeholder="WB-XXXX-xxxxxxxxXX"/>
                         <field name="activation_code"
                                placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"/>
+                        <field name="contact_email" widget="email"/>
+                    </group>
+
+                    <group string="Pflicht-Bestätigungen">
+                        <field name="confirm_eula"/>
+                        <div class="text-muted small ms-4" colspan="2">
+                            Ich habe die <strong>EULA</strong>
+                            (End-User-License-Agreement) gelesen und akzeptiere sie.
+                            Verfügbar unter <em>EULA.md</em> im Modul-Verzeichnis bzw.
+                            <a href="https://wissen-beratung.de/legal/eula" target="_blank">
+                                wissen-beratung.de/legal/eula
+                            </a>.
+                        </div>
+
+                        <field name="confirm_terms"/>
+                        <div class="text-muted small ms-4" colspan="2">
+                            Ich akzeptiere die <strong>Allgemeinen Geschäftsbedingungen
+                            (AGB)</strong> von WISSEN BERATUNG unter
+                            <a href="https://wissen-beratung.de/legal/agb" target="_blank">
+                                wissen-beratung.de/legal/agb
+                            </a>.
+                        </div>
+
+                        <field name="confirm_privacy"/>
+                        <div class="text-muted small ms-4" colspan="2">
+                            Ich habe den <strong>Datenschutzhinweis</strong> (DSGVO)
+                            zur Kenntnis genommen
+                            (<a href="https://wissen-beratung.de/legal/datenschutz" target="_blank">
+                                wissen-beratung.de/legal/datenschutz
+                            </a>).
+                        </div>
+
+                        <field name="confirm_no_refund"/>
+                        <div class="alert alert-warning ms-4" colspan="2">
+                            <strong>Wichtig:</strong> Mit der Aktivierung der Lizenz
+                            ist eine spätere <strong>Gutschrift bzw. Erstattung des
+                            Kaufpreises ausgeschlossen</strong> (§ 6.5 EULA).
+                            Diese Bestätigung wird zu Beweiszwecken bei
+                            WISSEN BERATUNG protokolliert.
+                        </div>
+                    </group>
+
+                    <group string="Optional">
+                        <field name="subscribe_newsletter"/>
+                        <div class="text-muted small ms-4" colspan="2">
+                            Ich möchte über <strong>Updates, Sicherheits-Patches
+                            und neue Features</strong> dieses Moduls per Email
+                            informiert werden. Abmeldung jederzeit über den
+                            Unsubscribe-Link in jeder Nachricht möglich.
+                        </div>
                     </group>
                 </sheet>
                 <footer>

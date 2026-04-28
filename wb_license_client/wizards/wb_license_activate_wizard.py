@@ -35,6 +35,41 @@ class WbLicenseActivateWizard(models.TransientModel):
         required=True,
         help="25 Zeichen in 5er-Gruppen, aus dem Portal-Download.",
     )
+
+    # ----------------------- Activation-Consents (Pflicht + Optional) ------
+    contact_email = fields.Char(
+        string='Email-Adresse',
+        required=True,
+        default=lambda self: self.env.user.email or '',
+        help="Email-Adresse für Activate-Audit und ggf. Newsletter-Anmeldung.",
+    )
+    confirm_eula = fields.Boolean(
+        string='EULA bestätigen',
+        help="Pflicht. Ich habe die End-User-License-Agreement (EULA) "
+             "gelesen und akzeptiert.",
+    )
+    confirm_terms = fields.Boolean(
+        string='AGB bestätigen',
+        help="Pflicht. Ich akzeptiere die Allgemeinen Geschäftsbedingungen "
+             "(AGB) von WISSEN BERATUNG.",
+    )
+    confirm_privacy = fields.Boolean(
+        string='Datenschutzhinweis bestätigen',
+        help="Pflicht. Ich habe den Datenschutzhinweis (DSGVO) zur Kenntnis "
+             "genommen.",
+    )
+    confirm_no_refund = fields.Boolean(
+        string='Verzicht auf Gutschrift bestätigen',
+        help="Pflicht. Ich bestätige, dass mit der Aktivierung der Lizenz "
+             "eine spätere Gutschrift bzw. Erstattung des Kaufpreises "
+             "ausgeschlossen ist.",
+    )
+    subscribe_newsletter = fields.Boolean(
+        string='Newsletter abonnieren',
+        help="Optional. Ich möchte über Updates, Sicherheits-Patches und "
+             "neue Features dieses Moduls per Email informiert werden.",
+    )
+
     info_message = fields.Html(compute='_compute_info_message')
 
     @api.depends('product_code')
@@ -83,10 +118,43 @@ class WbLicenseActivateWizard(models.TransientModel):
         key = (self.key or '').strip()
         code = (self.activation_code or '').strip()
         product_code = (self.product_code or '').strip().upper()
+        email = (self.contact_email or '').strip()
+
+        # Pflicht-Consents lokal prüfen — bricht früh ab statt einen
+        # Server-Roundtrip zu verschwenden. Server validiert nochmal.
+        missing = []
+        if not self.confirm_eula:
+            missing.append(_('EULA'))
+        if not self.confirm_terms:
+            missing.append(_('AGB'))
+        if not self.confirm_privacy:
+            missing.append(_('Datenschutzhinweis'))
+        if not self.confirm_no_refund:
+            missing.append(_('Verzicht auf Gutschrift'))
+        if missing:
+            raise UserError(_(
+                "Bitte bestätigen Sie folgende Pflicht-Punkte, um die Lizenz "
+                "aktivieren zu können:\n\n• %s"
+            ) % '\n• '.join(missing))
+        if not email:
+            raise UserError(_("Bitte eine Email-Adresse angeben."))
+
+        consents = {
+            'confirm_eula': True,
+            'confirm_terms': True,
+            'confirm_privacy': True,
+            'confirm_no_refund': True,
+            'subscribe_newsletter': bool(self.subscribe_newsletter),
+            'contact_email': email,
+        }
 
         info = self.env['wb.license.client'].activate_license(
-            product_code, key, code,
+            product_code, key, code, consents=consents,
         )
+
+        suffix = ''
+        if self.subscribe_newsletter:
+            suffix = _("\nSie wurden in den Produkt-Newsletter eingetragen.")
 
         return {
             'type': 'ir.actions.client',
@@ -95,8 +163,8 @@ class WbLicenseActivateWizard(models.TransientModel):
                 'type': 'success',
                 'title': _("Lizenz aktiviert"),
                 'message': _(
-                    "Die Lizenz für %s ist jetzt aktiv. Gültig bis %s."
-                ) % (product_code, info.valid_to or '-'),
+                    "Die Lizenz für %s ist jetzt aktiv. Gültig bis %s.%s"
+                ) % (product_code, info.valid_to or '-', suffix),
                 'sticky': False,
                 'next': {'type': 'ir.actions.act_window_close'},
             },

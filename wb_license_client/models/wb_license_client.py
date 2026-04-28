@@ -87,13 +87,21 @@ class WbLicenseClient(models.AbstractModel):
         return info
 
     @api.model
-    def activate_license(self, product_code, key, activation_code):
+    def activate_license(self, product_code, key, activation_code, consents=None):
         """Ruft /api/license/activate auf dem Server auf.
 
         Bei Erfolg: Key wird in ir.config_parameter gespeichert, Cache
         aktualisiert. Bei Fehler: UserError mit aussagekräftiger Meldung.
 
         Wird vom Activate-Wizard aufgerufen.
+
+        :param consents: Optional dict mit den Activate-Consents:
+            ``{'confirm_eula': bool, 'confirm_terms': bool,
+              'confirm_privacy': bool, 'confirm_no_refund': bool,
+              'subscribe_newsletter': bool, 'contact_email': str}``.
+            Werden 1:1 als Payload-Keys an den Server durchgereicht.
+            Server validiert die Pflicht-Consents und gibt
+            ``MISSING_CONSENTS`` zurück, wenn welche fehlen.
         """
         payload = {
             'key': key,
@@ -103,6 +111,15 @@ class WbLicenseClient(models.AbstractModel):
             'email': self.env.user.email or '',
             'client_version': self._get_module_version(),
         }
+        if consents:
+            payload.update({
+                'confirm_eula': bool(consents.get('confirm_eula')),
+                'confirm_terms': bool(consents.get('confirm_terms')),
+                'confirm_privacy': bool(consents.get('confirm_privacy')),
+                'confirm_no_refund': bool(consents.get('confirm_no_refund')),
+                'subscribe_newsletter': bool(consents.get('subscribe_newsletter')),
+                'contact_email': (consents.get('contact_email') or '').strip(),
+            })
         data, status = self._do_request(
             '/api/license/activate', payload, timeout=DEFAULT_ACTIVATE_TIMEOUT,
         )
@@ -146,6 +163,70 @@ class WbLicenseClient(models.AbstractModel):
                 "oder support@wissen-beratung.de kontaktieren."
             ) % status)
         return data
+
+    @api.model
+    def submit_lead_request(self, product_code, payload):
+        """Sendet einen Lead-/Verkaufschancen-Request an wissen-beratung.de.
+
+        Wird aus Onboarding- bzw. Lizenz-Anfrage-Wizards der Produkt-Module
+        aufgerufen. Der Server-Endpoint ``/api/license/lead`` legt einen
+        ``crm.lead`` (intent='info') bzw. eine Verkaufschance (intent='purchase')
+        an und reichert den ``wb.license.install``-Eintrag an.
+
+        Identifikation der Quelle erfolgt über ``db_uuid`` + ``domain``
+        (werden hier automatisch ergänzt). Auth ist 'public' analog zu den
+        anderen Endpoints; Spam-Schutz via Server-Rate-Limit.
+
+        :param product_code: 4-Char Produkt-Code (z.B. 'BITW')
+        :param payload: dict mit Wizard-Feldern. Erlaubte Keys:
+            ``intent`` ('info'|'purchase'), ``contact_email``, ``contact_name``,
+            ``contact_phone``, ``company_name``, ``company_vat``,
+            ``company_street``, ``company_zip``, ``company_city``,
+            ``company_country_code``, ``notes``.
+        :return: dict mit Server-Response (``status``, ``install_id``,
+            optional ``lead_id``).
+        :raises UserError: bei Server-Fehler oder Validierungsfehler.
+        """
+        body = dict(payload or {})
+        body['product_code'] = (product_code or '').strip().upper()
+        body['domain'] = self._get_domain() or ''
+        body['db_uuid'] = self._get_db_uuid() or ''
+        body['client_version'] = self._get_module_version()
+
+        if not body['domain'] or not body['db_uuid']:
+            raise UserError(_(
+                "Konnte Domain bzw. DB-UUID dieser Odoo-Instanz nicht "
+                "ermitteln — bitte System-Administrator informieren."
+            ))
+
+        data, status = self._do_request(
+            '/api/license/lead', body, timeout=DEFAULT_ACTIVATE_TIMEOUT,
+        )
+
+        if status == 200 and data and data.get('status') == 'ok':
+            return data
+
+        error_code = (data or {}).get('error') if data else None
+        messages = {
+            'TOO_MANY_REQUESTS': _(
+                "Zu viele Anfragen. Bitte in einer Stunde erneut versuchen."),
+            'INVALID_PRODUCT_CODE': _(
+                "Ungültiger Produkt-Code — bitte support@wissen-beratung.de "
+                "kontaktieren."),
+            'MISSING_BINDING_DATA': _(
+                "Domain oder DB-UUID dieser Odoo-Instanz konnte nicht ermittelt "
+                "werden — bitte System-Administrator informieren."),
+            'MISSING_REQUIRED_FIELDS': _(
+                "Bitte Firma, Ansprechpartner und Email ausfüllen."),
+        }
+        message = messages.get(error_code) or (
+            _("Lizenz-Server nicht erreichbar (HTTP %s). Bitte später erneut "
+              "versuchen oder vertrieb@wissen-beratung.de kontaktieren.") % status
+            if status == 0 or status >= 500
+            else _("Anfrage konnte nicht übermittelt werden (HTTP %s). Bitte "
+                   "Eingaben prüfen und erneut versuchen.") % status
+        )
+        raise UserError(message)
 
     @api.model
     def register_install(self, product_code):
@@ -314,6 +395,9 @@ class WbLicenseClient(models.AbstractModel):
                 "support@wissen-beratung.de für eine Reaktivierung."),
             'TOO_MANY_ATTEMPTS': _(
                 "Zu viele Fehlversuche. Bitte warten Sie 1 Stunde und versuchen Sie es erneut."),
+            'MISSING_CONSENTS': _(
+                "Aktivierung nicht möglich — Sie müssen EULA, AGB, Datenschutzhinweis "
+                "und den Verzicht auf Gutschrift bestätigen."),
         }
         message = messages.get(error_code)
         if not message:

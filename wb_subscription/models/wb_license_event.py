@@ -36,6 +36,13 @@ EVENT_TYPES = [
     ('revoked', 'Lizenz gesperrt'),
     ('reactivated', 'Lizenz reaktiviert'),
     ('certificate_generated', 'Zertifikat erzeugt'),
+    ('lead_received', 'Lead/Verkaufschance vom Kunden eingegangen'),
+    ('eula_accepted', 'EULA beim Activate bestätigt'),
+    ('terms_accepted', 'AGB beim Activate bestätigt'),
+    ('privacy_accepted', 'Datenschutzhinweis beim Activate bestätigt'),
+    ('refund_waiver_confirmed', 'Verzicht auf Gutschrift bestätigt'),
+    ('newsletter_optin', 'Newsletter-Opt-In beim Activate'),
+    ('newsletter_optin_failed', 'Newsletter-Opt-In fehlgeschlagen (Liste fehlt o.ä.)'),
 ]
 
 

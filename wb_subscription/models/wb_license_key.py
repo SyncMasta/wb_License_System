@@ -65,6 +65,43 @@ class WbLicenseKey(models.Model):
         help="Code kann bis zu diesem Datum verwendet werden.",
     )
 
+    # ----------------------- Activation-Consents (DSGVO + Vertragsrecht) ---
+    eula_accepted_at = fields.Datetime(
+        string='EULA bestätigt am', readonly=True, copy=False,
+        help="Zeitpunkt, zu dem der Anwender die EULA beim Aktivieren "
+             "explizit bestätigt hat.",
+    )
+    terms_accepted_at = fields.Datetime(
+        string='AGB bestätigt am', readonly=True, copy=False,
+        help="Zeitpunkt der ausdrücklichen AGB-Bestätigung.",
+    )
+    privacy_accepted_at = fields.Datetime(
+        string='Datenschutzhinweis bestätigt am', readonly=True, copy=False,
+        help="Zeitpunkt der ausdrücklichen DSGVO-/Datenschutzhinweis-Bestätigung.",
+    )
+    refund_waiver_confirmed_at = fields.Datetime(
+        string='Verzicht auf Gutschrift bestätigt am',
+        readonly=True, copy=False,
+        help="Zeitpunkt, zu dem der Anwender bestätigt hat, dass mit der "
+             "Aktivierung der Lizenz keine Gutschrift mehr möglich ist.",
+    )
+    activation_consent_email = fields.Char(
+        string='Bestätigt durch (Email)', readonly=True, copy=False,
+        help="Email-Adresse des Anwenders der die Consents beim Activate "
+             "bestätigt hat — Audit-Beweis.",
+    )
+    activation_consent_ip = fields.Char(
+        string='IP der Bestätigung', readonly=True, copy=False,
+    )
+    newsletter_optin_at = fields.Datetime(
+        string='Newsletter-Opt-In am', readonly=True, copy=False,
+        help="Zeitpunkt der Newsletter-Anmeldung beim Activate. "
+             "Leer = nicht angemeldet bzw. abgemeldet.",
+    )
+    newsletter_optin_email = fields.Char(
+        string='Newsletter-Email', readonly=True, copy=False,
+    )
+
     product_id = fields.Many2one(
         'product.product',
         string='Produkt',
@@ -349,11 +386,20 @@ class WbLicenseKey(models.Model):
         )
         return True
 
-    def activate_with_code(self, activation_code, domain, db_uuid, ip=None, user_agent=None):
+    def activate_with_code(self, activation_code, domain, db_uuid, ip=None,
+                           user_agent=None, consents=None):
         """Prüft Activation-Code und aktiviert die Lizenz.
 
         Wird vom Controller /api/license/activate aufgerufen. Siehe
         ARCHITECTURE.md 6.2 für den kompletten Flow.
+
+        :param consents: Optional dict mit den Activate-Consents:
+            ``{'eula': True, 'terms': True, 'privacy': True,
+              'refund_waiver': True, 'newsletter': bool, 'email': str}``.
+            Wenn ``None`` übergeben (Backwards-Compat / Tests), läuft die
+            Aktivierung ohne Consent-Persistenz durch — der Controller ist
+            jedoch dafür verantwortlich, dass die Pflicht-Consents da sind,
+            bevor er hier reingeht.
 
         Returns:
             dict mit 'status' und ggf. 'error' (für Controller-Response).
@@ -387,19 +433,30 @@ class WbLicenseKey(models.Model):
             return {'status': 'error', 'error': 'WRONG_CODE'}
 
         fingerprint = gen.compute_fingerprint(domain, db_uuid)
-        self.write({
+        now = fields.Datetime.now()
+        write_vals = {
             'bound_domain': domain,
             'bound_db_uuid': db_uuid,
-            'activated_at': fields.Datetime.now(),
+            'activated_at': now,
             'activated_fingerprint': fingerprint,
             'activation_hash': False,
             'state': 'active' if self.state == 'issued' else self.state,
-        })
+        }
+        if consents:
+            write_vals.update(self._consent_write_vals(consents, now, ip))
+        self.write(write_vals)
+
         self.env['wb.license.event'].log_event(
             self, 'activation',
             ip_address=ip, user_agent=user_agent,
             domain=domain, db_uuid=db_uuid,
         )
+        if consents:
+            self._log_consent_events(consents, ip, user_agent, domain, db_uuid)
+            if consents.get('newsletter') and consents.get('email'):
+                self._add_to_product_newsletter(
+                    consents['email'], ip=ip, user_agent=user_agent)
+
         if self.product_code:
             install = self.env['wb.license.install'].sudo().search([
                 ('product_code', '=', self.product_code),
@@ -409,6 +466,109 @@ class WbLicenseKey(models.Model):
             if install:
                 install.mark_converted(self)
         return {'status': 'ok'}
+
+    def _consent_write_vals(self, consents, when, ip):
+        """Mappt Consent-dict auf wb.license.key Schreibwerte."""
+        vals = {
+            'activation_consent_email': (consents.get('email') or '').strip() or False,
+            'activation_consent_ip': ip or False,
+        }
+        if consents.get('eula'):
+            vals['eula_accepted_at'] = when
+        if consents.get('terms'):
+            vals['terms_accepted_at'] = when
+        if consents.get('privacy'):
+            vals['privacy_accepted_at'] = when
+        if consents.get('refund_waiver'):
+            vals['refund_waiver_confirmed_at'] = when
+        if consents.get('newsletter') and consents.get('email'):
+            vals['newsletter_optin_at'] = when
+            vals['newsletter_optin_email'] = (consents['email'] or '').strip()
+        return vals
+
+    def _log_consent_events(self, consents, ip, user_agent, domain, db_uuid):
+        """Schreibt einen Audit-Event-Eintrag pro bestätigtem Consent."""
+        Event = self.env['wb.license.event']
+        mapping = [
+            ('eula', 'eula_accepted'),
+            ('terms', 'terms_accepted'),
+            ('privacy', 'privacy_accepted'),
+            ('refund_waiver', 'refund_waiver_confirmed'),
+        ]
+        for key, event_type in mapping:
+            if consents.get(key):
+                Event.log_event(
+                    self, event_type,
+                    ip_address=ip, user_agent=user_agent,
+                    domain=domain, db_uuid=db_uuid,
+                    details={'email': consents.get('email') or ''},
+                )
+        if consents.get('newsletter') and consents.get('email'):
+            Event.log_event(
+                self, 'newsletter_optin',
+                ip_address=ip, user_agent=user_agent,
+                domain=domain, db_uuid=db_uuid,
+                details={'email': consents['email']},
+            )
+
+    def _add_to_product_newsletter(self, email, ip=None, user_agent=None):
+        """Trägt die Email in die Mailing-Liste ein, deren Name mit dem
+        Produkt-Code in eckigen Klammern beginnt (z. B. '[BITW] ...').
+
+        Soft-Dependency: Wenn ``mass_mailing`` nicht installiert ist
+        bzw. keine passende Liste existiert, wird ein Warn-Event geloggt
+        und der Activate trotzdem durchgelassen.
+        """
+        self.ensure_one()
+        Event = self.env['wb.license.event']
+        MailingList = self.env.get('mailing.list')
+        MailingContact = self.env.get('mailing.contact')
+        if MailingList is None or MailingContact is None:
+            _logger.info(
+                "[wb_subscription] mass_mailing nicht installiert — "
+                "Newsletter-Opt-In für %s übersprungen.", email)
+            Event.log_event(
+                self, 'newsletter_optin_failed',
+                ip_address=ip, user_agent=user_agent,
+                details={'reason': 'mass_mailing_not_installed', 'email': email},
+            )
+            return False
+
+        if not self.product_code:
+            Event.log_event(
+                self, 'newsletter_optin_failed',
+                ip_address=ip, user_agent=user_agent,
+                details={'reason': 'no_product_code', 'email': email},
+            )
+            return False
+
+        prefix = '[%s]' % self.product_code
+        mlist = MailingList.sudo().search(
+            [('name', '=like', prefix + '%'), ('active', '=', True)], limit=1)
+        if not mlist:
+            _logger.warning(
+                "[wb_subscription] Keine Mailing-Liste mit Prefix '%s' gefunden — "
+                "Newsletter-Opt-In für %s nicht eingetragen.", prefix, email)
+            Event.log_event(
+                self, 'newsletter_optin_failed',
+                ip_address=ip, user_agent=user_agent,
+                details={'reason': 'list_not_found', 'prefix': prefix,
+                         'email': email},
+            )
+            return False
+
+        contact = MailingContact.sudo().search(
+            [('email', '=ilike', email)], limit=1)
+        if not contact:
+            contact = MailingContact.sudo().create({
+                'email': email,
+                'name': email.split('@', 1)[0],
+                'list_ids': [(6, 0, [mlist.id])],
+            })
+        else:
+            if mlist.id not in contact.list_ids.ids:
+                contact.sudo().write({'list_ids': [(4, mlist.id)]})
+        return contact
 
     def _compute_certificate_ids(self):
         Attach = self.env['ir.attachment'].sudo()
