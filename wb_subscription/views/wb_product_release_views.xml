@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="wb_product_release_view_list" model="ir.ui.view">
+        <field name="name">wb.product.release.list</field>
+        <field name="model">wb.product.release</field>
+        <field name="arch" type="xml">
+            <list string="Modul-Releases"
+                  decoration-success="is_current"
+                  decoration-muted="state == 'archived'"
+                  decoration-info="state == 'draft'">
+                <field name="product_tmpl_id"/>
+                <field name="version"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'published'"
+                       decoration-muted="state == 'archived'"
+                       decoration-info="state == 'draft'"/>
+                <field name="is_current" widget="boolean_toggle"/>
+                <field name="released_at"/>
+                <field name="has_attachment"/>
+                <field name="filename" optional="show"/>
+                <field name="download_count" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="wb_product_release_view_form" model="ir.ui.view">
+        <field name="name">wb.product.release.form</field>
+        <field name="model">wb.product.release</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_set_current" type="object"
+                            string="Als aktuelle Version setzen"
+                            class="btn-primary"
+                            invisible="is_current or state == 'archived' or not has_attachment"/>
+                    <button name="action_publish" type="object"
+                            string="Veröffentlichen"
+                            invisible="state != 'draft'"/>
+                    <button name="action_archive_release" type="object"
+                            string="Archivieren"
+                            invisible="state == 'archived'"
+                            confirm="Release wird archiviert. Wenn sie 'is_current' war, sehen Kunden ab sofort keine current-Version mehr — bis eine andere Release als current markiert wird. Fortfahren?"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,published,archived"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="display_name" readonly="1"/>
+                        </h1>
+                        <h3 invisible="not is_current">
+                            <span class="badge text-bg-success">
+                                <i class="fa fa-star"/> Aktuelle Version
+                            </span>
+                        </h3>
+                    </div>
+                    <group>
+                        <group string="Identifikation">
+                            <field name="product_tmpl_id"
+                                   options="{'no_create': True}"/>
+                            <field name="product_code" readonly="1"/>
+                            <field name="version" placeholder="z.B. 19.0.1.2.0"/>
+                            <field name="released_at"/>
+                            <field name="filename"
+                                   placeholder="z.B. wb_bitwarden_pro-19.0.1.2.0.tar.gz"/>
+                        </group>
+                        <group string="Tarball">
+                            <field name="attachment_id"
+                                   options="{'no_create': True}"/>
+                            <field name="has_attachment" readonly="1"/>
+                            <field name="is_current" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Changelog" name="changelog">
+                            <field name="changelog"
+                                   placeholder="Optional. Wird Kunden im Portal über der Release angezeigt."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="wb_product_release_view_search" model="ir.ui.view">
+        <field name="name">wb.product.release.search</field>
+        <field name="model">wb.product.release</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="product_tmpl_id"/>
+                <field name="version"/>
+                <field name="product_code"/>
+                <filter name="filter_current" string="Aktuelle Version"
+                        domain="[('is_current', '=', True)]"/>
+                <filter name="filter_published" string="Veröffentlicht"
+                        domain="[('state', '=', 'published')]"/>
+                <filter name="filter_draft" string="Entwurf"
+                        domain="[('state', '=', 'draft')]"/>
+                <filter name="filter_archived" string="Archiviert"
+                        domain="[('state', '=', 'archived')]"/>
+                <separator/>
+                <filter name="group_product" string="Gruppen: Produkt"
+                        context="{'group_by': 'product_tmpl_id'}"/>
+                <filter name="group_state" string="Gruppen: Status"
+                        context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="wb_product_release_action" model="ir.actions.act_window">
+        <field name="name">Modul-Releases</field>
+        <field name="res_model">wb.product.release</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="wb_product_release_view_search"/>
+        <field name="context">{'search_default_filter_published': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Noch keine Releases angelegt.</p>
+            <p>Lege eine Release an, lade den .tar.gz-Build als Anhang hoch
+               und klicke "Als aktuelle Version setzen". Lizensierte Kunden
+               sehen die Release ab dann im Portal unter
+               <code>/my/downloads</code>.</p>
+        </field>
+    </record>
+
+</odoo>

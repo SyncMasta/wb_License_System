@@ -120,7 +120,19 @@ class WbLicenseInstall(models.Model):
         index=True,
         help="res.partner der zur contact_email passt — nur Read-Only-Hinweis.",
     )
-    client_version = fields.Char(string='Client-Version')
+    client_version = fields.Char(
+        string='Client-Version',
+        help="Version des wb_license_client-Moduls beim Kunden — Telemetrie "
+             "für Lizenz-Schicht selbst (nicht das Produkt-Modul).",
+    )
+    installed_module_version = fields.Char(
+        string='Installierte Modul-Version',
+        index=True,
+        help="Version des Produkt-Moduls (z.B. wb_bitwarden_pro 19.0.1.1.0) "
+             "wie zuletzt vom Kunden gemeldet. Aktualisiert sich bei jedem "
+             "/api/license/check-Ping. Vergleich mit "
+             "product_id.wb_latest_module_version zeigt Update-Bedarf.",
+    )
 
     first_seen_at = fields.Datetime(
         required=True,

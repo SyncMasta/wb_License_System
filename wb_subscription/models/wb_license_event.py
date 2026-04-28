@@ -43,6 +43,7 @@ EVENT_TYPES = [
     ('refund_waiver_confirmed', 'Verzicht auf Gutschrift bestätigt'),
     ('newsletter_optin', 'Newsletter-Opt-In beim Activate'),
     ('newsletter_optin_failed', 'Newsletter-Opt-In fehlgeschlagen (Liste fehlt o.ä.)'),
+    ('download', 'Modul-Tarball aus Kunden-Portal heruntergeladen'),
 ]
 
 

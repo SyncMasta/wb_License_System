@@ -32,6 +32,9 @@
                             <field name="wb_module_technical_name"
                                    placeholder="z.B. wb_telnyx_voip"
                                    invisible="not wb_is_license_product"/>
+                            <field name="wb_latest_module_version"
+                                   placeholder="z.B. 19.0.1.1.0"
+                                   invisible="not wb_is_license_product"/>
                         </group>
                         <group invisible="not wb_is_license_product">
                             <field name="wb_instance_limit"/>
@@ -43,6 +46,38 @@
                     <group invisible="not wb_is_license_product" string="Templates">
                         <field name="wb_eula_template_id"/>
                         <field name="wb_certificate_template_id"/>
+                    </group>
+                    <group invisible="not wb_is_license_product"
+                           string="Modul-Releases (Kunden-Portal)">
+                        <field name="wb_current_release_id" readonly="1"
+                               options="{'no_open': False}"/>
+                        <field name="wb_latest_module_version" readonly="1"/>
+                        <field name="wb_has_downloadable_tarball" readonly="1"/>
+                    </group>
+                    <group invisible="not wb_is_license_product"
+                           string="Versionen">
+                        <field name="wb_release_ids" nolabel="1" colspan="2">
+                            <list editable="bottom"
+                                  decoration-success="is_current"
+                                  decoration-muted="state == 'archived'"
+                                  decoration-info="state == 'draft'">
+                                <field name="version"/>
+                                <field name="state" widget="badge"
+                                       decoration-success="state == 'published'"
+                                       decoration-muted="state == 'archived'"
+                                       decoration-info="state == 'draft'"/>
+                                <field name="is_current" widget="boolean_toggle" readonly="1"/>
+                                <field name="released_at"/>
+                                <field name="filename"/>
+                                <field name="attachment_id"
+                                       options="{'no_create': True}"/>
+                                <field name="has_attachment" readonly="1"/>
+                                <field name="download_count" readonly="1"/>
+                                <button name="action_set_current" type="object"
+                                        string="→ Current"
+                                        invisible="is_current or state == 'archived' or not has_attachment"/>
+                            </list>
+                        </field>
                     </group>
                 </page>
             </notebook>

@@ -51,7 +51,8 @@ class WbLicenseClient(models.AbstractModel):
     _description = 'WB License Client Service'
 
     @api.model
-    def check_license(self, product_code, min_cache_age_days=DEFAULT_MIN_CACHE_AGE_DAYS):
+    def check_license(self, product_code, min_cache_age_days=DEFAULT_MIN_CACHE_AGE_DAYS,
+                       module_name=None):
         """Hauptmethode. Liefert wb.license.info-Record mit aktuellem Status.
 
         Flow (siehe docs/modules/wb_license_client.md):
@@ -66,9 +67,13 @@ class WbLicenseClient(models.AbstractModel):
         :param min_cache_age_days: Max. Alter der letzten erfolgreichen
             Prüfung für 'unknown'-State. Default 30. Strenger bei Methoden
             mit externen Kosten.
+        :param module_name: Optional technischer Modul-Name (z.B.
+            'wb_bitwarden_pro'). Wenn übergeben und der Cache hat noch
+            keinen, wird das Mapping persistiert — danach kann der Ping
+            die installierte Modul-Version melden.
         :return: wb.license.info Record (erstellt einen, wenn noch keiner existiert)
         """
-        info = self._get_or_create_info(product_code)
+        info = self._get_or_create_info(product_code, module_name=module_name)
         key = self._get_stored_key(product_code)
 
         if not key:
@@ -229,11 +234,12 @@ class WbLicenseClient(models.AbstractModel):
         raise UserError(message)
 
     @api.model
-    def register_install(self, product_code):
+    def register_install(self, product_code, module_name=None):
         """Meldet diese Odoo-Instanz als Install bei wissen-beratung.de an.
 
         Wird aus zwei Pfaden gerufen:
-        1. ``_post_init_hook`` von Produkt-Modulen — explizit beim Install.
+        1. ``_post_init_hook`` von Produkt-Modulen — explizit beim Install,
+           hier sollte ``module_name`` mitgegeben werden.
         2. ``check_license`` — Fallback wenn (noch) kein Key gespeichert ist
            und der letzte Announce > 24h zurückliegt.
 
@@ -242,12 +248,15 @@ class WbLicenseClient(models.AbstractModel):
         Opt-out via ``ir.config_parameter`` ``wb_license_client.disable_install_registry=True``.
 
         :param product_code: 4-Char Produkt-Code (z.B. 'TELE')
+        :param module_name: Optional technischer Modul-Name (z.B.
+            'wb_bitwarden_pro'). Wird auf wb.license.info persistiert,
+            damit der tägliche Ping die installierte Modul-Version melden kann.
         :return: True wenn Announce erfolgreich, False sonst
         """
         if self._install_registry_disabled():
             return False
 
-        info = self._get_or_create_info(product_code)
+        info = self._get_or_create_info(product_code, module_name=module_name)
         return self._announce_install(info, product_code)
 
     @api.model
@@ -275,6 +284,9 @@ class WbLicenseClient(models.AbstractModel):
             'client_version': self._get_module_version(),
             'email': self.env.user.email or '',
         }
+        module_version = self._get_module_version_for(info.module_technical_name)
+        if module_version:
+            payload['module_version'] = module_version
         if not payload['domain'] or not payload['db_uuid']:
             _logger.info(
                 "[wb_license_client] Announce für %s übersprungen — "
@@ -304,8 +316,14 @@ class WbLicenseClient(models.AbstractModel):
         return str(param).lower() in ('1', 'true', 'yes')
 
     @api.model
-    def _get_or_create_info(self, product_code):
-        """Findet oder erzeugt den wb.license.info-Record für (product, company)."""
+    def _get_or_create_info(self, product_code, module_name=None):
+        """Findet oder erzeugt den wb.license.info-Record für (product, company).
+
+        Wenn ``module_name`` übergeben wird und der Record noch keinen hat
+        (oder er sich geändert hat — z.B. Pro/Free-Switch), wird das Feld
+        ``module_technical_name`` gesetzt. Damit kann der nächste Ping die
+        installierte Modul-Version melden.
+        """
         Info = self.env['wb.license.info'].sudo()
         info = Info.search([
             ('product_code', '=', product_code),
@@ -316,7 +334,10 @@ class WbLicenseClient(models.AbstractModel):
                 'product_code': product_code,
                 'company_id': self.env.company.id,
                 'state': 'unlicensed',
+                'module_technical_name': module_name or False,
             })
+        elif module_name and info.module_technical_name != module_name:
+            info.write({'module_technical_name': module_name})
         return info
 
     @api.model
@@ -329,6 +350,9 @@ class WbLicenseClient(models.AbstractModel):
             'db_uuid': self._get_db_uuid(),
             'client_version': self._get_module_version(),
         }
+        module_version = self._get_module_version_for(info.module_technical_name)
+        if module_version:
+            payload['module_version'] = module_version
         data, status = self._do_request('/api/license/check', payload)
         if status == 200 and data:
             info.apply_server_response(data)
@@ -439,6 +463,20 @@ class WbLicenseClient(models.AbstractModel):
         module = self.env['ir.module.module'].sudo().search(
             [('name', '=', 'wb_license_client')], limit=1)
         return module.latest_version or '19.0.1.0.0'
+
+    @api.model
+    def _get_module_version_for(self, module_name):
+        """Liest die installierte Version eines beliebigen Odoo-Moduls.
+
+        Returns False wenn ``module_name`` leer ist oder das Modul nicht
+        gefunden wird — der Caller entscheidet dann, ob trotzdem gepingt
+        wird (ohne module_version-Feld) oder nicht.
+        """
+        if not module_name:
+            return False
+        module = self.env['ir.module.module'].sudo().search(
+            [('name', '=', module_name)], limit=1)
+        return module.latest_version or False
 
     @api.model
     def _get_all_configured_product_codes(self):

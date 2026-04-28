@@ -50,6 +50,12 @@
               action="wb_license_product_action"
               sequence="50"/>
 
+    <menuitem id="menu_wb_subscription_releases"
+              name="Modul-Releases"
+              parent="menu_wb_subscription_root"
+              action="wb_product_release_action"
+              sequence="55"/>
+
     <menuitem id="menu_wb_subscription_ops"
               name="Betrieb"
               parent="menu_wb_subscription_root"

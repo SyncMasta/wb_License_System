@@ -31,6 +31,52 @@ class ProductTemplate(models.Model):
         string='Odoo-Modul-Name',
         help="Technischer Name des auszuliefernden Odoo-Moduls, z.B. 'wb_telnyx_voip'.",
     )
+    wb_release_ids = fields.One2many(
+        'wb.product.release', 'product_tmpl_id',
+        string='Modul-Releases',
+        help="Versionierte Tarballs des Lizenz-Produkts. "
+             "Pro Produkt wird genau eine Release als 'is_current' geführt "
+             "und vom täglichen Lizenz-Ping ausgeliefert.",
+    )
+    wb_current_release_id = fields.Many2one(
+        'wb.product.release',
+        string='Aktuelle Release',
+        compute='_compute_wb_current_release_id',
+        store=True,
+        index=True,
+        help="Release mit is_current=True. Source of Truth für "
+             "wb_latest_module_version und wb_has_downloadable_tarball.",
+    )
+    wb_latest_module_version = fields.Char(
+        string='Aktuelle Modul-Version',
+        compute='_compute_wb_latest_module_version',
+        store=True,
+        help="Version der aktuellen Release. Wird vom täglichen Lizenz-Ping "
+             "an die Kunden ausgeliefert; wenn die installierte Version "
+             "kleiner ist, zeigt das Pro-Modul beim Kunden einen "
+             "'Update verfügbar'-Hinweis. Leer = keine Update-Anzeige.",
+    )
+    wb_has_downloadable_tarball = fields.Boolean(
+        string='Tarball verfügbar',
+        compute='_compute_wb_latest_module_version',
+        store=True,
+    )
+
+    @api.depends('wb_release_ids.is_current', 'wb_release_ids.state')
+    def _compute_wb_current_release_id(self):
+        for rec in self:
+            current = rec.wb_release_ids.filtered(
+                lambda r: r.is_current and r.state == 'published')
+            rec.wb_current_release_id = current[:1]
+
+    @api.depends('wb_current_release_id', 'wb_current_release_id.version',
+                 'wb_current_release_id.has_attachment')
+    def _compute_wb_latest_module_version(self):
+        for rec in self:
+            release = rec.wb_current_release_id
+            rec.wb_latest_module_version = release.version if release else False
+            rec.wb_has_downloadable_tarball = bool(
+                release and release.has_attachment)
     wb_instance_limit = fields.Integer(
         string='Erlaubte Instanzen',
         default=1,

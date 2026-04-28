@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Card auf der Portal-Home-Seite (/my): "Modul-Downloads (X)" -->
+    <template id="portal_my_home_wb_downloads"
+              name="Portal: WB Modul-Downloads"
+              inherit_id="portal.portal_my_home"
+              priority="35">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Modul-Downloads</t>
+                <t t-set="url" t-value="'/my/downloads'"/>
+                <t t-set="text">Aktuelle Versionen Ihrer lizensierten WISSEN BERATUNG-Module herunterladen.</t>
+                <t t-set="placeholder_count" t-value="'wb_download_count'"/>
+            </t>
+        </xpath>
+    </template>
+
+    <!-- /my/downloads — Liste der lizensierten Module + Link zur Versions-History -->
+    <template id="portal_my_downloads" name="Portal: My Downloads">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Modul-Downloads</t>
+            </t>
+
+            <t t-if="not rows">
+                <div class="alert alert-info" role="status">
+                    <strong>Keine Downloads verfügbar.</strong>
+                    <p class="mb-0">
+                        Es sind aktuell keine lizensierten Module für Ihren Account
+                        zum Download bereitgestellt. Bei Fragen wenden Sie sich an
+                        <a href="mailto:support@wissen-beratung.de">support@wissen-beratung.de</a>.
+                    </p>
+                </div>
+            </t>
+
+            <t t-if="rows">
+                <div class="alert alert-light small mb-3" role="status">
+                    Klicken Sie auf eine Lizenz, um die verfügbaren Versionen zu sehen
+                    und herunterzuladen. Bei Fragen oder Deployment-Hilfe:
+                    <a href="mailto:support@wissen-beratung.de">support@wissen-beratung.de</a>.
+                </div>
+
+                <table class="table table-hover o_portal_my_doc_table">
+                    <thead>
+                        <tr>
+                            <th>Modul</th>
+                            <th>Lizenzschlüssel</th>
+                            <th>Aktuelle Version</th>
+                            <th>Verfügbare Versionen</th>
+                            <th>Gültig bis</th>
+                            <th class="text-end">Versionen anzeigen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="rows" t-as="row">
+                            <td>
+                                <strong t-out="row['product_name']"/>
+                            </td>
+                            <td>
+                                <code t-out="row['license'].name"/>
+                            </td>
+                            <td t-out="row['current_version']"/>
+                            <td t-out="row['release_count']"/>
+                            <td>
+                                <t t-if="row['license'].valid_to">
+                                    <span t-out="row['license'].valid_to"/>
+                                </t>
+                                <t t-else="">—</t>
+                            </td>
+                            <td class="text-end">
+                                <a t-att-href="'/my/downloads/%d' % row['license'].id"
+                                   class="btn btn-primary btn-sm">
+                                    <i class="fa fa-list"/> Anzeigen
+                                </a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </t>
+        </t>
+    </template>
+
+    <!-- /my/downloads/<license_id> — Versions-History für eine Lizenz -->
+    <template id="portal_license_releases" name="Portal: License Releases">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">
+                    <span t-out="product_name"/>
+                </t>
+            </t>
+
+            <ol class="breadcrumb mb-3">
+                <li class="breadcrumb-item">
+                    <a href="/my/downloads">Modul-Downloads</a>
+                </li>
+                <li class="breadcrumb-item active">
+                    <span t-out="product_name"/>
+                </li>
+            </ol>
+
+            <div class="alert alert-light small mb-3" role="status">
+                Lizenzschlüssel: <code t-out="license.name"/>
+                — Gültig bis:
+                <t t-if="license.valid_to">
+                    <span t-out="license.valid_to"/>
+                </t>
+                <t t-else="">—</t>
+            </div>
+
+            <table class="table table-hover o_portal_my_doc_table">
+                <thead>
+                    <tr>
+                        <th>Version</th>
+                        <th>Veröffentlicht</th>
+                        <th>Status</th>
+                        <th class="text-end">Download</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="releases" t-as="release">
+                        <td>
+                            <strong t-out="release.version"/>
+                            <t t-if="release.is_current">
+                                <span class="badge text-bg-success ms-2">
+                                    <i class="fa fa-star"/> Aktuell
+                                </span>
+                            </t>
+                        </td>
+                        <td>
+                            <t t-if="release.released_at">
+                                <span t-out="release.released_at"/>
+                            </t>
+                            <t t-else="">—</t>
+                        </td>
+                        <td>
+                            <t t-if="release.is_current">
+                                <span class="text-success">empfohlen</span>
+                            </t>
+                            <t t-else="">
+                                <span class="text-muted">älter</span>
+                            </t>
+                        </td>
+                        <td class="text-end">
+                            <a t-att-href="'/my/downloads/%d/%d' % (license.id, release.id)"
+                               t-att-class="'btn btn-sm ' + ('btn-primary' if release.is_current else 'btn-outline-secondary')">
+                                <i class="fa fa-download"/>
+                                <t t-out="release.filename or ('module-' + (release.version or '') + '.tar.gz')"/>
+                            </a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <t t-foreach="releases" t-as="release">
+                <t t-if="release.changelog">
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <strong>Changelog
+                                <t t-out="release.version"/>
+                            </strong>
+                            <t t-if="release.is_current">
+                                <span class="badge text-bg-success ms-2">Aktuell</span>
+                            </t>
+                        </div>
+                        <div class="card-body">
+                            <t t-out="release.changelog"/>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

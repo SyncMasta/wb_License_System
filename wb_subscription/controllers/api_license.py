@@ -61,6 +61,14 @@ class ApiLicenseController(http.Controller):
     def check_license(self, **kw):
         """Täglicher Ping — gibt aktuellen Status zurück.
 
+        Akzeptiert optional ``module_version`` (Version des Produkt-Moduls,
+        z. B. '19.0.1.1.0' aus wb_bitwarden_pro/__manifest__.py). Wird in
+        wb.license.install gespeichert und mit der gepflegten
+        product.template.wb_latest_module_version verglichen — bei
+        verfügbarem Update gibt die Response ``latest_module_version`` und
+        ``download_url`` zurück, damit der Client einen Banner anzeigen
+        kann. Reines Datenfeld, keine automatische Auslieferung.
+
         Rate-Limit: 100/h pro IP. Wird geloggt aber nicht in events.
         """
         if not _check_rate_limit(_client_ip(), 'check', 100, 3600):
@@ -81,12 +89,42 @@ class ApiLicenseController(http.Controller):
             ip_address=_client_ip(), user_agent=_client_ua(),
             domain=kw.get('domain'), db_uuid=kw.get('db_uuid'),
         )
+
+        domain = (kw.get('domain') or '').strip()
+        db_uuid = (kw.get('db_uuid') or '').strip()
+        module_version = (kw.get('module_version') or '').strip()
+        if module_version and license.product_code and domain and db_uuid:
+            install = request.env['wb.license.install'].sudo().search([
+                ('product_code', '=', license.product_code),
+                ('domain', '=', domain),
+                ('db_uuid', '=', db_uuid),
+            ], limit=1)
+            if install and install.installed_module_version != module_version:
+                install.write({'installed_module_version': module_version})
+
+        product_tmpl = license.product_id.product_tmpl_id
+        latest_module_version = (
+            product_tmpl.wb_latest_module_version or ''
+        ).strip() or None
+        download_url = None
+        if latest_module_version and latest_module_version != module_version:
+            if product_tmpl.wb_has_downloadable_tarball:
+                base_url = (request.env['ir.config_parameter'].sudo()
+                            .get_param('web.base.url') or '').rstrip('/')
+                if base_url:
+                    download_url = f'{base_url}/my/downloads/{license.id}'
+            if not download_url:
+                download_url = request.env['ir.config_parameter'].sudo().get_param(
+                    'wb_subscription.download_portal_url') or None
+
         return {
             'state': license.state,
             'valid_from': license.valid_from.isoformat() if license.valid_from else None,
             'valid_to': license.valid_to.isoformat() if license.valid_to else None,
             'grace_until': license.grace_until.isoformat() if license.grace_until else None,
             'product_code': license.product_code,
+            'latest_module_version': latest_module_version,
+            'download_url': download_url,
         }
 
     @http.route('/api/license/activate',

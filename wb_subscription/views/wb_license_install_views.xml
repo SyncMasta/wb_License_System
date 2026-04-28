@@ -24,6 +24,7 @@
                 <field name="announce_count"/>
                 <field name="license_id" optional="show"/>
                 <field name="days_until_conversion" optional="hide"/>
+                <field name="installed_module_version" optional="show"/>
                 <field name="client_version" optional="hide"/>
             </list>
         </field>
@@ -50,6 +51,7 @@
                             <field name="product_id" readonly="1"/>
                             <field name="domain"/>
                             <field name="db_uuid"/>
+                            <field name="installed_module_version"/>
                             <field name="client_version"/>
                         </group>
                         <group string="Kontakt &amp; Konversion">

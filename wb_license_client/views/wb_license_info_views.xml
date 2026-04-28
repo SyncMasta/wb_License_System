@@ -58,6 +58,16 @@
                         </group>
                     </group>
                     <group>
+                        <group string="Modul-Version">
+                            <field name="module_technical_name" readonly="1"/>
+                            <field name="installed_module_version" readonly="1"/>
+                            <field name="latest_module_version" readonly="1"/>
+                            <field name="update_available" readonly="1"/>
+                            <field name="download_url" widget="url" readonly="1"
+                                   invisible="not download_url"/>
+                        </group>
+                    </group>
+                    <group>
                         <field name="user_message" readonly="1" nolabel="1"/>
                     </group>
                     <group string="Raw Server Response" groups="base.group_system">

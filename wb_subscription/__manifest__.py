@@ -1,6 +1,6 @@
 {
     'name': 'WB Subscription & License Platform',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.2.0',
     'category': 'Sales/Subscriptions',
     'summary': 'Vertriebs-Backend für WISSEN BERATUNG Produkt-Module',
     'description': """
@@ -56,12 +56,14 @@ Siehe ARCHITECTURE.md v1.5 für Details.
         'views/wb_license_migration_views.xml',
         'views/wb_license_trial_views.xml',
         'views/wb_license_install_views.xml',
+        'views/wb_product_release_views.xml',
         'views/wb_notification_log_views.xml',
         'views/wb_rate_limit_entry_views.xml',
         'views/product_template_views.xml',
         'views/sale_order_views.xml',
         'views/res_partner_views.xml',
         'views/portal_templates.xml',
+        'views/portal_downloads_templates.xml',
         'views/public_verify_templates.xml',
         'views/wb_dashboard_views.xml',
         'views/menu.xml',

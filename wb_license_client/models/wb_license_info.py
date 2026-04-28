@@ -79,6 +79,38 @@ class WbLicenseInfo(models.Model):
              "den Fallback in check_license auf 1×/Tag.",
     )
 
+    module_technical_name = fields.Char(
+        string='Produkt-Modul (technisch)',
+        help="Technischer Name des Odoo-Moduls, das dieser Lizenz entspricht "
+             "(z.B. 'wb_bitwarden_pro'). Wird vom register_install des "
+             "Produkt-Moduls gesetzt und vom täglichen Ping benutzt, um "
+             "die installierte Version zu melden.",
+    )
+    installed_module_version = fields.Char(
+        string='Installierte Modul-Version',
+        compute='_compute_installed_module_version',
+        store=False,
+        help="Live aus ir.module.module gelesen — die aktuell installierte "
+             "Version des Produkt-Moduls.",
+    )
+    latest_module_version = fields.Char(
+        string='Neueste verfügbare Version',
+        help="Vom WB-Lizenz-Server gemeldete höchste Release-Version. "
+             "Wird beim täglichen Ping aktualisiert.",
+    )
+    download_url = fields.Char(
+        string='Download-URL',
+        help="Vom Server gemeldete Portal-URL für den Modul-Download. "
+             "Leer wenn Portal noch nicht eingerichtet ist; Banner zeigt "
+             "in dem Fall einen Support-Hinweis statt eines Links.",
+    )
+    update_available = fields.Boolean(
+        string='Update verfügbar',
+        compute='_compute_update_available',
+        store=False,
+        help="True wenn latest_module_version > installed_module_version.",
+    )
+
     effective_min_cache_age_days = fields.Integer(
         string='Min Cache-Age (Tage)',
         default=30,
@@ -121,6 +153,29 @@ class WbLicenseInfo(models.Model):
         today = fields.Date.context_today(self)
         for rec in self:
             rec.days_remaining = (rec.valid_to - today).days if rec.valid_to else 0
+
+    @api.depends('module_technical_name')
+    def _compute_installed_module_version(self):
+        Module = self.env['ir.module.module'].sudo()
+        cache = {}
+        for rec in self:
+            name = rec.module_technical_name
+            if not name:
+                rec.installed_module_version = False
+                continue
+            if name not in cache:
+                module = Module.search([('name', '=', name)], limit=1)
+                cache[name] = module.latest_version or False
+            rec.installed_module_version = cache[name]
+
+    @api.depends('latest_module_version', 'installed_module_version')
+    def _compute_update_available(self):
+        for rec in self:
+            latest = (rec.latest_module_version or '').strip()
+            installed = (rec.installed_module_version or '').strip()
+            rec.update_available = bool(
+                latest and installed and latest != installed
+            )
 
     @api.depends('state', 'last_server_check', 'effective_min_cache_age_days')
     def _compute_is_valid(self):
@@ -193,6 +248,8 @@ class WbLicenseInfo(models.Model):
             'last_check_success': True,
             'last_error_message': False,
             'server_response_raw': json.dumps(data, ensure_ascii=False),
+            'latest_module_version': (data.get('latest_module_version') or '').strip() or False,
+            'download_url': (data.get('download_url') or '').strip() or False,
         }
         old_state = self.state
         self.write(vals)

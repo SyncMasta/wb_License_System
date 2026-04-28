@@ -18,3 +18,5 @@ access_wb_dashboard_user,wb.dashboard user,model_wb_dashboard,group_wb_subscript
 access_wb_dashboard_manager,wb.dashboard manager,model_wb_dashboard,group_wb_subscription_manager,1,1,1,1
 access_wb_license_install_user,wb.license.install user,model_wb_license_install,group_wb_subscription_user,1,0,0,0
 access_wb_license_install_manager,wb.license.install manager,model_wb_license_install,group_wb_subscription_manager,1,1,1,1
+access_wb_product_release_user,wb.product.release user,model_wb_product_release,group_wb_subscription_user,1,0,0,0
+access_wb_product_release_manager,wb.product.release manager,model_wb_product_release,group_wb_subscription_manager,1,1,1,1
