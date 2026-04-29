@@ -21,3 +21,4 @@ access_wb_license_install_user,wb.license.install user,model_wb_license_install,
 access_wb_license_install_manager,wb.license.install manager,model_wb_license_install,group_wb_subscription_manager,1,1,1,1
 access_wb_product_release_user,wb.product.release user,model_wb_product_release,group_wb_subscription_user,1,0,0,0
 access_wb_product_release_manager,wb.product.release manager,model_wb_product_release,group_wb_subscription_manager,1,1,1,1
+access_wb_license_create_wizard_manager,wb.license.create.wizard manager,model_wb_license_create_wizard,group_wb_subscription_manager,1,1,1,1

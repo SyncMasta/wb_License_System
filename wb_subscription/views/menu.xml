@@ -19,6 +19,13 @@
               action="wb_license_key_action"
               sequence="10"/>
 
+    <menuitem id="menu_wb_subscription_license_manual_create"
+              name="Lizenz manuell anlegen"
+              parent="menu_wb_subscription_root"
+              action="wb_license_create_wizard_action"
+              sequence="11"
+              groups="wb_subscription.group_wb_subscription_manager"/>
+
     <menuitem id="menu_wb_subscription_trials"
               name="Trial-Anfragen"
               parent="menu_wb_subscription_root"

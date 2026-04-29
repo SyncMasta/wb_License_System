@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="wb_license_create_wizard_view_form" model="ir.ui.view">
+        <field name="name">wb.license.create.wizard.form</field>
+        <field name="model">wb.license.create.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Lizenz manuell anlegen">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Lizenz manuell anlegen</h1>
+                        <p class="text-muted">
+                            Erzeugt einen Lizenzschlüssel ohne Sale-Order-Workflow.
+                            Für Mitarbeiter-Lizenzen, Beta-Tester, Spezial-Deals
+                            oder Smoke-Tests.
+                        </p>
+                    </div>
+
+                    <group>
+                        <group string="Lizenznehmer">
+                            <field name="partner_id"/>
+                            <field name="product_id"
+                                   options="{'no_create': True}"/>
+                            <field name="sale_order_id"
+                                   options="{'no_create': True}"/>
+                        </group>
+                        <group string="Laufzeit + Limits">
+                            <field name="valid_from"/>
+                            <field name="valid_to"/>
+                            <field name="instance_limit"/>
+                        </group>
+                    </group>
+
+                    <group string="Auto-Aktionen (Defaults: alles an außer Telegram)">
+                        <group>
+                            <field name="generate_certificate"/>
+                            <field name="send_payment_received_mail"/>
+                        </group>
+                        <group>
+                            <field name="send_activation_mail"/>
+                            <field name="send_telegram"/>
+                        </group>
+                    </group>
+
+                    <group string="Notiz (Audit-Trail)">
+                        <field name="notes" nolabel="1"
+                               placeholder="z.B. 'Mitarbeiter-Lizenz Tobias Q2 2026' oder 'Smoke-Test #14'"/>
+                    </group>
+
+                    <div class="alert alert-info" role="alert">
+                        <strong>Hinweis:</strong> Im Gegensatz zum normalen
+                        Workflow (Sale-Order → Pro-forma → Zahlung →
+                        Auto-Issuance) wird hier <em>direkt</em> ein License-Key
+                        erzeugt. Wenn du die Lizenz mit einer Buchhaltung
+                        verknüpfen willst, später manuell eine Rechnung an
+                        diesen Partner stellen — ohne dass nochmal eine
+                        Lizenz auto-generiert wird.
+                    </div>
+                </sheet>
+                <footer>
+                    <button name="action_create_license" type="object"
+                            string="Lizenz erstellen" class="btn-primary"/>
+                    <button string="Abbrechen" special="cancel"
+                            class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="wb_license_create_wizard_action" model="ir.actions.act_window">
+        <field name="name">Lizenz manuell anlegen</field>
+        <field name="res_model">wb.license.create.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>
