@@ -1,6 +1,6 @@
 {
     'name': 'WB Subscription & License Platform',
-    'version': '19.0.2.1.0',
+    'version': '19.0.2.2.0',
     'category': 'Sales/Subscriptions',
     'summary': 'Vertriebs-Backend für WISSEN BERATUNG Produkt-Module',
     'description': """
@@ -44,6 +44,7 @@ Siehe ARCHITECTURE.md v1.5 für Details.
         'data/ir_sequence_data.xml',
         'data/wb_license_tag_data.xml',
         'data/mail_template_data.xml',
+        'data/eula_templates.xml',
         'data/ir_cron_data.xml',
         'reports/license_certificate_report.xml',
         'reports/license_certificate_template.xml',

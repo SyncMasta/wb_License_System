@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            EULA-Templates fuer Lizenz-Produkte.
+
+            Beide Records sind noupdate="1" — Tobias kann sie in der Odoo-UI
+            weiter pflegen ohne dass das naechste Modul-Update sie ueberschreibt.
+
+            Verwendung: am product.template Tab "WB Lizenz" → Group "Templates"
+            das gewuenschte Template per wb_eula_template_id zuweisen. Beim
+            License-Issuance wird der body_html-Inhalt vom EULA-PDF-Report
+            (reports/license_eula_template.xml) gerendert und der Lizenz als
+            Anhang beigelegt.
+
+            ⚠ Rechtlicher Inhalt — vor Produktiv-Versand vom Anwalt pruefen
+            lassen, insbesondere § 5 (Verguetung), § 8 (Gewaehrleistung) und
+            § 9 (Haftung).
+        -->
+
+        <!-- ====================================================== -->
+        <!-- 1) Generisches Skelett (Boilerplate-Felder, leerer Body)  -->
+        <!-- ====================================================== -->
+        <record id="mail_template_eula_skeleton" model="mail.template">
+            <field name="name">WB Lizenz: EULA-Skelett (anpassen vor Nutzung)</field>
+            <field name="model_id" ref="model_wb_license_key"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">EULA — {{ object.product_id.name }}</field>
+            <field name="email_from">{{ object.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.partner_id.email or '' }}</field>
+            <field name="auto_delete" eval="False"/>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222; line-height: 1.5;">
+                    <h1>Endbenutzer-Lizenzvertrag (EULA)</h1>
+
+                    <p><strong>Produkt:</strong> <t t-out="object.product_id.name or ''"/></p>
+                    <p><strong>Lizenzschlüssel:</strong> <code t-out="object.name"/></p>
+                    <p><strong>Lizenznehmer:</strong> <t t-out="object.partner_id.name or ''"/></p>
+                    <p><strong>Lizenzlaufzeit:</strong>
+                        <t t-out="object.valid_from or ''"/> – <t t-out="object.valid_to or ''"/></p>
+
+                    <hr/>
+
+                    <h2>1. Lizenzgegenstand</h2>
+                    <p>WISSEN BERATUNG (Tobias Wissen) erteilt dem Lizenznehmer ein
+                       nicht-ausschließliches, nicht-übertragbares Recht zur Nutzung
+                       von <t t-out="object.product_id.name or ''"/> für die oben
+                       angegebene Laufzeit auf maximal
+                       <t t-out="object.instance_limit"/> Odoo-Instanz(en).</p>
+
+                    <h2>2. Nutzungsrechte</h2>
+                    <p>[TEXT VOM ANWALT EINFÜGEN]</p>
+
+                    <h2>3. Untersagte Handlungen</h2>
+                    <p>[TEXT VOM ANWALT EINFÜGEN]</p>
+
+                    <h2>4. Lizenzaktivierung &amp; Laufzeit</h2>
+                    <p>[TEXT VOM ANWALT EINFÜGEN]</p>
+
+                    <h2>5. Vergütung</h2>
+                    <p>[TEXT VOM ANWALT EINFÜGEN]</p>
+
+                    <h2>6. Datenschutz</h2>
+                    <p>[TEXT VOM ANWALT EINFÜGEN]</p>
+
+                    <h2>7. Support &amp; Updates</h2>
+                    <p>[TEXT VOM ANWALT EINFÜGEN]</p>
+
+                    <h2>8. Gewährleistung</h2>
+                    <p>[TEXT VOM ANWALT EINFÜGEN]</p>
+
+                    <h2>9. Haftung</h2>
+                    <p>[TEXT VOM ANWALT EINFÜGEN]</p>
+
+                    <h2>10. Schlussbestimmungen</h2>
+                    <p>Es gilt deutsches Recht. Gerichtsstand ist [...].</p>
+
+                    <p style="margin-top: 30px;">
+                        WISSEN BERATUNG · Tobias Wissen ·
+                        <a href="https://www.wissen-beratung.de">www.wissen-beratung.de</a>
+                    </p>
+                </div>
+            </field>
+        </record>
+
+        <!-- ============================================================ -->
+        <!-- 2) Bitwarden-spezifisch — Inhalt aus wb_odoo_bitwarden/EULA.md -->
+        <!--    Stand: 28.04.2026, Version 1.0                              -->
+        <!-- ============================================================ -->
+        <record id="mail_template_eula_bitwarden" model="mail.template">
+            <field name="name">WB Lizenz: EULA — Bitwarden for Odoo (Free + Pro)</field>
+            <field name="model_id" ref="model_wb_license_key"/>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="subject">EULA — Bitwarden for Odoo</field>
+            <field name="email_from">{{ object.company_id.email or '' }}</field>
+            <field name="email_to">{{ object.partner_id.email or '' }}</field>
+            <field name="auto_delete" eval="False"/>
+            <field name="body_html" type="html">
+                <div style="font-family: Arial, sans-serif; color: #222; line-height: 1.5;">
+
+                    <h1>Endbenutzer-Lizenzvertrag (EULA)</h1>
+
+                    <p><strong>Produkt:</strong> Bitwarden for Odoo — Free Edition (<code>wb_bitwarden</code>) und Pro Edition (<code>wb_bitwarden_pro</code>)</p>
+                    <p><strong>Lizenzgeber:</strong> WISSEN BERATUNG · Inhaber Tobias Wissen<br/>
+                        Anschrift, Handelsregister und USt-IdNr. siehe Impressum unter
+                        <a href="https://www.wissen-beratung.de">https://www.wissen-beratung.de</a></p>
+                    <p><strong>Kontakt:</strong> support@wissen-beratung.de · vertrieb@wissen-beratung.de</p>
+                    <p><strong>Stand:</strong> 28.04.2026 · <strong>Version:</strong> 1.0</p>
+                    <p><strong>Lizenznehmer:</strong> <t t-out="object.partner_id.name or ''"/></p>
+                    <p><strong>Lizenzschlüssel:</strong> <code t-out="object.name"/></p>
+                    <p><strong>Lizenzlaufzeit:</strong>
+                        <t t-out="object.valid_from or ''"/> – <t t-out="object.valid_to or ''"/></p>
+
+                    <hr/>
+
+                    <h2>1. Geltungsbereich und Vertragsschluss</h2>
+                    <p>1.1 Dieser Endbenutzer-Lizenzvertrag (nachfolgend „<strong>EULA</strong>") regelt die Nutzung der Odoo-Module <code>wb_bitwarden</code> (Free Edition) und <code>wb_bitwarden_pro</code> (Pro Edition), einschließlich aller mitgelieferten Skripte, Datendateien, Vorlagen, Reports, Konfigurationsdaten und Dokumentation (gemeinsam die „<strong>Software</strong>").</p>
+                    <p>1.2 Vertragspartner sind WISSEN BERATUNG, Inhaber Tobias Wissen (nachfolgend „<strong>WB</strong>" oder „<strong>Lizenzgeber</strong>"), und der Endkunde, der die Software installiert, kopiert oder anderweitig nutzt (nachfolgend „<strong>Lizenznehmer</strong>").</p>
+                    <p>1.3 Der Vertrag kommt zustande, sobald der Lizenznehmer die Software installiert, in Betrieb nimmt oder eine Lizenz im Sinne dieser EULA aktiviert. Wer mit den Bestimmungen nicht einverstanden ist, darf die Software nicht installieren oder nutzen und ist verpflichtet, sie unverzüglich zu deinstallieren.</p>
+                    <p>1.4 Diese EULA ergänzt die zugrunde liegende Open-Source-Lizenz <strong>„Odoo Proprietary License v1.0" (OPL-1)</strong>, unter der die Software ausgeliefert wird. Bei Widersprüchen zwischen OPL-1 und dieser EULA gilt für entgeltpflichtige Funktionen (Pro Edition) diese EULA vorrangig.</p>
+
+                    <h2>2. Editionen und Leistungsumfang</h2>
+
+                    <h3>2.1 Free Edition (<code>wb_bitwarden</code>)</h3>
+                    <p>Kostenfreie Edition mit folgendem Funktionsumfang:</p>
+                    <ul>
+                        <li>5-Schritt Setup-Wizard inkl. Test-Connection</li>
+                        <li>Anbindung Bitwarden Cloud (vault.bitwarden.eu / .com) und Vaultwarden self-hosted</li>
+                        <li>Fernet-verschlüsselte Speicherung des Bitwarden-API-<code>client_secret</code></li>
+                        <li>OAuth2-Token-Refresh</li>
+                        <li>Vault-Link-Feld auf <code>res.partner</code> („In Bitwarden öffnen")</li>
+                        <li>Read-Only-Liste der Bitwarden-Collections der Organisation</li>
+                        <li>Diagnose-Log</li>
+                    </ul>
+                    <p>Die Free Edition wird <strong>„as is"</strong> ohne Service-Level-Zusagen, ohne garantierten Support und ohne Update-Pflicht überlassen.</p>
+
+                    <h3>2.2 Pro Edition (<code>wb_bitwarden_pro</code>)</h3>
+                    <p>Entgeltpflichtige Edition (Listenpreis: <strong>34,95 € netto pro Monat und Tenant/Datenbank</strong>), die u.a. folgenden Funktionsumfang ergänzt:</p>
+                    <ul>
+                        <li>Mitarbeiter-Auto-Provisioning (<code>hr.employee</code> → Bitwarden-Member)</li>
+                        <li>Off-Boarding-Cron mit Admin-Benachrichtigung</li>
+                        <li>Bitwarden-Plan-Detection (Free/Teams/Enterprise/Vaultwarden)</li>
+                        <li>Feature-Gate-Decorator mit Plan-abhängigen Fehlermeldungen</li>
+                        <li>Group-to-Collection-Mapping</li>
+                        <li>Cross-Company-Share-Rules</li>
+                        <li>Bitwarden Send aus Odoo (Partner / Sales-Order / Helpdesk)</li>
+                        <li>Compliance-Reports (DSGVO Art. 32 / ISO 27001)</li>
+                        <li>Lizenz-Integration über <code>wb_license_client</code> (Produkt-Code <code>BITW</code>)</li>
+                    </ul>
+                    <p>Der vollständige, jeweils aktuelle Funktionsumfang ergibt sich aus der Produktbeschreibung im Manifest und aus der Marketplace-Seite. Der Lizenzgeber behält sich vor, einzelne Pro-Funktionen zu erweitern, zu konsolidieren oder durch funktional gleichwertige Funktionen zu ersetzen, soweit der vertragliche Hauptzweck unberührt bleibt.</p>
+
+                    <h3>2.3 Voraussetzungen</h3>
+                    <ul>
+                        <li>Odoo 19 (Community oder Enterprise)</li>
+                        <li>Bitwarden-Organisation (Cloud — beliebiger Plan) oder Vaultwarden ≥ 1.30</li>
+                        <li>Für Pro: aktivierte Modul-Lizenz und Modul <code>wb_license_client</code></li>
+                    </ul>
+                    <p>Die Beschaffung von Odoo, Bitwarden bzw. Vaultwarden und der zugehörigen Server-Infrastruktur obliegt dem Lizenznehmer. Diese Komponenten sind <strong>nicht</strong> Bestandteil dieser EULA.</p>
+
+                    <h2>3. Nutzungsrechte</h2>
+
+                    <h3>3.1 Free Edition</h3>
+                    <p>Der Lizenznehmer erhält an <code>wb_bitwarden</code> ein nicht-exklusives, nicht-übertragbares, weltweites Nutzungsrecht für eine unbegrenzte Anzahl Odoo-Datenbanken, ohne zeitliche Beschränkung. Die Free Edition darf zu produktiven, internen wie kommerziellen Zwecken eingesetzt werden.</p>
+
+                    <h3>3.2 Pro Edition</h3>
+                    <p>Der Lizenznehmer erhält an <code>wb_bitwarden_pro</code> ein <strong>nicht-exklusives, nicht-übertragbares, an die jeweilige Odoo-Datenbank (<code>db_uuid</code>) gebundenes Nutzungsrecht</strong> für die Dauer der bezahlten Lizenz-Periode.</p>
+                    <p>Pro Lizenz darf die Pro Edition standardmäßig auf <strong>einer (1) produktiven Odoo-Datenbank</strong> betrieben werden. Zusätzliche Tenants/Datenbanken erfordern separate Lizenzen, sofern nicht vertraglich etwas anderes vereinbart ist (z.B. Bundle-Vertrag, Mietmodell-Vertrag).</p>
+                    <p>Eine Test-/Stage-Datenbank zur ausschließlich nicht-produktiven Erprobung darf parallel betrieben werden, sofern sie keine produktiven Personendaten enthält und nicht öffentlich erreichbar ist.</p>
+
+                    <h3>3.3 Untersagte Handlungen</h3>
+                    <p>Dem Lizenznehmer ist insbesondere untersagt:</p>
+                    <ul>
+                        <li>die Software ganz oder in Teilen weiterzuverkaufen, zu vermieten, zu verleasen, zu unterlizenzieren oder als Bestandteil eines „as-a-Service"-Angebots Dritten verfügbar zu machen, sofern nicht ausdrücklich schriftlich vereinbart;</li>
+                        <li>die Lizenz-Prüf-Mechanismen (<code>@license_required</code>, <code>bound_db_uuid</code>, <code>bound_domain</code>, Cache-Logik) zu umgehen, zu deaktivieren, zu manipulieren oder durch Patches/Monkey-Patches funktional außer Kraft zu setzen;</li>
+                        <li>die Software zu dekompilieren, zu disassemblieren oder einer sonstigen Reverse-Engineering-Maßnahme zu unterziehen, soweit dies nicht durch zwingendes Gesetz (insbesondere § 69e UrhG) gestattet ist;</li>
+                        <li>Urheberrechtsvermerke, Lizenzhinweise, Branding-Bestandteile oder Autoren-Angaben zu entfernen oder zu verändern;</li>
+                        <li>die Software zu nutzen, um Bitwarden-Lizenzbedingungen zu umgehen oder Drittanbieter-AGB zu verletzen.</li>
+                    </ul>
+
+                    <h3>3.4 Modifikationen</h3>
+                    <p>Der Quellcode der Software wird offen ausgeliefert (OPL-1). Der Lizenznehmer darf die Software für eigene interne Zwecke anpassen. Modifikationen sind ausschließlich für den Eigengebrauch gestattet; eine Weitergabe modifizierter Versionen an Dritte ist unzulässig.</p>
+                    <p>WB übernimmt für modifizierte Versionen <strong>keinerlei Gewährleistung oder Support</strong>. Etwaige durch Modifikationen entstehende Folgeschäden, Inkompatibilitäten oder Sicherheitsrisiken trägt der Lizenznehmer.</p>
+
+                    <h2>4. Lizenzaktivierung, Laufzeit, Kündigung (Pro Edition)</h2>
+
+                    <h3>4.1 Aktivierung</h3>
+                    <p>Die Pro Edition wird über das Modul <code>wb_license_client</code> aktiviert. Der Lizenz-Key bindet das Modul an die Odoo-Datenbank (<code>db_uuid</code>) und — sofern konfiguriert — an die <code>web.base.url</code>. Eine Übertragung der Lizenz auf eine andere Datenbank erfolgt durch Re-Aktivierung; missbräuchliche Mehrfach-Aktivierungen werden geloggt und können zur Sperre führen.</p>
+
+                    <h3>4.2 Laufzeit und Verlängerung</h3>
+                    <p>Pro-Lizenzen werden in der Regel als <strong>Monats- oder Jahresabonnement</strong> erworben. Die Laufzeit beginnt mit der Aktivierung und verlängert sich um die jeweilige Periode, sofern nicht spätestens 14 Tage vor Periodenende in Textform gekündigt wird (Mindestkündigungsfrist; abweichende vertragliche Regelungen gehen vor).</p>
+
+                    <h3>4.3 Lizenz-Status und Cache</h3>
+                    <p>Der Lizenz-Client führt eine tägliche Status-Prüfung gegenüber dem WB-Lizenzserver durch und cacht den letzten gültigen Status. Die Software toleriert Server-Ausfälle für eine konfigurierte Karenz (Default 30 Tage, kostenrelevante Operationen 7 Tage). Nach Ablauf der Karenz oder bei festgestelltem <code>expired</code>-Status werden gesicherte Pro-Funktionen deaktiviert; der lesende Zugriff auf bereits erzeugte Datensätze bleibt erhalten („read-only auf eigene Daten").</p>
+
+                    <h3>4.4 Kündigung aus wichtigem Grund</h3>
+                    <p>Beide Parteien können den Vertrag fristlos kündigen, wenn die andere Partei wesentliche Pflichten dieser EULA trotz Abmahnung mit angemessener Frist verletzt. Ein wichtiger Grund liegt für WB insbesondere vor bei Umgehung der Lizenz-Mechanismen, ausbleibender Zahlung trotz Mahnung oder Verstoß gegen Ziffer 3.3.</p>
+
+                    <h3>4.5 Wirkung der Beendigung</h3>
+                    <p>Mit Beendigung des Pro-Vertrags ist der Lizenznehmer verpflichtet, das Modul <code>wb_bitwarden_pro</code> zu deinstallieren oder seinen Lizenz-Key zu deaktivieren. Bestehende Datenbestände in Odoo bleiben unberührt; gesicherte Pro-Funktionen werden technisch gesperrt. Die Free Edition bleibt nutzbar.</p>
+
+                    <h2>5. Vergütung und Zahlung (Pro Edition)</h2>
+                    <p>5.1 Es gelten die in der Bestellung bzw. im Angebot vereinbarten Preise. Soweit nichts Abweichendes vereinbart ist, gilt der Listenpreis von <strong>34,95 € netto pro Monat und Tenant</strong>.</p>
+                    <p>5.2 Rechnungen sind innerhalb von <strong>14 Tagen ab Rechnungsdatum</strong> ohne Abzug zur Zahlung fällig.</p>
+                    <p>5.3 Bei Zahlungsverzug kann der Lizenz-Server den Status auf <code>grace</code> setzen (Banner-Mahnung, Funktionen laufen weiter). Nach Ablauf der Grace-Periode ohne Zahlungseingang wird die Lizenz auf <code>expired</code> gesetzt und die Pro-Funktionen werden gesperrt.</p>
+                    <p>5.4 Sämtliche Preise verstehen sich zzgl. der jeweils gültigen gesetzlichen Umsatzsteuer.</p>
+                    <p>5.5 <strong>Aktivierungs-Bestätigungen.</strong> Vor dem Aktivieren der Lizenz muss der Lizenznehmer im Aktivierungs-Wizard ausdrücklich folgende Bestätigungen abgeben (Pflicht-Häkchen):</p>
+                    <ul>
+                        <li>Kenntnisnahme und Akzeptanz dieser <strong>EULA</strong></li>
+                        <li>Akzeptanz der <strong>AGB</strong> von WISSEN BERATUNG</li>
+                        <li>Kenntnisnahme des <strong>Datenschutzhinweises</strong> (DSGVO)</li>
+                        <li><strong>Verzicht auf Gutschrift</strong> gemäß § 5.6</li>
+                    </ul>
+                    <p>Alle vier Bestätigungen werden auf dem Lizenz-Server von WB mit Zeitstempel, IP-Adresse und Email-Adresse zu Beweiszwecken protokolliert (Audit-Log + persistente Felder am Lizenz-Datensatz).</p>
+                    <p>5.6 <strong>Ausschluss von Gutschrift / Erstattung.</strong> Mit der Aktivierung der Lizenz ist eine spätere <strong>Gutschrift, Erstattung oder Rückabwicklung</strong> des bereits gezahlten Lizenz-Entgelts <strong>ausgeschlossen</strong>. Der Lizenznehmer bestätigt diesen Ausschluss durch das entsprechende Pflicht-Häkchen im Aktivierungs-Wizard. Gesetzliche Gewährleistungs- und Mängelrechte (§ 8) sowie Rücktrittsrechte aus wichtigem Grund bleiben hiervon unberührt.</p>
+                    <p>5.7 <strong>Newsletter-Anmeldung (optional).</strong> Im Aktivierungs-Wizard kann der Lizenznehmer optional die Anmeldung zum Produkt-Newsletter aktivieren. Bei Anmeldung wird die angegebene Email-Adresse in die zum jeweiligen Modul gehörige Mailing-Liste bei WB eingetragen (Liste mit Prefix <code>[&lt;PRODUKT_CODE&gt;]</code>). Inhalt: Updates, Sicherheits-Patches, neue Features. Eine Abmeldung ist jederzeit über den Unsubscribe-Link in jeder Newsletter-Mail oder per formloser Email an <code>newsletter@wissen-beratung.de</code> möglich (Art. 7 Abs. 3 DSGVO).</p>
+
+                    <h2>6. Daten, Datenschutz, Auftragsverarbeitung</h2>
+
+                    <h3>6.1 Datenflüsse durch die Software</h3>
+                    <p>Die Software kommuniziert über die offizielle Bitwarden-API mit der vom Lizenznehmer konfigurierten Bitwarden-Organisation. Übertragen werden u.a.:</p>
+                    <ul>
+                        <li>Bitwarden-Member-, Collection- und (bei Pro) Send-Metadaten</li>
+                        <li>Mapping-Informationen zwischen Odoo-Records (z.B. <code>hr.employee</code>, <code>res.partner</code>) und Bitwarden-Objekten</li>
+                        <li>Audit- und Diagnose-Daten der API-Aufrufe (Endpoint, Status, Fehlertext)</li>
+                    </ul>
+                    <p><strong>WB selbst empfängt durch die Software keine Vault-Inhalte und keine Klartext-Passwörter.</strong> Vault-Inhalte verbleiben ausschließlich zwischen Odoo-Anwender, Odoo-Datenbank und Bitwarden-Server.</p>
+
+                    <h3>6.2 Lizenz-Telemetrie (Pro Edition)</h3>
+                    <p>Bei aktivierter Pro Edition übermittelt <code>wb_license_client</code> an WB regelmäßig:</p>
+                    <ul>
+                        <li>Lizenz-Key, <code>db_uuid</code>, technischer Produkt-Code (<code>BITW</code>)</li>
+                        <li>Modul-Version, Odoo-Version</li>
+                        <li>Letzter Heartbeat-Zeitstempel</li>
+                        <li>Bei Erst-Installation einmalig: ein Lead-Eintrag (Modul-Code, Domain, technischer Kontakt)</li>
+                    </ul>
+                    <p>Diese Datenverarbeitung dient ausschließlich der Lizenz-Verwaltung und Missbrauchsvermeidung. Eine Übermittlung von Personen- oder Vault-Daten findet <strong>nicht</strong> statt.</p>
+
+                    <h3>6.3 Lizenz-Anfrage- und Onboarding-Wizard (Pro Edition)</h3>
+                    <p>Die Pro Edition stellt einen optionalen Wizard zur Verfügung, mit dem der Lizenznehmer Kontakt- und Firmendaten an WB übermitteln kann — entweder beim erstmaligen Öffnen der Pro-Einstellungen ("Onboarding") oder bei einer aktiven Lizenz-Anfrage ("Lizenz anfragen"-Button).</p>
+                    <p><strong>Übermittelt werden ausschließlich die vom Anwender im Wizard freigegebenen Felder:</strong></p>
+                    <ul>
+                        <li>Firmenstammdaten: Name, Anschrift, USt-IdNr.</li>
+                        <li>Ansprechpartner: Name, E-Mail-Adresse, Telefonnummer</li>
+                        <li>Frei eingegebene Notizen / Wünsche</li>
+                        <li>Technische Identifikatoren: <code>db_uuid</code>, <code>web.base.url</code>, Modul-Version</li>
+                    </ul>
+                    <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. b DSGVO (Vertragsanbahnung bzw. Durchführung vorvertraglicher Maßnahmen). Vor der Übermittlung muss der Anwender eine ausdrückliche Bestätigungs-Checkbox aktivieren; ohne dieses Häkchen wird keine Übermittlung ausgelöst.</p>
+                    <p><strong>Verarbeitungszweck:</strong> Bearbeitung von Lizenz-Anfragen, Erstellung von Angeboten, persönliche Beratung sowie ggf. Anlage einer Verkaufschance (<code>crm.lead</code> mit <code>type='opportunity'</code>) bzw. eines Leads (<code>type='lead'</code>) im Vertriebs-System von WB.</p>
+                    <p><strong>Speicherort und -dauer:</strong> Die Daten werden ausschließlich auf den Systemen von WB unter <code>wissen-beratung.de</code> gespeichert (Hosting in Deutschland) und für die Dauer der Geschäftsbeziehung sowie der gesetzlichen Aufbewahrungsfristen verwahrt. Eine Weitergabe an Dritte findet nicht statt.</p>
+                    <p><strong>Opt-out:</strong> Der Onboarding-Wizard kann durch Klick auf "Später" übersprungen werden. Das Auto-Announcement der Erst-Installation (siehe 6.2) lässt sich permanent deaktivieren via <code>ir.config_parameter</code> <code>wb_license_client.disable_install_registry=True</code>.</p>
+                    <p><strong>Betroffenenrechte:</strong> Auskunft, Berichtigung, Löschung und Widerspruch nach Art. 15–21 DSGVO können jederzeit unter <code>datenschutz@wissen-beratung.de</code> geltend gemacht werden.</p>
+
+                    <h3>6.4 DSGVO und Auftragsverarbeitung</h3>
+                    <p>Soweit der Lizenznehmer mit der Software personenbezogene Daten verarbeitet, ist er datenschutzrechtlich Verantwortlicher im Sinne der DSGVO. WB stellt auf Anforderung einen Auftragsverarbeitungsvertrag (AVV) nach Art. 28 DSGVO bereit, sofern WB im Rahmen von Hosting, Support oder Mietmodell-Leistungen Zugriff auf personenbezogene Daten erhält. Bei reiner Modul-Lieferung ohne Hosting/Support-Zugriff ist ein AVV nicht erforderlich.</p>
+
+                    <h3>6.5 Bitwarden-Mietmodell (optional)</h3>
+                    <p>Sofern der Lizenznehmer Bitwarden über das <strong>WB-Mietmodell</strong> bezieht (DSGVO-konformes Hosting Frankfurt, Hotline DE, einmal jährlich Audit-Walkthrough), gelten zusätzlich die separaten Mietmodell-Bedingungen sowie der dort vereinbarte AVV.</p>
+
+                    <h2>7. Support, Updates, Service-Level</h2>
+
+                    <h3>7.1 Free Edition</h3>
+                    <p>Für die Free Edition besteht <strong>kein</strong> Anspruch auf Support, Updates, Bug-Fixes oder Reaktionszeiten. Best-Effort-Support kann auf Anfrage über <code>support@wissen-beratung.de</code> angeboten werden, ohne dass hieraus ein Anspruch erwächst.</p>
+
+                    <h3>7.2 Pro Edition</h3>
+                    <p>Mit aktiver Pro-Lizenz erhält der Lizenznehmer:</p>
+                    <ul>
+                        <li>Zugang zu Updates und Sicherheits-Patches der Pro-Module für die Dauer der Lizenz-Periode</li>
+                        <li>E-Mail-Support unter <code>support@wissen-beratung.de</code> zu üblichen Geschäftszeiten (Mo–Fr 09:00–17:00 MEZ/MESZ)</li>
+                        <li>Bei Bezug über das WB-Mietmodell zusätzlich Hotline-Support DE und einmal jährlich Audit-Walkthrough</li>
+                    </ul>
+                    <p>WB schuldet keine konkreten Reaktions- oder Wiederherstellungszeiten, sofern nicht in einem separaten SLA vereinbart. Patches werden so zeitnah bereitgestellt, wie es nach pflichtgemäßem Ermessen sinnvoll und zumutbar ist.</p>
+
+                    <h3>7.3 Update-Obliegenheit</h3>
+                    <p>Der Lizenznehmer ist verpflichtet, sicherheitsrelevante Updates innerhalb angemessener Frist einzuspielen. WB haftet nicht für Schäden, die aus dem Betrieb veralteter, sicherheitskritisch markierter Versionen resultieren.</p>
+
+                    <h2>8. Gewährleistung</h2>
+                    <p>8.1 WB gewährleistet, dass die Software in der jeweils ausgelieferten Version im Wesentlichen die im Manifest und in der Produktbeschreibung dokumentierten Funktionen erfüllt.</p>
+                    <p>8.2 Eine Gewährleistung dafür, dass die Software fehlerfrei, ununterbrochen oder mit jeder beliebigen Drittsoftware (insbesondere Odoo-Anpassungen, andere Custom-Module, Vaultwarden-Forks) kompatibel ist, wird <strong>nicht</strong> übernommen.</p>
+                    <p>8.3 Bei berechtigten Mängelrügen leistet WB nach eigener Wahl Nachbesserung oder Ersatzlieferung. Schlägt die Nacherfüllung wiederholt fehl, kann der Lizenznehmer mindern oder vom betroffenen Vertragsbestandteil zurücktreten.</p>
+                    <p>8.4 Mängel sind dem Lizenzgeber unverzüglich, in reproduzierbarer Form (Schritte, Logs, Modul-Versionen, Odoo-Version) zu melden.</p>
+                    <p>8.5 Die Gewährleistungsfrist beträgt <strong>12 Monate</strong> ab Aktivierung der Pro Edition bzw. ab erstmaliger Installation der Free Edition.</p>
+
+                    <h2>9. Haftung</h2>
+                    <p>9.1 WB haftet unbegrenzt bei Vorsatz und grober Fahrlässigkeit, bei Verletzung von Leben, Körper oder Gesundheit sowie nach den zwingenden Bestimmungen des Produkthaftungsgesetzes.</p>
+                    <p>9.2 Bei einfacher Fahrlässigkeit haftet WB nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten); die Haftung ist in diesem Fall der Höhe nach auf den <strong>vertragstypischen, bei Vertragsschluss vorhersehbaren Schaden</strong> begrenzt, höchstens jedoch auf den im Jahr vor Schadenseintritt vom Lizenznehmer für die Pro Edition gezahlten Lizenzbetrag.</p>
+                    <p>9.3 Eine Haftung für <strong>mittelbare Schäden, entgangenen Gewinn, Datenverluste, Vertragsstrafen Dritter und Folgeschäden</strong> ist im Rahmen einfacher Fahrlässigkeit ausgeschlossen, soweit es sich nicht um die Verletzung von Kardinalpflichten handelt.</p>
+                    <p>9.4 Für die Free Edition ist die Haftung — soweit gesetzlich zulässig — auf Vorsatz und grobe Fahrlässigkeit beschränkt.</p>
+                    <p>9.5 Der Lizenznehmer ist verantwortlich für regelmäßige Backups seiner Odoo-Datenbank und seiner Bitwarden-Vault-Daten. WB haftet nicht für Schäden, die durch das Fehlen geeigneter Backup-Strategien beim Lizenznehmer entstehen.</p>
+
+                    <h2>10. Sicherheit, Geheimhaltung, Compliance</h2>
+                    <p>10.1 Der Lizenznehmer verpflichtet sich, die Bitwarden-API-Credentials (<code>client_id</code>, <code>client_secret</code>) und die Lizenz-Keys vertraulich zu behandeln und vor unberechtigtem Zugriff zu schützen.</p>
+                    <p>10.2 WB verarbeitet sämtliche im Rahmen von Support oder Mietmodell empfangenen Daten vertraulich und ausschließlich zweckgebunden. Mitarbeiter und Auftragsverarbeiter sind auf Vertraulichkeit verpflichtet.</p>
+                    <p>10.3 Der Lizenznehmer ist verantwortlich für die Einhaltung etwaiger branchenspezifischer Regulierung (DSGVO, ISO 27001, BAIT, KRITIS o.ä.) im eigenen Verantwortungsbereich. Die Software unterstützt Compliance-Anforderungen, ersetzt aber keine eigene Compliance-Prüfung.</p>
+
+                    <h2>11. Schutzrechte Dritter / Freistellung</h2>
+                    <p>11.1 WB stellt den Lizenznehmer von berechtigten Ansprüchen Dritter frei, die aus einer durch die bestimmungsgemäße Nutzung der Software verursachten Verletzung gewerblicher Schutzrechte oder Urheberrechte resultieren, sofern der Lizenznehmer WB unverzüglich informiert und die Rechtsverteidigung WB überlässt.</p>
+                    <p>11.2 Voraussetzung der Freistellung ist, dass die Verletzung nicht auf einer Modifikation der Software durch den Lizenznehmer oder einer Nutzung außerhalb der vertragsgemäßen Bestimmung beruht.</p>
+
+                    <h2>12. Schlussbestimmungen</h2>
+                    <p>12.1 <strong>Schriftform.</strong> Änderungen und Ergänzungen dieser EULA bedürfen der Textform. Dies gilt auch für die Änderung dieser Klausel.</p>
+                    <p>12.2 <strong>Anwendbares Recht.</strong> Es gilt das Recht der Bundesrepublik Deutschland unter Ausschluss des UN-Kaufrechts (CISG).</p>
+                    <p>12.3 <strong>Gerichtsstand.</strong> Soweit der Lizenznehmer Kaufmann, juristische Person des öffentlichen Rechts oder öffentlich-rechtliches Sondervermögen ist, ist ausschließlicher Gerichtsstand für alle Streitigkeiten aus diesem Vertrag der Sitz des Lizenzgebers. WB ist berechtigt, auch am Sitz des Lizenznehmers zu klagen.</p>
+                    <p>12.4 <strong>Salvatorische Klausel.</strong> Sollten einzelne Bestimmungen dieses Vertrags unwirksam sein oder werden, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt. Anstelle der unwirksamen Bestimmung gilt diejenige wirksame Regelung als vereinbart, die dem wirtschaftlichen Zweck der unwirksamen Bestimmung am nächsten kommt.</p>
+                    <p>12.5 <strong>Vertragssprache.</strong> Maßgebliche Vertragssprache ist Deutsch. Übersetzungen dienen ausschließlich der Information.</p>
+
+                    <h2>13. Kontakt</h2>
+                    <p><strong>WISSEN BERATUNG · Tobias Wissen</strong><br/>
+                        Vertrieb · Lizenz-Anfragen: vertrieb@wissen-beratung.de<br/>
+                        Support: support@wissen-beratung.de<br/>
+                        Web: <a href="https://www.wissen-beratung.de">https://www.wissen-beratung.de</a></p>
+
+                    <hr/>
+
+                    <p><em>Mit Installation oder Aktivierung der Software bestätigt der Lizenznehmer, diese EULA gelesen, verstanden und akzeptiert zu haben.</em></p>
+                </div>
+            </field>
+        </record>
+
+    </data>
+</odoo>
