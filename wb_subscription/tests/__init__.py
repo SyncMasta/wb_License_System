@@ -12,3 +12,4 @@ from . import test_sprint3_security
 from . import test_sprint5_polish
 from . import test_subscription_promote
 from . import test_mailing_list_sync
+from . import test_pro_rata_invoice

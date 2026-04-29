@@ -50,6 +50,14 @@ class SaleOrder(models.Model):
         string='Anzahl Lizenzen',
         groups='wb_subscription.group_wb_subscription_user',
     )
+    wb_first_period_invoiced = fields.Boolean(
+        string='Erste Periode bereits anteilig abgerechnet',
+        default=False, copy=False, readonly=True,
+        help="Idempotenz-Marker fuer den Pro-Rata-Override. Sobald die "
+             "erste Rechnung dieser Subscription erzeugt und anteilig "
+             "berechnet wurde, wird der Flag gesetzt — Folge-Rechnungen "
+             "laufen unangetastet durch.",
+    )
 
     @api.depends('order_line.product_id.wb_is_license_product')
     def _compute_wb_is_license_sub(self):
@@ -98,6 +106,52 @@ class SaleOrder(models.Model):
         if billing_calendar == 'yearly':
             return date(start_date.year, 12, 31)
         raise ValueError(f"Unknown billing_calendar: {billing_calendar!r}")
+
+    @staticmethod
+    def _wb_full_period_days(start_date, billing_calendar):
+        """Tage in der vollen Kalenderperiode, in der start_date liegt.
+
+        Beispiele:
+        - monthly + 15.05.   → 31 (Mai hat 31 Tage)
+        - quarterly + 15.05. → 91 (Q2 = Apr+Mai+Jun)
+        - biannual + 15.05.  → 181 (H1 2026 = Jan-Jun)
+        - yearly + 15.05.    → 365 (oder 366 in Schaltjahren)
+        """
+        if billing_calendar == 'monthly':
+            month_start = date(start_date.year, start_date.month, 1)
+            month_end = month_start + relativedelta(months=1, days=-1)
+            return (month_end - month_start).days + 1
+        if billing_calendar == 'quarterly':
+            q_idx = (start_date.month - 1) // 3
+            q_start = date(start_date.year, q_idx * 3 + 1, 1)
+            q_end = q_start + relativedelta(months=3, days=-1)
+            return (q_end - q_start).days + 1
+        if billing_calendar == 'biannual':
+            h_start_month = 1 if start_date.month <= 6 else 7
+            h_start = date(start_date.year, h_start_month, 1)
+            h_end = h_start + relativedelta(months=6, days=-1)
+            return (h_end - h_start).days + 1
+        if billing_calendar == 'yearly':
+            y_start = date(start_date.year, 1, 1)
+            y_end = date(start_date.year, 12, 31)
+            return (y_end - y_start).days + 1
+        raise ValueError(f"Unknown billing_calendar: {billing_calendar!r}")
+
+    @classmethod
+    def _wb_pro_rata_factor(cls, start_date, billing_calendar):
+        """Anteils-Faktor (0..1) fuer die Erstrechnung.
+
+        = Tage(start_date..first_period_end) / Tage(volle_Periode)
+
+        Bei start_date am 1. der Periode: factor = 1.0 (kein Pro-Rata).
+        Bei start_date in der Mitte: 0..1.
+        """
+        first_end = cls._wb_first_period_end(start_date, billing_calendar)
+        days_in_first = (first_end - start_date).days + 1
+        full_days = cls._wb_full_period_days(start_date, billing_calendar)
+        if full_days == 0:
+            return 1.0
+        return days_in_first / full_days
 
     def action_confirm(self):
         """Override: bei Lizenz-Orders Subscription-Setup automatisch durchführen."""
@@ -283,6 +337,71 @@ class SaleOrder(models.Model):
             )
 
             del activation_code
+
+    # -------------------------------------------------- Pro-Rata Erst-Rechnung
+
+    def _create_invoices(self, grouped=False, final=False, date=None):
+        """Override: bei Lizenz-Subscriptions wird die ERSTE Rechnung
+        anteilig zum Ende der aktuellen Kalenderperiode berechnet.
+
+        Idempotenz: wb_first_period_invoiced verhindert Re-Apply bei
+        wiederholter Methoden-Call. Folge-Rechnungen laufen unangetastet
+        durch — Standard-Odoo-Subscription-Mechanik handhabt die.
+        """
+        invoices = super()._create_invoices(
+            grouped=grouped, final=final, date=date,
+        )
+        if invoices:
+            self._wb_apply_pro_rata_to_invoices(invoices)
+        return invoices
+
+    def _wb_apply_pro_rata_to_invoices(self, invoices):
+        """Pro betroffener Rechnung: prufe ob erste Rechnung der Subscription
+        und passe Lizenz-Lines anteilig an.
+
+        Robust gegen:
+        - Rechnung enthaelt Lines aus mehreren SOs
+        - SO hat schon eine erste Rechnung (idempotent)
+        - SO ist nicht is_subscription oder hat keine Lizenz-Produkte
+        """
+        for invoice in invoices:
+            if invoice.move_type != 'out_invoice':
+                continue
+            sos_to_mark = self.env['sale.order']
+            for line in invoice.invoice_line_ids:
+                if not line.product_id.wb_is_license_product:
+                    continue
+                so = line.sale_line_ids.order_id[:1]
+                if not so:
+                    continue
+                if not so.wb_is_license_sub:
+                    continue
+                if so.wb_first_period_invoiced:
+                    continue
+                billing_cal = (line.product_id.wb_billing_calendar
+                               or 'monthly')
+                start = (so.start_date
+                         or invoice.invoice_date
+                         or fields.Date.context_today(so))
+                factor = self._wb_pro_rata_factor(start, billing_cal)
+                if factor >= 1.0:
+                    # start_date am 1. der Periode → kein Pro-Rata
+                    sos_to_mark |= so
+                    continue
+                first_end = self._wb_first_period_end(start, billing_cal)
+                days_first = (first_end - start).days + 1
+                days_full = self._wb_full_period_days(start, billing_cal)
+                line.price_unit = line.price_unit * factor
+                suffix = _(" (anteilig %(d)d/%(f)d Tage: %(s)s–%(e)s)") % {
+                    'd': days_first,
+                    'f': days_full,
+                    's': start.strftime('%d.%m.%Y'),
+                    'e': first_end.strftime('%d.%m.%Y'),
+                }
+                line.name = (line.name or line.product_id.name) + suffix
+                sos_to_mark |= so
+            for so in sos_to_mark:
+                so.wb_first_period_invoiced = True
 
     @api.model
     def _cron_generate_renewal_invoices(self):
