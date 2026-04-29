@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Erweitert den Standard-Sale-Order-Druck (gleichzeitig Pro-forma-Druck)
+        um einen Vertragsdetail-Block bei Lizenz-Subscriptions.
+
+        Erscheint:
+        - in der Pro-forma-Rechnung (vor Bezahlung an den Kunden versendet)
+        - in der normalen Auftragsbestätigung
+        - NICHT in der echten Rechnung (account.move) — die hat ihren eigenen
+          Block über account_move_template_ext.xml
+
+        Sichtbar nur wenn die Order ein Lizenz-Produkt enthält
+        (wb_is_license_sub=True). Zeigt:
+        - Vertragslaufzeit (start_date – end_date)
+        - Abrechnungs-Rhythmus (plan_id.name)
+        - Nächste Rechnung (next_invoice_date)
+        - Hinweis dass die erste Periode anteilig zum Ende der aktuellen
+          Kalenderperiode abgerechnet wird
+
+        Activation-Code wird hier NIE gezeigt (Pro-forma ist Vor-Dokument,
+        Lizenz existiert noch nicht — siehe DECISIONS.md #16, #39).
+    -->
+
+    <template id="report_saleorder_document_wb_license"
+              inherit_id="sale.report_saleorder_document">
+
+        <xpath expr="//div[@id='informations']" position="after">
+            <t t-if="doc.wb_is_license_sub">
+                <div class="row mt-3 mb-3 wb_license_subscription_block"
+                     style="border: 1px solid #1D3C6E; padding: 8px 12px; border-radius: 4px;">
+                    <div class="col-12">
+                        <h5 style="color: #1D3C6E; margin-bottom: 8px;">
+                            Vertragsdetails (WB Lizenz-Subscription)
+                        </h5>
+                        <table class="table table-sm" style="margin-bottom: 0;">
+                            <tbody>
+                                <tr t-if="doc.start_date or doc.end_date">
+                                    <td style="width: 40%;"><strong>Vertragslaufzeit:</strong></td>
+                                    <td>
+                                        <t t-if="doc.start_date"
+                                           t-out="doc.start_date.strftime('%d.%m.%Y')"/>
+                                        <t t-if="doc.start_date and doc.end_date"> &#8211; </t>
+                                        <t t-if="doc.end_date"
+                                           t-out="doc.end_date.strftime('%d.%m.%Y')"/>
+                                    </td>
+                                </tr>
+                                <tr t-if="doc.plan_id">
+                                    <td><strong>Abrechnungs-Rhythmus:</strong></td>
+                                    <td t-out="doc.plan_id.display_name"/>
+                                </tr>
+                                <tr t-if="doc.next_invoice_date">
+                                    <td><strong>Nächste Rechnung am:</strong></td>
+                                    <td t-out="doc.next_invoice_date.strftime('%d.%m.%Y')"/>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p style="font-size: 0.85em; color: #555; margin-top: 6px; margin-bottom: 0;">
+                            Die erste Rechnung wird anteilig vom Vertragsbeginn bis zum Ende der
+                            aktuellen Kalenderperiode (Monat / Quartal / Halbjahr / Jahr) gestellt.
+                            Folgerechnungen umfassen die volle Kalenderperiode und werden jeweils
+                            zum 1. erstellt. Der Lizenzschlüssel und das Aktivierungs-Zertifikat
+                            werden nach Zahlungseingang automatisch versendet.
+                        </p>
+                    </div>
+                </div>
+            </t>
+        </xpath>
+
+    </template>
+
+</odoo>

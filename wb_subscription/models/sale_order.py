@@ -23,7 +23,10 @@ Fernet-encrypted Code im Ticket (siehe DECISION #48).
 import logging
 from datetime import date, timedelta
 
+from dateutil.relativedelta import relativedelta
+
 from odoo import _, api, fields, models
+from odoo.exceptions import RedirectWarning
 
 _logger = logging.getLogger(__name__)
 
@@ -71,15 +74,130 @@ class SaleOrder(models.Model):
             eoy = date(today.year + 1, 12, 31)
         return eoy
 
+    @staticmethod
+    def _wb_first_period_end(start_date, billing_calendar):
+        """Letzter Tag der aktuellen Kalenderperiode für Pro-Rata-Logik.
+
+        Beispiele (start_date=15.05.):
+        - monthly   → 31.05.
+        - quarterly → 30.06. (Rest-Q2: Apr-Jun)
+        - biannual  → 30.06. (Rest-H1: Jan-Jun)
+        - yearly    → 31.12.
+
+        Quartale = Kalenderquartale (Q1 Jan-Mär, Q2 Apr-Jun, Q3 Jul-Sep, Q4 Okt-Dez),
+        Halbjahre = Kalenderhalbjahre (H1 Jan-Jun, H2 Jul-Dez), kein Rolling.
+        """
+        if billing_calendar == 'monthly':
+            return start_date + relativedelta(day=1, months=1, days=-1)
+        if billing_calendar == 'quarterly':
+            q_end_month = ((start_date.month - 1) // 3 + 1) * 3
+            return date(start_date.year, q_end_month, 1) + relativedelta(months=1, days=-1)
+        if billing_calendar == 'biannual':
+            h_end_month = 6 if start_date.month <= 6 else 12
+            return date(start_date.year, h_end_month, 1) + relativedelta(months=1, days=-1)
+        if billing_calendar == 'yearly':
+            return date(start_date.year, 12, 31)
+        raise ValueError(f"Unknown billing_calendar: {billing_calendar!r}")
+
+    def action_confirm(self):
+        """Override: bei Lizenz-Orders Subscription-Setup automatisch durchführen."""
+        res = super().action_confirm()
+        self._wb_promote_to_subscription()
+        return res
+
+    def _wb_promote_to_subscription(self):
+        """Setzt is_subscription + plan_id + Eckdaten bei Lizenz-Orders.
+
+        Idempotent: überschreibt nichts was schon gesetzt ist.
+
+        Wirft RedirectWarning wenn das Lizenz-Produkt keinen Default-Plan hat —
+        Tobias bekommt einen "Produkt öffnen"-Button und kann das Feld dort
+        pflegen, dann nochmal auf Bestätigen klicken.
+
+        Eckdaten:
+        - is_subscription = True
+        - plan_id = Default vom Produkt
+        - start_date = today (falls leer)
+        - end_date = _wb_compute_valid_to() (= 31.12. dieses/nächsten Jahres)
+        - next_invoice_date = 1. der nächsten Kalenderperiode
+        """
+        for order in self.filtered('wb_is_license_sub'):
+            if 'is_subscription' not in order._fields:
+                _logger.warning(
+                    "[wb_subscription] sale.order.is_subscription nicht verfügbar "
+                    "— Subscription-Promote skipped für %s", order.name)
+                continue
+            license_lines = order.order_line.filtered(
+                lambda l: l.product_id.wb_is_license_product
+            )
+            if not license_lines:
+                continue
+            # Plan setzen (mit RedirectWarning-Fallback)
+            if 'plan_id' in order._fields and not order.plan_id:
+                plans = license_lines.product_id.wb_default_subscription_plan_id
+                plan = plans[:1]
+                if not plan:
+                    missing = license_lines[0].product_id
+                    raise RedirectWarning(
+                        _("Lizenz-Produkt '%s' hat keinen Default-Subscription-Plan "
+                          "konfiguriert. Ohne Plan kann keine Subscription erstellt "
+                          "werden.\n\n"
+                          "Bitte am Produkt unter Tab 'WB Lizenz' einen Plan setzen, "
+                          "dann hier nochmal auf 'Bestätigen' klicken.")
+                        % missing.display_name,
+                        {
+                            'type': 'ir.actions.act_window',
+                            'res_model': 'product.template',
+                            'res_id': missing.product_tmpl_id.id,
+                            'views': [(False, 'form')],
+                            'target': 'current',
+                        },
+                        _("Produkt öffnen"),
+                    )
+                order.plan_id = plan.id
+            # is_subscription
+            if not order.is_subscription:
+                order.is_subscription = True
+            # Eckdaten
+            today = fields.Date.context_today(order)
+            start = (
+                order.start_date if 'start_date' in order._fields and order.start_date
+                else today
+            )
+            if 'start_date' in order._fields and not order.start_date:
+                order.start_date = start
+            if 'end_date' in order._fields and not order.end_date:
+                order.end_date = order._wb_compute_valid_to()
+            # next_invoice_date = 1. der nächsten Kalenderperiode
+            if 'next_invoice_date' in order._fields and not order.next_invoice_date:
+                billing_cal = license_lines[0].product_id.wb_billing_calendar or 'monthly'
+                first_period_end = self._wb_first_period_end(start, billing_cal)
+                order.next_invoice_date = first_period_end + timedelta(days=1)
+            _logger.info(
+                "[wb_subscription] Subscription-Promote für %s: plan=%s, "
+                "end_date=%s, next_invoice_date=%s",
+                order.name,
+                order.plan_id.display_name if order.plan_id else '-',
+                order.end_date if 'end_date' in order._fields else '-',
+                order.next_invoice_date if 'next_invoice_date' in order._fields else '-',
+            )
+
     def _wb_issue_license_keys(self):
-        """Erzeugt für jede unbearbeitete Lizenz-Zeile einen wb.license.key.
+        """Erzeugt oder verlängert für jede Lizenz-Zeile einen wb.license.key.
 
-        Idempotent: Wenn für (order_line, product) bereits ein Key existiert,
-        wird übersprungen — Mehrfach-Aufruf bei mehreren Zahlungseingängen
-        oder Webhook-Replays ist sicher.
+        Idempotent über state-basiertes Lookup pro (sale_order, product):
 
-        Wird ausgelöst durch account.move.write wenn payment_state auf
-        'paid' oder 'in_payment' wechselt — siehe account_move.py.
+        - issued/active/grace → Mid-Cycle-Payment (z.B. monatliche Teil-Rechnung
+          innerhalb eines Jahresvertrags). Key bleibt unverändert, keine Mails.
+        - expired              → Year-Rollover (Renewal-Cron-Rechnung wurde bezahlt).
+                                 action_renew verlängert valid_to. Bei nicht-aktivierter
+                                 Lizenz bleibt state='expired' (egal — Kunde hat eh nie
+                                 aktiviert), bei aktivierter wird state='active'.
+        - revoked/cancelled    → bewusst abgeschaltet, keine Auto-Reaktivierung.
+        - kein Key vorhanden   → Initial-Sale, neuen Key erzeugen + Mails versenden.
+
+        Wird ausgelöst durch account.move._invoice_paid_hook wenn payment_state
+        auf 'paid' wechselt — siehe account_move.py.
         """
         self.ensure_one()
         Key = self.env['wb.license.key'].sudo()
@@ -91,15 +209,30 @@ class SaleOrder(models.Model):
                 continue
 
             existing = Key.search([
-                ('partner_id', '=', self.partner_id.id),
+                ('sale_order_id', '=', self.id),
                 ('product_id', '=', line.product_id.id),
-                ('valid_from', '>=', fields.Date.context_today(self) - timedelta(days=7)),
-            ], limit=1)
+            ], limit=1, order='create_date desc')
+
             if existing:
+                if existing.state in ('issued', 'active', 'grace'):
+                    _logger.info(
+                        "[wb_subscription] Mid-cycle Payment auf Order %s — "
+                        "Key %s (state=%s) bleibt unverändert.",
+                        self.name, existing.name, existing.state)
+                    continue
+                if existing.state == 'expired':
+                    new_valid_to = self._wb_compute_valid_to()
+                    _logger.info(
+                        "[wb_subscription] Year-Rollover auf Order %s — "
+                        "Key %s (activated_at=%s) wird auf %s verlängert.",
+                        self.name, existing.name, bool(existing.activated_at),
+                        new_valid_to)
+                    existing.action_renew(new_valid_to=new_valid_to)
+                    continue
+                # revoked / cancelled → bewusst abgeschaltet
                 _logger.info(
-                    "[wb_subscription] Lizenz für Order %s / Produkt %s existiert "
-                    "bereits (%s) — skip Erzeugung",
-                    self.name, line.product_id.display_name, existing.name)
+                    "[wb_subscription] Key %s ist %s — keine Auto-Reaktivierung "
+                    "auf Order %s.", existing.name, existing.state, self.name)
                 continue
 
             valid_from = fields.Date.context_today(self)

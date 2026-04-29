@@ -50,6 +50,7 @@ Siehe ARCHITECTURE.md v1.5 für Details.
         'reports/license_eula_report.xml',
         'reports/license_eula_template.xml',
         'reports/account_move_template_ext.xml',
+        'reports/saleorder_proforma_ext.xml',
         'views/wb_license_key_views.xml',
         'views/wb_license_event_views.xml',
         'views/wb_license_tag_views.xml',

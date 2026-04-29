@@ -47,6 +47,11 @@
                         <field name="wb_eula_template_id"/>
                         <field name="wb_certificate_template_id"/>
                     </group>
+                    <group invisible="not wb_is_license_product" string="Subscription">
+                        <field name="wb_default_subscription_plan_id"
+                               options="{'no_create': True}"/>
+                        <field name="wb_billing_calendar"/>
+                    </group>
                     <group invisible="not wb_is_license_product"
                            string="Modul-Releases (Kunden-Portal)">
                         <field name="wb_current_release_id" readonly="1"

@@ -10,3 +10,4 @@ from . import test_portal_downloads
 from . import test_sprint2_security
 from . import test_sprint3_security
 from . import test_sprint5_polish
+from . import test_subscription_promote

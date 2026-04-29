@@ -102,6 +102,30 @@ class ProductTemplate(models.Model):
         'ir.actions.report',
         string='Zertifikat-Report',
     )
+    wb_default_subscription_plan_id = fields.Many2one(
+        'sale.subscription.plan',
+        string='Default-Subscription-Plan',
+        help="Standard-Odoo-Subscription-Plan (Recurrence) — bestimmt den "
+             "Cron-Rhythmus der Folge-Rechnungen. Wird beim Bestätigen der "
+             "Sale Order automatisch gesetzt, wenn die Order ein Lizenz-Produkt "
+             "enthält und noch keinen Plan hat. Sollte zum wb_billing_calendar "
+             "passen (z.B. Plan='Quarterly' bei wb_billing_calendar='quarterly').",
+    )
+    wb_billing_calendar = fields.Selection(
+        [
+            ('monthly',   'Monatlich (1.–letzter Tag des Monats)'),
+            ('quarterly', 'Quartalsweise (Q1: Jan-Mär, Q2: Apr-Jun, Q3: Jul-Sep, Q4: Okt-Dez)'),
+            ('biannual',  'Halbjährlich (H1: Jan-Jun, H2: Jul-Dez)'),
+            ('yearly',    'Jährlich (Jan-Dez)'),
+        ],
+        string='Abrechnungs-Kalender',
+        default='monthly',
+        help="Kalender-Anker für die erste Rechnung (anteilig zum Ende der "
+             "aktuellen Kalenderperiode). Beispiel: 'quarterly' + "
+             "Vertragsbeginn 15.05. → Erstrechnung 15.05.–30.06. (Rest-Q2), "
+             "danach Q3 und Q4 jeweils zum 1. zum vollen Quartalspreis. "
+             "Vertragsende ist universell der 31.12. (`_wb_compute_valid_to`).",
+    )
 
     _sql_constraints = [
         ('wb_technical_code_unique',

@@ -5,11 +5,19 @@ Zwei Aufgaben:
 1. wb_license_ids-Felder auf account.move(.line) für die QWeb-Rechnung,
    damit pro Zeile Key + Domain + Laufzeit angezeigt werden können.
 
-2. **Payment-Hook**: Wenn payment_state einer Out-Invoice auf 'paid' oder
-   'in_payment' wechselt, wird auf den verknüpften sale.order(s)
-   `_wb_issue_license_keys` aufgerufen. So wird die Lizenz erst erzeugt
-   wenn das Geld da ist — folgt dem Odoo-Standard-Flow ohne Stripe-
-   spezifischen Code.
+2. **Payment-Hook**: Wenn die Rechnung auf 'paid' wechselt, wird auf den
+   verknüpften sale.order(s) `_wb_issue_license_keys` aufgerufen. So wird
+   die Lizenz erst erzeugt wenn das Geld da ist.
+
+   Primärer Trigger ist `_invoice_paid_hook`, der vom Odoo-Core garantiert
+   aufgerufen wird wenn payment_state auf 'paid' wechselt — unabhängig vom
+   Reconcile-Pfad (manuelle Zahlung, SEPA, Stripe-Webhook, ...).
+   `payment_state` ist ein computed Field; ein direkter `write`-Override
+   greift nicht zuverlässig.
+
+   Der `write`-Override bleibt als Safety-Net für Code-Pfade die `payment_state`
+   doch direkt setzen (z.B. Tests oder Custom-Module). _wb_issue_license_keys
+   ist idempotent über existing-Lookup, Doppel-Trigger schadet nicht.
 """
 
 import logging
@@ -69,11 +77,26 @@ class AccountMove(models.Model):
             move.wb_license_ids = keys
             move.wb_has_license_lines = bool(keys)
 
-    def write(self, vals):
-        """Override: bei payment_state-Wechsel auf 'paid' werden Lizenzen erzeugt.
+    def _invoice_paid_hook(self):
+        """Override: nach Zahlungseingang Lizenz-Issuance auslösen.
 
-        Wir prüfen den state-Übergang vor dem write, um Doppel-Trigger zu
-        vermeiden. _wb_issue_license_keys ist selbst idempotent.
+        Primärer Trigger. Vom Odoo-Core garantiert aufgerufen wenn
+        payment_state auf 'paid' wechselt — egal über welchen Reconcile-
+        Pfad (manuelle Zahlung, SEPA, Stripe-Webhook). Zuverlässiger als
+        write()-Override auf computed payment_state.
+        """
+        super()._invoice_paid_hook()
+        for move in self.filtered(
+            lambda m: m.move_type == 'out_invoice' and m.wb_has_license_lines
+        ):
+            self._wb_trigger_license_issuance(move)
+
+    def write(self, vals):
+        """Safety-Net für Code-Pfade die payment_state direkt setzen.
+
+        Greift in Tests und manchen Custom-Modulen, die nicht den normalen
+        Reconcile-Pfad nutzen. _invoice_paid_hook ist der primäre Trigger.
+        _wb_issue_license_keys ist idempotent — Doppel-Trigger schadet nicht.
         """
         moves_just_paid = self.env['account.move']
         if 'payment_state' in vals and vals['payment_state'] in PAID_STATES:
@@ -85,14 +108,22 @@ class AccountMove(models.Model):
 
         result = super().write(vals)
 
-        if moves_just_paid:
-            for move in moves_just_paid:
-                try:
-                    orders = move.invoice_line_ids.mapped('sale_line_ids.order_id')
-                    for order in orders:
-                        order._wb_issue_license_keys()
-                except Exception as e:
-                    _logger.exception(
-                        "[wb_subscription] License-Issuance auf Rechnung %s fehlgeschlagen: %s",
-                        move.name, e)
+        for move in moves_just_paid:
+            self._wb_trigger_license_issuance(move)
         return result
+
+    @staticmethod
+    def _wb_trigger_license_issuance(move):
+        """Findet alle SOs der Move-Lines und ruft _wb_issue_license_keys.
+
+        Exceptions werden geloggt aber nicht weitergeworfen — eine
+        Lizenz-Issuance darf den Payment-Hook nicht blockieren.
+        """
+        try:
+            orders = move.invoice_line_ids.mapped('sale_line_ids.order_id')
+            for order in orders:
+                order._wb_issue_license_keys()
+        except Exception as e:
+            _logger.exception(
+                "[wb_subscription] License-Issuance auf Rechnung %s "
+                "fehlgeschlagen: %s", move.name, e)
