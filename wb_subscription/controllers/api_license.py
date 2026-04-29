@@ -371,6 +371,76 @@ class ApiLicenseController(http.Controller):
             'intent': intent,
         }
 
+    @http.route('/api/license/lookup',
+                type='json', auth='public', methods=['POST'],
+                csrf=False, cors=CORS_ANY)
+    def lookup_license(self, **kw):
+        """Zero-Touch-Aktivierung: Auto-Bind einer armierten Lizenz.
+
+        Wird vom wb_license_client beim Modul-Install aufgerufen, um eine
+        Lizenz zu finden und automatisch zu binden (ohne dass der Kunde
+        Key+Code manuell eintippen muss). Voraussetzung: WB hat die Lizenz
+        beim Verkauf vorbelegt (pre_assigned_domain/email) und armiert
+        (auto_bind_armed=True, auto_bind_armed_until in der Zukunft).
+
+        Request:
+            {
+                "product_code": "BITW",
+                "db_uuid": "abc-...",
+                "domain": "https://kunde.odoo.com",
+                "email": "kunde@example.com"   # Fallback wenn Domain unklar
+            }
+
+        Response (Match):
+            {"found": true, "key": "WB-BITW-...", "valid_to": "...",
+             "state": "active"}
+
+        Response (No-Match): {"found": false}
+
+        Rate-Limit: 10/h pro IP — strikt, weil Match-Antwort einen
+        gueltigen Key + Activation enthaelt. Anti-Enumeration.
+        """
+        if not _check_rate_limit(_client_ip(), 'lookup', 10, 3600):
+            return {'error': 'TOO_MANY_REQUESTS'}
+
+        product_code = (kw.get('product_code') or '').strip().upper()
+        db_uuid = (kw.get('db_uuid') or '').strip()
+        domain = (kw.get('domain') or '').strip()
+        email = (kw.get('email') or '').strip()
+
+        if not product_code or len(product_code) != 4:
+            return {'error': 'INVALID_PRODUCT_CODE'}
+        if not db_uuid:
+            return {'error': 'MISSING_BINDING_DATA'}
+        if not domain and not email:
+            return {'error': 'MISSING_MATCH_CRITERIA'}
+
+        License = request.env['wb.license.key'].sudo()
+        license = License._lookup_for_auto_bind(
+            product_code, db_uuid, domain, email,
+        )
+        if not license:
+            request.env['wb.license.event'].sudo().log_event(
+                False, 'auto_bind_lookup_failed',
+                ip_address=_client_ip(), user_agent=_client_ua(),
+                domain=domain, db_uuid=db_uuid,
+                details={'product_code': product_code,
+                         'email': email or ''},
+            )
+            return {'found': False}
+
+        license._bind_via_auto_lookup(
+            db_uuid, domain, email,
+            ip=_client_ip(), user_agent=_client_ua(),
+        )
+        return {
+            'found': True,
+            'key': license.name,
+            'state': license.state,
+            'valid_from': license.valid_from.isoformat() if license.valid_from else None,
+            'valid_to': license.valid_to.isoformat() if license.valid_to else None,
+        }
+
     @http.route('/api/license/migrate',
                 type='json', auth='public', methods=['POST'],
                 csrf=False, cors=CORS_ANY)

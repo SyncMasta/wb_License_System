@@ -242,7 +242,8 @@ class WbLicenseClient(models.AbstractModel):
         raise UserError(message)
 
     @api.model
-    def register_install(self, product_code, module_name=None):
+    def register_install(self, product_code, module_name=None,
+                         try_auto_lookup=True):
         """Meldet diese Odoo-Instanz als Install bei wissen-beratung.de an.
 
         Wird aus zwei Pfaden gerufen:
@@ -259,13 +260,112 @@ class WbLicenseClient(models.AbstractModel):
         :param module_name: Optional technischer Modul-Name (z.B.
             'wb_bitwarden_pro'). Wird auf wb.license.info persistiert,
             damit der tägliche Ping die installierte Modul-Version melden kann.
+        :param try_auto_lookup: Wenn True (default) und kein Key gespeichert,
+            wird /api/license/lookup probiert — Zero-Touch-Aktivierung wenn
+            WB die Lizenz beim Verkauf armiert hat.
         :return: True wenn Announce erfolgreich, False sonst
         """
         if self._install_registry_disabled():
             return False
 
         info = self._get_or_create_info(product_code, module_name=module_name)
-        return self._announce_install(info, product_code)
+        announce_ok = self._announce_install(info, product_code)
+
+        # Zero-Touch: wenn noch kein Key konfiguriert ist, einmal versuchen
+        # ob WB eine armierte Lizenz fuer (domain, db_uuid, email) hat.
+        # Best-effort — bei Fehler stiller Fallback auf manuellen Wizard.
+        if try_auto_lookup and not self._get_stored_key(product_code):
+            try:
+                self._try_auto_lookup(info, product_code)
+            except Exception as e:
+                _logger.warning(
+                    "[wb_license_client] Auto-Lookup fuer %s gescheitert: %s",
+                    product_code, e)
+
+        return announce_ok
+
+    @api.model
+    def _try_auto_lookup(self, info, product_code):
+        """Ruft /api/license/lookup und speichert Key bei Match.
+
+        Liefert True wenn Match gefunden + Key gespeichert, sonst False.
+        Wird aus ``register_install`` und aus ``_post_init_auto_lookup``
+        gerufen.
+        """
+        domain = self._get_domain()
+        db_uuid = self._get_db_uuid()
+        if not db_uuid:
+            return False
+        email = self.env.user.email or ''
+        if not domain and not email:
+            return False
+        payload = {
+            'product_code': product_code,
+            'db_uuid': db_uuid,
+            'domain': domain or '',
+            'email': email,
+        }
+        data, status = self._do_request(
+            '/api/license/lookup', payload, timeout=DEFAULT_ACTIVATE_TIMEOUT,
+        )
+        if status != 200 or not isinstance(data, dict):
+            return False
+        if not data.get('found'):
+            _logger.info(
+                "[wb_license_client] Auto-Lookup %s: kein Match.", product_code)
+            return False
+        key = (data.get('key') or '').strip()
+        if not key:
+            return False
+        self._store_key(product_code, key)
+        info.sudo().write({
+            'key': key,
+            'state': data.get('state') or 'active',
+            'valid_to': data.get('valid_to'),
+            'last_server_check': fields.Datetime.now(),
+            'last_check_success': True,
+            'last_error_message': False,
+        })
+        _logger.info(
+            "[wb_license_client] Auto-Lookup %s: Match — Lizenz '%s' "
+            "automatisch gebunden.", product_code, key)
+        return True
+
+    @api.model
+    def auto_lookup_all_installed(self):
+        """Iteriert ueber alle Module, die ``wb_license_client`` als
+        Dependency haben und einen 4-Buchstaben-Produkt-Code via
+        ``ir.config_parameter`` ``wb_license_client.product_code_<modul>``
+        oder via Modul-Eigenschaft melden, und versucht /api/license/lookup
+        fuer jeden, der noch keinen Key gespeichert hat.
+
+        Wird vom post_init_hook von wb_license_client und manuell aus dem
+        Settings-Dialog aufrufbar — z.B. nach Server-Migration kann der
+        Admin damit alle Lizenzen neu auflosen lassen.
+        """
+        Module = self.env['ir.module.module'].sudo()
+        IrConfig = self.env['ir.config_parameter'].sudo()
+        installed = Module.search([('state', '=', 'installed')])
+        wlc = installed.filtered(
+            lambda m: 'wb_license_client' in (m.dependencies_id.mapped('name') or [])
+        )
+        results = {}
+        for module in wlc:
+            product_code = (IrConfig.get_param(
+                'wb_license_client.product_code_' + module.name) or '').strip().upper()
+            if not product_code or len(product_code) != 4:
+                continue
+            if self._get_stored_key(product_code):
+                continue
+            try:
+                info = self._get_or_create_info(product_code, module_name=module.name)
+                results[product_code] = self._try_auto_lookup(info, product_code)
+            except Exception as e:
+                _logger.warning(
+                    "[wb_license_client] auto_lookup_all_installed %s: %s",
+                    product_code, e)
+                results[product_code] = False
+        return results
 
     @api.model
     def _maybe_announce_install(self, info, product_code):

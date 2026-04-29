@@ -47,6 +47,11 @@ EVENT_TYPES = [
     ('newsletter_optin', 'Newsletter-Opt-In beim Activate'),
     ('newsletter_optin_failed', 'Newsletter-Opt-In fehlgeschlagen (Liste fehlt o.ä.)'),
     ('download', 'Modul-Tarball aus Kunden-Portal heruntergeladen'),
+    ('auto_bind_armed', 'Auto-Bind armiert (Vertrieb)'),
+    ('auto_bind_disarmed', 'Auto-Bind manuell zurueckgesetzt'),
+    ('auto_bind_expired', 'Auto-Bind abgelaufen (Cron-Disarm)'),
+    ('auto_bind_resolved', 'Auto-Bind via Lookup gebunden'),
+    ('auto_bind_lookup_failed', 'Auto-Bind Lookup-Versuch ohne Match'),
 ]
 
 

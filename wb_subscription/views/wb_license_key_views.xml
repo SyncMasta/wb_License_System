@@ -40,6 +40,13 @@
                     <button name="action_reactivate" string="Reaktivieren" type="object"
                             invisible="state not in ('revoked', 'expired')"
                             class="btn-secondary"/>
+                    <button name="action_arm_auto_bind" string="Auto-Bind aktivieren"
+                            type="object" class="btn-secondary"
+                            invisible="auto_bind_armed or state in ('revoked', 'cancelled', 'expired') or activated_at"
+                            confirm="Auto-Bind fuer 24h aktivieren? Die naechste Lookup-Anfrage mit passender Domain/Email wird die Lizenz automatisch binden."/>
+                    <button name="action_disarm_auto_bind" string="Auto-Bind zuruecksetzen"
+                            type="object" class="btn-secondary"
+                            invisible="not auto_bind_armed"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="issued,trial,active,grace,expired"/>
                 </header>
@@ -88,6 +95,27 @@
                                    groups="wb_subscription.group_wb_subscription_manager"/>
                             <field name="last_seen_user_agent" readonly="1"
                                    groups="wb_subscription.group_wb_subscription_manager"/>
+                        </group>
+                    </group>
+                    <group string="Auto-Bind (Zero-Touch-Aktivierung)" name="auto_bind">
+                        <group>
+                            <field name="pre_assigned_domain"
+                                   placeholder="https://kunde.odoo.com"
+                                   readonly="auto_bind_armed or activated_at"/>
+                            <field name="pre_assigned_email"
+                                   placeholder="kunde@example.com"
+                                   readonly="auto_bind_armed or activated_at"/>
+                        </group>
+                        <group>
+                            <field name="auto_bind_armed" readonly="1"/>
+                            <field name="auto_bind_armed_until" readonly="1"
+                                   invisible="not auto_bind_armed"/>
+                            <field name="auto_bind_armed_at" readonly="1"
+                                   invisible="not auto_bind_armed_at"/>
+                            <field name="auto_bind_armed_by" readonly="1"
+                                   invisible="not auto_bind_armed_by"/>
+                            <field name="auto_bind_resolved_at" readonly="1"
+                                   invisible="not auto_bind_resolved_at"/>
                         </group>
                     </group>
                     <group>
@@ -174,6 +202,8 @@
                 <filter name="filter_revoked" string="Revoked" domain="[('state', '=', 'revoked')]"/>
                 <filter name="filter_expiring_soon" string="Läuft in 30 Tagen ab"
                         domain="[('is_expiring_soon', '=', True)]"/>
+                <filter name="filter_auto_bind_armed" string="Auto-Bind aktiv"
+                        domain="[('auto_bind_armed', '=', True)]"/>
                 <filter name="group_state" string="Gruppen: Status" context="{'group_by': 'state'}"/>
                 <filter name="group_product" string="Gruppen: Produkt" context="{'group_by': 'product_id'}"/>
                 <filter name="group_partner" string="Gruppen: Kunde" context="{'group_by': 'partner_id'}"/>

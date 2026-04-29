@@ -1,6 +1,6 @@
 {
     'name': 'WB License Client',
-    'version': '19.0.2.0.0',
+    'version': '19.0.2.1.0',
     'category': 'Technical',
     'summary': 'Lizenz-Client für WISSEN BERATUNG Produkt-Module',
     'description': """
@@ -54,4 +54,5 @@ Siehe ARCHITECTURE.md v1.5 und docs/modules/wb_license_client.md für Details.
     'installable': True,
     'application': False,
     'auto_install': False,
+    'post_init_hook': '_post_init_auto_lookup',
 }

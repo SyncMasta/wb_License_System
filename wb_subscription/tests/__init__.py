@@ -14,3 +14,4 @@ from . import test_subscription_promote
 from . import test_mailing_list_sync
 from . import test_pro_rata_invoice
 from . import test_license_create_wizard
+from . import test_auto_bind_lookup

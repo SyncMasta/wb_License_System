@@ -241,6 +241,54 @@ class WbLicenseKey(models.Model):
     )
     currency_id = fields.Many2one(related='company_id.currency_id', readonly=True)
 
+    # ----------------------------------------------------- Auto-Bind (Sprint)
+    # Zero-Touch-Aktivierung: Wenn der Vertrieb beim Verkauf domain/email
+    # vorbelegt und 'armiert', kann der Kunde via /api/license/lookup
+    # ohne manuelle Key+Code-Eingabe an seine Lizenz kommen.
+    pre_assigned_domain = fields.Char(
+        string='Vorbelegte Domain',
+        help="Domain die WB beim Vertragsabschluss eintraegt — Match-Kriterium "
+             "fuer /api/license/lookup. Format: 'https://kunde.odoo.com' oder "
+             "'kunde.odoo.com' (egal). Leer = kein Domain-Match moeglich.",
+        copy=False,
+    )
+    pre_assigned_email = fields.Char(
+        string='Vorbelegte Email',
+        help="Fallback-Match wenn die Domain noch nicht bekannt ist — z.B. "
+             "Kunde liefert nur Firmen-Email beim Verkauf. Match gegen den "
+             "im /api/license/lookup mitgeschickten contact_email.",
+        copy=False,
+    )
+    auto_bind_armed = fields.Boolean(
+        string='Auto-Bind aktiv',
+        copy=False,
+        tracking=True,
+        help="Wenn True: /api/license/lookup darf diese Lizenz an die naechste "
+             "passende DB-UUID binden (sofern domain ODER email matchen). "
+             "Wird nach Match automatisch zurueckgesetzt. Schutz vor "
+             "Domain-Spoofing — nur WB darf armieren, nicht der Kunde.",
+    )
+    auto_bind_armed_until = fields.Datetime(
+        string='Auto-Bind Ablauf',
+        copy=False,
+        help="Auto-Disarm-Zeitpunkt (default 24h nach Armieren). Schuetzt "
+             "vor stehengelassenen Armierungen falls der Kunde nicht zeitnah "
+             "installiert.",
+    )
+    auto_bind_armed_at = fields.Datetime(
+        string='Auto-Bind aktiviert am',
+        copy=False, readonly=True,
+    )
+    auto_bind_armed_by = fields.Many2one(
+        'res.users', string='Auto-Bind aktiviert durch',
+        copy=False, readonly=True,
+    )
+    auto_bind_resolved_at = fields.Datetime(
+        string='Auto-Bind aufgeloest am',
+        copy=False, readonly=True,
+        help="Wann ein Lookup-Match die Lizenz tatsaechlich gebunden hat.",
+    )
+
     _sql_constraints = [
         ('name_unique', 'UNIQUE(name)', 'Lizenzschlüssel muss eindeutig sein.'),
         ('instance_limit_positive', 'CHECK(instance_limit >= 1)',
@@ -489,6 +537,186 @@ class WbLicenseKey(models.Model):
             _logger.exception(
                 "[wb_subscription] Mailing-Unsubscribe fuer Lizenz %s "
                 "fehlgeschlagen: %s", self.name, e)
+
+    # ----------------------------------------
+    # Auto-Bind (Zero-Touch-Aktivierung)
+    # ----------------------------------------
+
+    AUTO_BIND_DEFAULT_HOURS = 24
+
+    def action_arm_auto_bind(self):
+        """Armiert die Lizenz fuer /api/license/lookup-Auto-Bind.
+
+        Default-Frist: 24h. Wenn der Kunde in dem Fenster ein passendes
+        Produkt-Modul installiert, wird die Lizenz vom Server selbst an
+        seine db_uuid gebunden — kein manueller Activate-Wizard noetig.
+
+        Voraussetzung: pre_assigned_domain ODER pre_assigned_email gesetzt
+        (sonst gibt es keinen Match-Kriterium und Lookup matcht sowieso nie).
+        """
+        self.ensure_one()
+        if self.state in ('revoked', 'cancelled', 'expired'):
+            raise UserError(_(
+                "Lizenz im Status '%s' kann nicht armiert werden."
+            ) % self.state)
+        if self.activated_at and self.bound_db_uuid:
+            raise UserError(_(
+                "Lizenz ist bereits an %s gebunden — Auto-Bind nicht moeglich. "
+                "Bitte Migration nutzen."
+            ) % (self.bound_domain or self.bound_db_uuid))
+        if not (self.pre_assigned_domain or self.pre_assigned_email):
+            raise UserError(_(
+                "Mindestens 'Vorbelegte Domain' oder 'Vorbelegte Email' muss "
+                "gesetzt sein, sonst kann der Lookup keine Lizenz matchen."
+            ))
+        now = fields.Datetime.now()
+        self.write({
+            'auto_bind_armed': True,
+            'auto_bind_armed_until': now + timedelta(hours=self.AUTO_BIND_DEFAULT_HOURS),
+            'auto_bind_armed_at': now,
+            'auto_bind_armed_by': self.env.user.id,
+        })
+        self.env['wb.license.event'].log_event(
+            self, 'auto_bind_armed',
+            details={
+                'pre_assigned_domain': self.pre_assigned_domain or '',
+                'pre_assigned_email': self.pre_assigned_email or '',
+                'until': self.auto_bind_armed_until.isoformat(),
+            },
+        )
+        return True
+
+    def action_disarm_auto_bind(self):
+        """Manuelles Disarm — z.B. wenn der Vertrieb merkt, dass die Daten
+        falsch eingetragen waren oder der Kunde abspringt."""
+        self.ensure_one()
+        if not self.auto_bind_armed:
+            return False
+        self.write({
+            'auto_bind_armed': False,
+            'auto_bind_armed_until': False,
+        })
+        self.env['wb.license.event'].log_event(self, 'auto_bind_disarmed')
+        return True
+
+    @staticmethod
+    def _normalize_domain(value):
+        """Schemata/Trailing-Slashes/Case ignorieren beim Vergleich."""
+        if not value:
+            return ''
+        value = value.strip().lower()
+        for prefix in ('https://', 'http://'):
+            if value.startswith(prefix):
+                value = value[len(prefix):]
+                break
+        if value.endswith('/'):
+            value = value[:-1]
+        return value
+
+    @api.model
+    def _lookup_for_auto_bind(self, product_code, db_uuid, domain, email):
+        """Sucht eine armierte Lizenz die zu (product_code, db_uuid, domain,
+        email) passt.
+
+        Match-Regeln (siehe Memory ``todo_license_auto_lookup``):
+        - product_code exakt
+        - auto_bind_armed=True
+        - auto_bind_armed_until > now
+        - state in ('issued', 'active') — keine revoked/cancelled/expired
+        - db_uuid noch nicht gebunden ODER bereits an db_uuid gebunden
+        - normalisierte pre_assigned_domain == domain ODER
+          pre_assigned_email.lower() == email.lower()
+
+        Liefert leeres Recordset wenn nichts matched.
+        """
+        if not product_code or not db_uuid:
+            return self.browse()
+        norm_domain = self._normalize_domain(domain)
+        norm_email = (email or '').strip().lower()
+        if not norm_domain and not norm_email:
+            return self.browse()
+        now = fields.Datetime.now()
+        candidates = self.sudo().search([
+            ('product_code', '=', product_code.upper()),
+            ('auto_bind_armed', '=', True),
+            ('auto_bind_armed_until', '>', now),
+            ('state', 'in', ('issued', 'active')),
+            '|',
+            ('bound_db_uuid', '=', False),
+            ('bound_db_uuid', '=', db_uuid),
+        ])
+        for cand in candidates:
+            if (norm_domain and self._normalize_domain(cand.pre_assigned_domain) == norm_domain):
+                return cand
+            if (norm_email and (cand.pre_assigned_email or '').strip().lower() == norm_email):
+                return cand
+        return self.browse()
+
+    def _bind_via_auto_lookup(self, db_uuid, domain, email, ip=None, user_agent=None):
+        """Fuehrt das Auto-Bind durch — wird vom /api/license/lookup-Controller
+        gerufen wenn ein Match gefunden wurde.
+
+        Setzt bound_db_uuid + bound_domain, aktiviert die Lizenz wenn noch
+        issued, disarmed das auto_bind-Flag und loggt ein Event. Der Kunde
+        bekommt damit einen aktiven Status ohne dass er den Activate-Code
+        eingeben muesste — Vertrauen liegt bei WB, das die Lizenz armiert hat.
+        """
+        self.ensure_one()
+        gen = self.env['wb.key.generator'].sudo()
+        fingerprint = gen.compute_fingerprint(domain, db_uuid)
+        now = fields.Datetime.now()
+        write_vals = {
+            'bound_domain': domain,
+            'bound_db_uuid': db_uuid,
+            'auto_bind_armed': False,
+            'auto_bind_armed_until': False,
+            'auto_bind_resolved_at': now,
+        }
+        if not self.activated_at:
+            write_vals.update({
+                'activated_at': now,
+                'activated_fingerprint': fingerprint,
+                'activation_hash': False,
+                'state': 'active' if self.state == 'issued' else self.state,
+            })
+        self.write(write_vals)
+        self.env['wb.license.event'].log_event(
+            self, 'auto_bind_resolved',
+            ip_address=ip, user_agent=user_agent,
+            domain=domain, db_uuid=db_uuid,
+            details={'matched_email': email or ''},
+        )
+        if self.product_code:
+            install = self.env['wb.license.install'].sudo().search([
+                ('product_code', '=', self.product_code),
+                ('domain', '=', domain),
+                ('db_uuid', '=', db_uuid),
+            ], limit=1)
+            if install:
+                install.mark_converted(self)
+        return True
+
+    @api.model
+    def _cron_disarm_auto_bind(self):
+        """Disarmed alle Lizenzen, deren auto_bind_armed_until in der
+        Vergangenheit liegt — Auto-Disarm-Garantie unabhaengig vom
+        Lookup-Endpoint (Server-Restart, Endpoint nicht aufgerufen, ...).
+        """
+        now = fields.Datetime.now()
+        stale = self.sudo().search([
+            ('auto_bind_armed', '=', True),
+            ('auto_bind_armed_until', '<', now),
+        ])
+        for rec in stale:
+            rec.write({
+                'auto_bind_armed': False,
+                'auto_bind_armed_until': False,
+            })
+            self.env['wb.license.event'].log_event(
+                rec, 'auto_bind_expired',
+                details={'expired_at': now.isoformat()},
+            )
+        return len(stale)
 
     def action_revoke(self, reason=None):
         """Manuell sperren. Audit-Event wird geloggt + Mails."""
