@@ -4,11 +4,13 @@ Auf Template-Ebene (nicht Variant), weil Lizenz-Metadaten über
 alle Varianten gleich sind. product.product erbt die Felder automatisch.
 """
 
+import logging
 import re
 
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
+_logger = logging.getLogger(__name__)
 
 PRODUCT_CODE_RE = re.compile(r'^[A-Z]{4}$')
 
@@ -111,6 +113,18 @@ class ProductTemplate(models.Model):
              "enthält und noch keinen Plan hat. Sollte zum wb_billing_calendar "
              "passen (z.B. Plan='Quarterly' bei wb_billing_calendar='quarterly').",
     )
+    wb_mailing_list_id = fields.Many2one(
+        'mailing.list',
+        string='Newsletter-Liste',
+        ondelete='set null',
+        copy=False,
+        help="Mailingliste fuer Service-Mails (Changelog, Sicherheits-Patches) "
+             "an Kunden mit aktiver Lizenz dieses Produkts. Wird beim Anlegen "
+             "des Produkts (oder beim Setzen von wb_is_license_product=True) "
+             "automatisch erzeugt mit Name '[<TECHNICAL_CODE>] <Produkt-Name>'. "
+             "Lizenz-Aktivierung subscribed automatisch, expired/revoked/cancelled "
+             "unsubscribed (DSGVO-konform per opt_out=True, Audit-Trail bleibt).",
+    )
     wb_billing_calendar = fields.Selection(
         [
             ('monthly',   'Monatlich (1.–letzter Tag des Monats)'),
@@ -132,6 +146,55 @@ class ProductTemplate(models.Model):
          'UNIQUE(wb_technical_code)',
          'Technischer Produkt-Code muss einzigartig sein.'),
     ]
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        for rec in records:
+            if rec.wb_is_license_product and not rec.wb_mailing_list_id:
+                rec._wb_create_mailing_list()
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        # Auto-Create der Mailingliste, wenn Produkt nachtraeglich auf
+        # Lizenz-Produkt umgestellt wird oder ein technischer Code dazukommt.
+        if 'wb_is_license_product' in vals or 'wb_technical_code' in vals:
+            for rec in self:
+                if (rec.wb_is_license_product
+                        and rec.wb_technical_code
+                        and not rec.wb_mailing_list_id):
+                    rec._wb_create_mailing_list()
+        return res
+
+    def _wb_create_mailing_list(self):
+        """Erzeugt eine neue mailing.list mit '[<CODE>] <Name>' und verlinkt sie.
+
+        Idempotent — wird nicht aufgerufen wenn schon eine Liste verlinkt ist.
+        Best-effort: Fehler werden geloggt aber nicht weitergeworfen, damit
+        ein mass_mailing-Konfigurationsproblem das Produkt-Speichern nicht blockt.
+        """
+        self.ensure_one()
+        if self.wb_mailing_list_id:
+            return
+        if not self.wb_technical_code:
+            _logger.warning(
+                "[wb_subscription] Mailingliste fuer %s nicht angelegt — "
+                "wb_technical_code fehlt.", self.display_name)
+            return
+        try:
+            mailing_list = self.env['mailing.list'].sudo().create({
+                'name': f'[{self.wb_technical_code}] {self.name}',
+                'is_public': False,
+            })
+            self.wb_mailing_list_id = mailing_list.id
+            _logger.info(
+                "[wb_subscription] Mailingliste %s fuer Produkt %s angelegt.",
+                mailing_list.name, self.display_name)
+        except Exception as e:
+            _logger.exception(
+                "[wb_subscription] Mailinglisten-Erzeugung fuer %s "
+                "fehlgeschlagen: %s", self.display_name, e)
 
     @api.constrains('wb_is_license_product', 'wb_technical_code')
     def _check_wb_license_fields(self):

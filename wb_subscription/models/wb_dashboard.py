@@ -17,6 +17,14 @@ class WbDashboard(models.TransientModel):
     _name = 'wb.dashboard'
     _description = 'WB Subscription Admin-Dashboard'
 
+    name = fields.Char(
+        default=lambda self: _('WB Lizenz-Plattform — Stand %s')
+                              % fields.Datetime.now().strftime('%d.%m.%Y %H:%M'),
+        readonly=True,
+        help="Snapshot-Zeitpunkt — wird beim Klick auf Dashboard-Menue "
+             "neu erzeugt, also entspricht der aktuellen Live-Abfrage.",
+    )
+
     license_active_count = fields.Integer(compute='_compute_kpis')
     license_trial_count = fields.Integer(compute='_compute_kpis')
     license_grace_count = fields.Integer(compute='_compute_kpis')

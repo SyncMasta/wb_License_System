@@ -348,7 +348,147 @@ class WbLicenseKey(models.Model):
         records = super().create(vals_list)
         for rec in records:
             self.env['wb.license.event'].log_event(rec, 'key_generated')
+            # Falls Lizenz direkt aktiv erzeugt wird (Trial, Tests):
+            # Mailing-List-Subscribe greift hier, da der write-State-Hook
+            # nicht ausgeloest wird wenn state schon im create-vals ist.
+            if rec.state == 'active':
+                rec._wb_subscribe_to_mailing_list()
         return records
+
+    def write(self, vals):
+        """State-Watcher fuer Mailing-List-Sync.
+
+        Beim Uebergang auf 'active' (egal welcher Pfad: activate_with_code,
+        action_renew, action_reactivate, _cron_update_states) wird der Partner
+        in die Produkt-Mailingliste subscribed. Bei 'expired'/'revoked'/
+        'cancelled' wird er ausgetragen (opt_out=True, DSGVO-Audit-Trail).
+
+        'grace' triggert nichts — Lizenz funktioniert noch, Kunde soll
+        Service-Mails weiter bekommen.
+        """
+        old_states = {}
+        if 'state' in vals:
+            old_states = {rec.id: rec.state for rec in self}
+        result = super().write(vals)
+        if old_states:
+            for rec in self:
+                old = old_states.get(rec.id)
+                new = rec.state
+                if old == new:
+                    continue
+                if new == 'active':
+                    rec._wb_subscribe_to_mailing_list()
+                elif new in ('expired', 'revoked', 'cancelled'):
+                    rec._wb_unsubscribe_from_mailing_list()
+        return result
+
+    def _wb_subscribe_to_mailing_list(self):
+        """Subscribed den Lizenznehmer in die Produkt-Mailingliste.
+
+        Idempotent: bestehende Subscription mit opt_out=True wird wieder
+        aktiviert, sonst neu angelegt. Best-effort — Mailing-Probleme
+        duerfen die Lizenz-Aktivierung nicht blocken.
+
+        Voraussetzungen die still skippen (mit Log-Warning):
+        - Produkt hat keine wb_mailing_list_id (z.B. Produkt vor diesem
+          Sprint angelegt, Mailing-Modul nicht installiert, ...)
+        - Partner hat keine Email
+        """
+        self.ensure_one()
+        mailing_list = self.product_id.wb_mailing_list_id
+        if not mailing_list:
+            return
+        partner = self.partner_id
+        if not partner.email:
+            _logger.warning(
+                "[wb_subscription] Mailing-Subscribe fuer Lizenz %s "
+                "skipped — Partner %s hat keine Email.",
+                self.name, partner.display_name)
+            return
+        try:
+            Contact = self.env['mailing.contact'].sudo()
+            Subscription = self.env['mailing.subscription'].sudo()
+            contact = Contact.search(
+                [('email', '=ilike', partner.email)], limit=1
+            )
+            if not contact:
+                contact = Contact.create({
+                    'name': partner.name,
+                    'email': partner.email,
+                    'country_id': partner.country_id.id,
+                })
+            subscription = Subscription.search([
+                ('contact_id', '=', contact.id),
+                ('list_id', '=', mailing_list.id),
+            ], limit=1)
+            if subscription:
+                if subscription.opt_out:
+                    subscription.opt_out = False
+                    _logger.info(
+                        "[wb_subscription] Re-subscribe %s in '%s' "
+                        "(war opt_out).", partner.email, mailing_list.name)
+            else:
+                Subscription.create({
+                    'contact_id': contact.id,
+                    'list_id': mailing_list.id,
+                })
+                _logger.info(
+                    "[wb_subscription] Subscribe %s in '%s' "
+                    "(Lizenz %s aktiv).",
+                    partner.email, mailing_list.name, self.name)
+        except Exception as e:
+            _logger.exception(
+                "[wb_subscription] Mailing-Subscribe fuer Lizenz %s "
+                "fehlgeschlagen: %s", self.name, e)
+
+    def _wb_unsubscribe_from_mailing_list(self):
+        """Unsubscribed den Lizenznehmer per opt_out=True.
+
+        Behaelt den Subscription-Record (DSGVO-Audit-Trail), setzt nur
+        opt_out=True. Skipped wenn der Partner noch eine andere
+        active/grace Lizenz fuer dasselbe Produkt hat — z.B. mehrere
+        Tenants, die nicht alle gleichzeitig auslaufen.
+        """
+        self.ensure_one()
+        mailing_list = self.product_id.wb_mailing_list_id
+        if not mailing_list or not self.partner_id.email:
+            return
+        # Andere aktive/grace-Lizenz fuer (partner, product)?
+        other_active = self.search([
+            ('id', '!=', self.id),
+            ('partner_id', '=', self.partner_id.id),
+            ('product_id', '=', self.product_id.id),
+            ('state', 'in', ('active', 'grace')),
+        ], limit=1)
+        if other_active:
+            _logger.info(
+                "[wb_subscription] Unsubscribe %s aus '%s' skipped — "
+                "Partner hat noch aktive Lizenz %s fuer dasselbe Produkt.",
+                self.partner_id.email, mailing_list.name, other_active.name)
+            return
+        try:
+            Contact = self.env['mailing.contact'].sudo()
+            Subscription = self.env['mailing.subscription'].sudo()
+            contact = Contact.search(
+                [('email', '=ilike', self.partner_id.email)], limit=1
+            )
+            if not contact:
+                return
+            subscription = Subscription.search([
+                ('contact_id', '=', contact.id),
+                ('list_id', '=', mailing_list.id),
+            ], limit=1)
+            if subscription and not subscription.opt_out:
+                subscription.opt_out = True
+                _logger.info(
+                    "[wb_subscription] Unsubscribe %s aus '%s' "
+                    "(Lizenz %s state=%s).",
+                    self.partner_id.email, mailing_list.name,
+                    self.name, self.state)
+        except Exception as e:
+            _logger.exception(
+                "[wb_subscription] Mailing-Unsubscribe fuer Lizenz %s "
+                "fehlgeschlagen: %s", self.name, e)
 
     def action_revoke(self, reason=None):
         """Manuell sperren. Audit-Event wird geloggt + Mails."""

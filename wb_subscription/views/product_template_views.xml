@@ -62,6 +62,8 @@
                         <field name="wb_default_subscription_plan_id"
                                options="{'no_create': True}"/>
                         <field name="wb_billing_calendar"/>
+                        <field name="wb_mailing_list_id"
+                               options="{'no_create': True}"/>
                     </group>
                     <group invisible="not wb_is_license_product"
                            string="Modul-Releases (Kunden-Portal)">
