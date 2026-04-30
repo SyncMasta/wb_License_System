@@ -369,6 +369,47 @@ class WbLicenseInstall(models.Model):
         install._ensure_crm_lead(intent=intent)
         return install
 
+    # ----------------------------------------- Lead-Tag-Auto-Assign
+
+    LEAD_NOTES_MARKER_TAGS = {
+        '[BITWARDEN-MIETMODELL]': 'Bitwarden-Mietmodell',
+        '[BUNDLE: PRO + MIETMODELL]': 'Bundle (Pro + Mietmodell)',
+        '[PRO-LIZENZ]': 'WB-Pro-Modul',
+    }
+
+    def _extract_marker_tags(self, notes):
+        """Liest Notes-Marker und gibt Tag-Namen zurueck.
+
+        Marker werden vom Kunden-Wizard (wb_bitwarden / wb_bitwarden_pro)
+        in den ersten Notes-Zeilen gesetzt. Reihenfolge der Erkennung
+        macht keinen Unterschied — bei mehreren Markern werden alle
+        zugewiesen (z.B. legacy bundle-marker + neuer pro-marker).
+        """
+        if not notes:
+            return []
+        tags = []
+        for marker, tag_name in self.LEAD_NOTES_MARKER_TAGS.items():
+            if marker in notes:
+                tags.append(tag_name)
+        return tags
+
+    def _resolve_crm_tags(self, tag_names):
+        """Sucht/erzeugt crm.tag-Records fuer die gegebenen Namen.
+
+        Auto-Create ist sicher, weil die Marker-Map fix ist (3 Eintraege).
+        Bei vorhandenem Tag wird der wiederverwendet — kein Duplikat.
+        """
+        Tag = self.env.get('crm.tag')
+        if Tag is None or not tag_names:
+            return []
+        result = []
+        for name in tag_names:
+            tag = Tag.sudo().search([('name', '=', name)], limit=1)
+            if not tag:
+                tag = Tag.sudo().create({'name': name})
+            result.append(tag.id)
+        return result
+
     def _ensure_crm_lead(self, intent='info'):
         """Erzeugt einen crm.lead/Opportunity wenn das CRM-Modul vorhanden ist.
 
@@ -407,6 +448,9 @@ class WbLicenseInstall(models.Model):
             country = self.env['res.country'].sudo().search(
                 [('code', '=', self.company_country_code.upper())], limit=1)
 
+        marker_tag_ids = self._resolve_crm_tags(
+            self._extract_marker_tags(self.lead_notes))
+
         lead_vals = {
             'name': lead_name,
             'type': lead_type,
@@ -423,6 +467,8 @@ class WbLicenseInstall(models.Model):
         }
         if self.partner_id:
             lead_vals['partner_id'] = self.partner_id.id
+        if marker_tag_ids:
+            lead_vals['tag_ids'] = [(6, 0, marker_tag_ids)]
 
         if self.crm_lead_id:
             if intent == 'purchase' and self.crm_lead_id.type == 'lead':
@@ -431,6 +477,13 @@ class WbLicenseInstall(models.Model):
                     'priority': '2',
                     'description': (self.crm_lead_id.description or '') +
                                    '\n\n--- Eskaliert zur Verkaufschance ---\n' + description,
+                })
+            # Marker-Tags additiv anhaengen — auch beim Re-Submit, falls
+            # der zweite Submit andere Marker liefert (z.B. info -> purchase
+            # mit jetzt klarem Plan-Wunsch).
+            if marker_tag_ids:
+                self.crm_lead_id.sudo().write({
+                    'tag_ids': [(4, tid) for tid in marker_tag_ids],
                 })
             try:
                 self.crm_lead_id.sudo().message_post(

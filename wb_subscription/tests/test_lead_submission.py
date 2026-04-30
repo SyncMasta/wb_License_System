@@ -112,3 +112,68 @@ class TestSubmitLead(TransactionCase):
         install = self.Install.submit_lead(self._payload())
         self.assertTrue(install)
         self.assertFalse(install.crm_lead_id)
+
+    # ----------------------------------- Marker-basierte Tag-Auto-Assign
+
+    def _tag_names(self, lead):
+        return set(lead.tag_ids.mapped('name'))
+
+    def test_marker_bitwarden_mietmodell_assigns_tag(self):
+        if not self.has_crm:
+            self.skipTest("crm-Modul nicht installiert")
+        install = self.Install.submit_lead(self._payload(
+            db_uuid='db-marker-mietmodell',
+            notes='[BITWARDEN-MIETMODELL]\nGewuenschte Edition: Teams\nAnzahl: 25',
+        ))
+        self.assertIn('Bitwarden-Mietmodell',
+            self._tag_names(install.crm_lead_id))
+
+    def test_marker_pro_lizenz_assigns_tag(self):
+        if not self.has_crm:
+            self.skipTest("crm-Modul nicht installiert")
+        install = self.Install.submit_lead(self._payload(
+            db_uuid='db-marker-pro',
+            notes='[PRO-LIZENZ]\nKunde will Pro-Modul.',
+        ))
+        self.assertIn('WB-Pro-Modul',
+            self._tag_names(install.crm_lead_id))
+
+    def test_marker_bundle_assigns_tag(self):
+        if not self.has_crm:
+            self.skipTest("crm-Modul nicht installiert")
+        install = self.Install.submit_lead(self._payload(
+            db_uuid='db-marker-bundle',
+            notes='[BUNDLE: PRO + MIETMODELL]\nEdition: Enterprise',
+        ))
+        self.assertIn('Bundle (Pro + Mietmodell)',
+            self._tag_names(install.crm_lead_id))
+
+    def test_no_marker_no_extra_tag(self):
+        if not self.has_crm:
+            self.skipTest("crm-Modul nicht installiert")
+        install = self.Install.submit_lead(self._payload(
+            db_uuid='db-no-marker',
+            notes='Einfacher Freitext ohne Marker.',
+        ))
+        names = self._tag_names(install.crm_lead_id)
+        self.assertNotIn('Bitwarden-Mietmodell', names)
+        self.assertNotIn('WB-Pro-Modul', names)
+        self.assertNotIn('Bundle (Pro + Mietmodell)', names)
+
+    def test_marker_tag_idempotent_on_resubmit(self):
+        if not self.has_crm:
+            self.skipTest("crm-Modul nicht installiert")
+        # 1. Submit
+        install = self.Install.submit_lead(self._payload(
+            db_uuid='db-resubmit',
+            notes='[BITWARDEN-MIETMODELL]\nUser: 10',
+        ))
+        first_count = len(install.crm_lead_id.tag_ids)
+        # 2. Submit (gleicher Marker) — idempotent
+        self.Install.submit_lead(self._payload(
+            db_uuid='db-resubmit',
+            notes='[BITWARDEN-MIETMODELL]\nUser: 15',
+        ))
+        install.invalidate_recordset()
+        self.assertEqual(len(install.crm_lead_id.tag_ids), first_count,
+            "Re-Submit mit gleichem Marker darf den Tag nicht duplizieren.")
