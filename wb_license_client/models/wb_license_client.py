@@ -476,11 +476,20 @@ class WbLicenseClient(models.AbstractModel):
             status=0 signalisiert Netzwerk-Fehler (Timeout/ConnectionError).
         """
         url = self._get_server_url() + endpoint
+        # X-Odoo-Database (M-109): bei Self-Hosting (License-Server + Client
+        # in derselben Odoo-Instanz mit Multi-DB) kann der License-Server-
+        # Endpoint ohne expliziten DB-Selektor 404 zurueckgeben, was den
+        # Client-Cache auf `unlicensed` zuruecksetzt. Wir senden den Namen
+        # der eigenen DB als Hint mit — die License-Server-Box (oder
+        # nginx davor) kann ihn ignorieren oder zur Routing-Entscheidung
+        # nutzen. Fuer Standard-Setups (License-Server auf separater Box)
+        # ist der Header eine harmlose Zusatzinfo.
         headers = {
             'Content-Type': 'application/json',
             'User-Agent': f'wb_license_client/{self._get_module_version()}',
             'X-WB-DB-UUID': self._get_db_uuid() or '',
             'X-WB-Domain': self._get_domain() or '',
+            'X-Odoo-Database': self.env.cr.dbname or '',
         }
         try:
             envelope = {'jsonrpc': '2.0', 'method': 'call', 'params': payload}
