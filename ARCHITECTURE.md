@@ -321,7 +321,7 @@ def generate_license(product_code: str) -> tuple[str, str, bytes]:
 def validate_key_format(key: str) -> bool:
     import re
     # Checksum hängt direkt an UUID, kein Bindestrich dazwischen
-    m = re.match(r'^WB-([A-Z]{4})-([a-f0-9]{8})([A-Z2-7]{2})$', key)
+    m = re.match(r'^WB-([A-Z0-9]{4})-([a-f0-9]{8})([A-Z2-7]{2})$', key)
     if not m:
         return False
     product_code, uuid_short, checksum = m.groups()

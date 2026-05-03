@@ -47,7 +47,8 @@ class WbLicenseInstall(models.Model):
         size=4,
         required=True,
         index=True,
-        help="4-stelliger Produkt-Code wie der Kunden-Client ihn meldet.",
+        help="4-stelliger alphanumerischer Produkt-Code (A-Z/0-9), "
+             "wie der Kunden-Client ihn meldet.",
     )
     product_id = fields.Many2one(
         'product.product',

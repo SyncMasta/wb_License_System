@@ -52,7 +52,8 @@ class WbLicenseInfo(models.Model):
         size=4,
         required=True,
         index=True,
-        help="4-stelliger Produkt-Code, z.B. 'TELE'.",
+        help="4-stelliger alphanumerischer Produkt-Code (A-Z/0-9), "
+             "z.B. 'TELE' oder 'MCP1'.",
     )
     key = fields.Char(
         string='Lizenzschlüssel',

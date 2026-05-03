@@ -56,7 +56,7 @@ class ApiTrialController(http.Controller):
             return {'error': 'MISSING_COMPANY'}
         if not domain:
             return {'error': 'MISSING_DOMAIN'}
-        if not re.match(r'^[A-Z]{4}$', product_code):
+        if not re.match(r'^[A-Z0-9]{4}$', product_code):
             return {'error': 'INVALID_PRODUCT_CODE'}
 
         if not _rate_limit(f"email:{email}", 'trial', 1, 86400):

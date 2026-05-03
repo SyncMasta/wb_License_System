@@ -12,7 +12,9 @@ from odoo.exceptions import ValidationError
 
 _logger = logging.getLogger(__name__)
 
-PRODUCT_CODE_RE = re.compile(r'^[A-Z]{4}$')
+# 4 alphanumerische Großbuchstaben/Ziffern. Ziffern erlauben Versions-Suffixe
+# wie MCP1, MCP2 (Model Context Protocol v1, v2). Einheitliche Länge bleibt bei 4.
+PRODUCT_CODE_RE = re.compile(r'^[A-Z0-9]{4}$')
 
 
 class ProductTemplate(models.Model):
@@ -26,8 +28,8 @@ class ProductTemplate(models.Model):
     wb_technical_code = fields.Char(
         string='Technischer Code',
         size=4,
-        help="4-stelliger Großbuchstaben-Code, z.B. 'TELE' oder 'TEST'. "
-             "Geht in das Public-Key-Format WB-{CODE}-xxx ein.",
+        help="4-stelliger alphanumerischer Code (A-Z, 0-9), z.B. 'TELE', 'TEST' "
+             "oder 'MCP1'. Geht in das Public-Key-Format WB-{CODE}-xxx ein.",
     )
     wb_module_technical_name = fields.Char(
         string='Odoo-Modul-Name',
@@ -202,11 +204,12 @@ class ProductTemplate(models.Model):
             if rec.wb_is_license_product:
                 if not rec.wb_technical_code:
                     raise ValidationError(_(
-                        "Lizenz-Produkt '%s' benötigt einen technischen Code (4 Großbuchstaben)."
+                        "Lizenz-Produkt '%s' benötigt einen technischen Code "
+                        "(4 alphanumerische Großbuchstaben/Ziffern)."
                     ) % rec.display_name)
                 if not PRODUCT_CODE_RE.match(rec.wb_technical_code):
                     raise ValidationError(_(
-                        "Technischer Code '%s' muss exakt 4 Großbuchstaben sein (A-Z)."
+                        "Technischer Code '%s' muss exakt 4 Zeichen aus A-Z/0-9 sein."
                     ) % rec.wb_technical_code)
 
 
