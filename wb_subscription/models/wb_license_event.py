@@ -52,6 +52,7 @@ EVENT_TYPES = [
     ('auto_bind_expired', 'Auto-Bind abgelaufen (Cron-Disarm)'),
     ('auto_bind_resolved', 'Auto-Bind via Lookup gebunden'),
     ('auto_bind_lookup_failed', 'Auto-Bind Lookup-Versuch ohne Match'),
+    ('nfr_issued', 'NFR-Lizenz ausgestellt'),
 ]
 
 
