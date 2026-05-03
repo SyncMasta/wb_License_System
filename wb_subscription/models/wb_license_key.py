@@ -137,7 +137,23 @@ class WbLicenseKey(models.Model):
         ondelete='set null',
         help="Sale-Order, aus der die Lizenz erzeugt wurde. "
              "In Odoo 19 EE ist die Subscription gleichzeitig die Order "
-             "(is_subscription=True). Bei Trials NULL.",
+             "(is_subscription=True). Bei Trials und NFR-Lizenzen NULL.",
+    )
+
+    # ----------------------------------------------------- NFR (Not For Resale)
+    # Interne / Eval / Dev-Lizenzen ohne Sale-Order. Werden direkt im
+    # aktivierten Zustand erzeugt (state='active'), durchlaufen keinen
+    # Activation-Code-Flow und sind nicht in Revenue-Reports einbezogen.
+    # Standard-Anwendungsfall: WISSEN BERATUNG lizenziert eigene Module
+    # für eigene Tenants (z.B. MCP1 auf wissen-beratung.de).
+    is_nfr = fields.Boolean(
+        string='NFR (Not For Resale)',
+        default=False,
+        copy=False,
+        tracking=True,
+        help="Wenn True: interner / Eval / Dev-Key ohne Sale-Order und "
+             "ohne Activation-Code. Wird mit state='active' erzeugt und "
+             "ist sofort einsatzbereit. Nicht für kommerzielle Distribution.",
     )
 
     state = fields.Selection(
@@ -695,6 +711,88 @@ class WbLicenseKey(models.Model):
             if install:
                 install.mark_converted(self)
         return True
+
+    @api.model
+    def issue_nfr_license(
+        self,
+        product_code,
+        bound_domain,
+        bound_db_uuid=None,
+        partner_id=None,
+        valid_years=99,
+        instance_limit=1,
+        internal_note='',
+    ):
+        """NFR-Lizenz (Not For Resale) ausstellen — interner Workflow.
+
+        Erzeugt einen pre-activated Key (state='active') ohne Sale-Order
+        und ohne Activation-Code-Flow. Bindet direkt an domain/db_uuid.
+        Defaults auf 99 Jahre Laufzeit (effektiv perpetuell).
+
+        Standard-Anwendungsfall: WB lizenziert eigene Module für eigene
+        Tenants (z.B. MCP1 für wissen-beratung.de).
+
+        :param product_code: 4-stelliger Produkt-Code, z.B. 'MCP1'
+        :param bound_domain: Domain die den Key nutzen darf
+        :param bound_db_uuid: optional, sonst beim ersten Ping gesetzt
+        :param partner_id: default = env.company.partner_id (Self-Issue)
+        :param valid_years: default 99 (effektiv perpetuell)
+        :param instance_limit: default 1
+        :param internal_note: Freitext, an interne Notiz angehängt
+        :return: wb.license.key Recordset (genau 1)
+        """
+        Product = self.env['product.product']
+        product = Product.search(
+            [
+                ('wb_technical_code', '=', product_code),
+                ('wb_is_license_product', '=', True),
+            ],
+            limit=1,
+        )
+        if not product:
+            raise UserError(_(
+                "Kein License-Produkt mit Code %s gefunden. "
+                "Erst über die Produkt-Liste anlegen "
+                "(wb_is_license_product=True, wb_technical_code='%s')."
+            ) % (product_code, product_code))
+
+        if partner_id is None:
+            partner_id = self.env.company.partner_id.id
+
+        today = fields.Date.context_today(self)
+        valid_to = today + timedelta(days=int(valid_years) * 365)
+
+        nfr_marker = _("NFR-Lizenz — keine Sale-Order, keine Revenue-Erfassung.")
+        merged_note = (internal_note + '\n\n' + nfr_marker).strip() if internal_note else nfr_marker
+
+        key = self.create([{
+            'product_id': product.id,
+            'partner_id': partner_id,
+            'state': 'active',
+            'is_nfr': True,
+            'bound_domain': bound_domain,
+            'bound_db_uuid': bound_db_uuid or False,
+            'valid_from': today,
+            'valid_to': valid_to,
+            'instance_limit': instance_limit,
+            'activated_at': fields.Datetime.now(),
+            'activation_hash_method': 'nfr',
+            'internal_note': merged_note,
+        }])
+        self.env['wb.license.event'].log_event(
+            key, 'nfr_issued',
+            details={
+                'product_code': product_code,
+                'bound_domain': bound_domain,
+                'bound_db_uuid': bound_db_uuid or '(unset)',
+                'valid_years': valid_years,
+            },
+        )
+        _logger.info(
+            "[wb_subscription] NFR-Lizenz ausgestellt: %s (%s) für %s",
+            key.name, product_code, bound_domain,
+        )
+        return key
 
     @api.model
     def _cron_disarm_auto_bind(self):

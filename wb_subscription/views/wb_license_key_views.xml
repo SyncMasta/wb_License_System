@@ -14,6 +14,7 @@
                 <field name="product_id"/>
                 <field name="partner_id"/>
                 <field name="state"/>
+                <field name="is_nfr" optional="show" widget="boolean_toggle" readonly="1"/>
                 <field name="valid_from"/>
                 <field name="valid_to"/>
                 <field name="bound_domain"/>
@@ -53,7 +54,14 @@
                 <sheet>
                     <div class="oe_title">
                         <label for="name" string="Lizenzschlüssel"/>
-                        <h1><field name="name" readonly="1"/></h1>
+                        <h1>
+                            <field name="name" readonly="1"/>
+                            <field name="is_nfr" widget="boolean_toggle" readonly="1"
+                                   class="oe_inline ms-2"
+                                   invisible="not is_nfr"/>
+                            <span class="badge text-bg-info ms-2"
+                                  invisible="not is_nfr">NFR</span>
+                        </h1>
                     </div>
                     <group>
                         <group string="Beziehungen">
@@ -204,6 +212,11 @@
                         domain="[('is_expiring_soon', '=', True)]"/>
                 <filter name="filter_auto_bind_armed" string="Auto-Bind aktiv"
                         domain="[('auto_bind_armed', '=', True)]"/>
+                <separator/>
+                <filter name="filter_nfr" string="NFR (intern/eval)"
+                        domain="[('is_nfr', '=', True)]"/>
+                <filter name="filter_paid" string="Verkauft (kein NFR)"
+                        domain="[('is_nfr', '=', False)]"/>
                 <filter name="group_state" string="Gruppen: Status" context="{'group_by': 'state'}"/>
                 <filter name="group_product" string="Gruppen: Produkt" context="{'group_by': 'product_id'}"/>
                 <filter name="group_partner" string="Gruppen: Kunde" context="{'group_by': 'partner_id'}"/>

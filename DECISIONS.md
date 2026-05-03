@@ -154,6 +154,31 @@ Details siehe `ARCHITECTURE.md` Kapitel 11.
 
 ---
 
+## NFR-Lizenzen (Not For Resale, 2026-05-03)
+
+WB-eigene Module für WB-eigene Tenants — z.B. `wb_odoo_mcp` (MCP1) auf `wissen-beratung.de` — werden über eine eigene NFR-Klasse abgerechnet, nicht über Sale-Order-Workflow:
+
+- Neues Bool-Feld `wb.license.key.is_nfr` (default False, copy=False, tracked)
+- Neue Model-Methode `wb.license.key.issue_nfr_license(product_code, bound_domain, bound_db_uuid=None, partner_id=None, valid_years=99, instance_limit=1, internal_note='')`
+- Erzeugt direkt Key mit `state='active'`, `activation_hash_method='nfr'` (kein bcrypt-Code), `activated_at=now()`, ohne `sale_order_id`
+- Default 99 Jahre Laufzeit ≈ perpetuell
+- Default partner = `env.company.partner_id` (Self-Issue)
+- Audit-Event-Type `nfr_issued` mit Details (product_code, bound_domain, valid_years)
+- UI: NFR-Badge im Form-Header (`<span class="badge text-bg-info">NFR</span>`), `is_nfr`-Spalte im List-View, Search-Filter "NFR (intern/eval)" + "Verkauft (kein NFR)"
+
+**Anwendungsregel:** NFR ist explizit für interne Selbst-Lizenzierung. Keine kommerzielle Distribution. Keine Sale-Order-Verknüpfung — fließt nicht in MRR/ARR-Reporting.
+
+**Aufrufmuster (Odoo-Shell oder Python):**
+```python
+env['wb.license.key'].issue_nfr_license(
+    product_code='MCP1',
+    bound_domain='https://www.wissen-beratung.de',
+    bound_db_uuid='<db-uuid>',
+)
+```
+
+---
+
 ## Produkt-Code-Registry
 
 **Format:** 4 Zeichen aus `[A-Z0-9]` (alphanumerisch, Großbuchstaben + Ziffern). Erweitert 2026-05-03 von rein-alphabetisch (`[A-Z]{4}`) auf alphanumerisch, um versionierte Codes wie `MCP1`, `MCP2` zu unterstützen. Bestehende Codes (TEST, TELE, BITW, …) bleiben unverändert gültig — der neue Regex ist ein Superset.
