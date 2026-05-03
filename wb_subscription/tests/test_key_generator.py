@@ -61,7 +61,7 @@ class TestKeyGenerator(TransactionCase):
         keys = {self.gen.generate_public_key('TEST') for _ in range(1000)}
         self.assertEqual(len(keys), 1000, "UUID-Kollision in 1000 Keys — extrem unwahrscheinlich.")
 
-    def test_product_code_must_be_4_uppercase(self):
+    def test_product_code_must_be_4_alphanumeric_uppercase(self):
         from odoo.exceptions import ValidationError
         with self.assertRaises(ValidationError):
             self.gen.generate_public_key('test')  # lowercase
@@ -69,6 +69,20 @@ class TestKeyGenerator(TransactionCase):
             self.gen.generate_public_key('ABC')  # zu kurz
         with self.assertRaises(ValidationError):
             self.gen.generate_public_key('ABCDE')  # zu lang
+        with self.assertRaises(ValidationError):
+            self.gen.generate_public_key('AB-C')  # Sonderzeichen
+        with self.assertRaises(ValidationError):
+            self.gen.generate_public_key('mcp1')  # Lowercase + digit
+
+    def test_product_code_with_digits_accepted(self):
+        # Versionierte Produkt-Codes wie MCP1 (Model Context Protocol v1).
+        key = self.gen.generate_public_key('MCP1')
+        self.assertRegex(
+            key,
+            r'^WB-MCP1-[a-f0-9]{8}[A-Z2-7]{2}$',
+            f"Alphanumerischer Produkt-Code wird nicht akzeptiert: {key!r}",
+        )
+        self.assertTrue(self.gen.validate_key_format(key))
 
     def test_activation_code_format(self):
         for _ in range(50):

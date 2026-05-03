@@ -24,7 +24,8 @@ from odoo.exceptions import UserError, ValidationError
 _logger = logging.getLogger(__name__)
 
 
-KEY_FORMAT_RE = re.compile(r'^WB-([A-Z]{4})-([a-f0-9]{8})([A-Z2-7]{2})$')
+# 4 alphanumerische Großbuchstaben/Ziffern für den Produkt-Code (z.B. TELE, MCP1).
+KEY_FORMAT_RE = re.compile(r'^WB-([A-Z0-9]{4})-([a-f0-9]{8})([A-Z2-7]{2})$')
 CODE_FORMAT_RE = re.compile(r'^[A-HJ-NP-Z2-9]{5}(-[A-HJ-NP-Z2-9]{5}){4}$')
 
 CHECKSUM_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
@@ -47,9 +48,9 @@ class WbKeyGenerator(models.AbstractModel):
     @api.model
     def generate_public_key(self, product_code):
         """Erzeugt einen Public Key im Format WB-{PROD}-{UUID8}{CHK}."""
-        if not product_code or not re.match(r'^[A-Z]{4}$', product_code):
+        if not product_code or not re.match(r'^[A-Z0-9]{4}$', product_code):
             raise ValidationError(_(
-                "Produkt-Code muss genau 4 Großbuchstaben sein (erhalten: %s)"
+                "Produkt-Code muss exakt 4 Zeichen aus A-Z/0-9 sein (erhalten: %s)"
             ) % product_code)
         uuid_short = uuid.uuid4().hex[:8]
         payload = f"WB-{product_code.upper()}-{uuid_short}"

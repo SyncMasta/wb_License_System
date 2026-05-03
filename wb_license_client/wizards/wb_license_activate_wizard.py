@@ -12,7 +12,8 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
 
-KEY_FORMAT_RE = re.compile(r'^WB-([A-Z]{4})-([a-f0-9]{8})([A-Z2-7]{2})$')
+# 4 alphanumerische Großbuchstaben/Ziffern für den Produkt-Code (TELE, MCP1, …).
+KEY_FORMAT_RE = re.compile(r'^WB-([A-Z0-9]{4})-([a-f0-9]{8})([A-Z2-7]{2})$')
 CODE_FORMAT_RE = re.compile(r'^[A-HJ-NP-Z2-9]{5}(-[A-HJ-NP-Z2-9]{5}){4}$')
 
 
@@ -23,7 +24,8 @@ class WbLicenseActivateWizard(models.TransientModel):
     product_code = fields.Char(
         size=4,
         required=True,
-        help="4-stelliger Produkt-Code (z.B. 'TELE'). Steht auf dem Lizenz-Zertifikat.",
+        help="4-stelliger alphanumerischer Produkt-Code (A-Z, 0-9), "
+             "z.B. 'TELE' oder 'MCP1'. Steht auf dem Lizenz-Zertifikat.",
     )
     key = fields.Char(
         string='Lizenzschlüssel',
@@ -108,9 +110,9 @@ class WbLicenseActivateWizard(models.TransientModel):
     @api.constrains('product_code')
     def _check_product_code(self):
         for rec in self:
-            if rec.product_code and not re.match(r'^[A-Z]{4}$', rec.product_code):
+            if rec.product_code and not re.match(r'^[A-Z0-9]{4}$', rec.product_code):
                 raise ValidationError(_(
-                    "Produkt-Code muss genau 4 Großbuchstaben sein."
+                    "Produkt-Code muss exakt 4 Zeichen aus A-Z/0-9 sein."
                 ))
 
     def action_activate(self):
