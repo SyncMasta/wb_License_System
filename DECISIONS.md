@@ -154,6 +154,18 @@ Details siehe `ARCHITECTURE.md` Kapitel 11.
 
 ---
 
+## Multi-DB Self-Hosting / X-Odoo-Database-Header (2026-05-03)
+
+`wb_license_client._do_request()` setzt seit v19.0.2.3.0 den Header `X-Odoo-Database: <self.env.cr.dbname>` auf alle HTTP-Requests an den License-Server.
+
+**Warum:** Wenn ein Customer den License-Server und den License-Client in derselben Odoo-Instanz selbst betreibt (typisch bei WB selbst auf wissen-beratung.de) UND die Instanz mehrere Datenbanken hostet (z.B. `Main` + `wb_dev`), beantwortet Odoo HTTP-Requests ohne expliziten DB-Selektor mit 404, weil der Hostname-→-DB-Resolver mehrdeutig ist. Folge: jeder License-Ping schlug fehl, der Client-Cache `wb.license.info` flippte auf `state=unlicensed`, das gemonitorte Pro-Modul (`wb_bitwarden_pro` etc.) zeigte den User "keine gültige Lizenz" obwohl der Server-side-Key `state=active` hatte.
+
+**Trade-Off:** Bei Standard-Setups (License-Server auf separater Box, eine DB) ist der Header eine harmlose Zusatzinfo — Odoo akzeptiert oder ignoriert ihn. Kein Migrations-Aufwand, kein Breakage.
+
+**Alternative-Lösung verworfen:** Cache lokal befüllen ohne Ping (`apply_local_nfr`-Methode) — verletzt die Layering-Invariante "Client-Status spiegelt nur Server-Antworten wider", würde NFR-Keys an den Lifecycle-Hooks vorbei aktivieren.
+
+---
+
 ## NFR-Lizenzen (Not For Resale, 2026-05-03)
 
 WB-eigene Module für WB-eigene Tenants — z.B. `wb_odoo_mcp` (MCP1) auf `wissen-beratung.de` — werden über eine eigene NFR-Klasse abgerechnet, nicht über Sale-Order-Workflow:
