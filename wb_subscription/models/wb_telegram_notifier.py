@@ -36,7 +36,8 @@ class WbTelegramNotifier(models.AbstractModel):
         return bool(icp.get_param(TELEGRAM_TOKEN_PARAM) and icp.get_param(TELEGRAM_CHAT_ID_PARAM))
 
     @api.model
-    def send_message(self, message, parse_mode='HTML'):
+    def send_message(self, message, chat_ids=None, parse_mode='HTML',
+                     disable_web_preview=True, silent=False):
         """Sendet eine Nachricht an den konfigurierten Tobias-Chat.
 
         Returns:
@@ -45,6 +46,16 @@ class WbTelegramNotifier(models.AbstractModel):
         WICHTIG: Niemals Activation-Codes oder Klartext-Secrets in `message`
         einbetten. Die Nachricht landet in Telegram-Servern und im
         wb.notification.log.
+
+        Signatur-Hinweis: Diese standalone-Variante teilt sich den _name
+        'wb.telegram.notifier' bewusst mit dem gleichnamigen Modell aus
+        wb_odoo_automations (beide Module standalone-installierbar). Bei
+        paralleler Installation gewinnt eine der beiden Implementierungen in
+        der MRO. Damit Aufrufer beider Module unabhaengig von der Ladeordnung
+        funktionieren, akzeptiert und bedient diese Methode dieselbe
+        Superset-Signatur (chat_ids/disable_web_preview/silent). `chat_ids`
+        wird hier ignoriert (fester Chat aus ir.config_parameter) und existiert
+        nur zur Signatur-Kompatibilitaet.
         """
         icp = self.env['ir.config_parameter'].sudo()
         token = icp.get_param(TELEGRAM_TOKEN_PARAM)
@@ -66,7 +77,8 @@ class WbTelegramNotifier(models.AbstractModel):
                     'chat_id': chat_id,
                     'text': message,
                     'parse_mode': parse_mode,
-                    'disable_web_page_preview': True,
+                    'disable_web_page_preview': disable_web_preview,
+                    'disable_notification': silent,
                 },
                 timeout=DEFAULT_TIMEOUT,
             )
