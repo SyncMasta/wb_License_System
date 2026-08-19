@@ -404,15 +404,23 @@ class SaleOrder(models.Model):
                 so.wb_first_period_invoiced = True
 
     @api.model
-    def _cron_generate_renewal_invoices(self):
+    def _cron_generate_renewal_invoices(self, force=False):
         """Cron 01.12., 06:00 UTC — generiert Draft-Renewal-Rechnungen.
 
         Pro sale.order mit is_subscription=True und wb_is_license_sub=True
         wird ein account.move (Draft) erstellt für die nächste Periode.
         Tobias gibt die Drafts dann manuell frei (DECISION #30).
 
-        Idempotent: Wenn schon eine Draft-Rechnung im Zieljahr für diese
-        Order existiert, wird keine neue erzeugt.
+        Läuft NUR im Dezember. Der Cron ist auf einen täglichen Takt
+        gestellt, damit der 01.12. sicher getroffen wird; ohne diese Sperre
+        würde er das ganze Jahr über Entwürfe mit Rechnungsdatum 01.01.
+        des laufenden Jahres erzeugen, also rückdatiert in einen bereits
+        abgeschlossenen Zeitraum. Mit force=True lässt sich der Lauf im
+        Notfall von Hand auslösen.
+
+        Idempotent: Es wird pro Auftrag geprüft, nicht pro Kunde und
+        Produkt. Sonst blockieren sich zwei Abos desselben Kunden mit
+        demselben Produkt gegenseitig. Zuordnung über invoice_origin.
 
         Nutzt Odoo 19 EE Standard: sale.order ist die Subscription
         (kein separates sale.subscription-Modell mehr).
@@ -420,6 +428,11 @@ class SaleOrder(models.Model):
         from datetime import date
 
         today = fields.Date.today()
+        if today.month != 12 and not force:
+            _logger.info(
+                "[wb_subscription] Renewal-Cron: nicht Dezember (%s), übersprungen.",
+                today.isoformat())
+            return
         target_year = today.year + 1 if today.month == 12 else today.year
 
         domain = [('wb_is_license_sub', '=', True), ('state', '=', 'sale')]
@@ -431,12 +444,19 @@ class SaleOrder(models.Model):
         orders = self.search(domain)
         created = 0
         for order in orders:
+            # Vorrangig über invoice_origin, das ist eindeutig je Auftrag.
+            # Der zweite Zweig fängt Altbestand ab, der noch ohne Herkunft
+            # angelegt wurde; ohne ihn entstünden dafür Doppelrechnungen.
             existing = self.env['account.move'].sudo().search([
                 ('move_type', '=', 'out_invoice'),
                 ('state', '=', 'draft'),
                 ('partner_id', '=', order.partner_id.id),
                 ('invoice_date', '>=', date(target_year, 1, 1)),
                 ('invoice_date', '<=', date(target_year, 12, 31)),
+                '|',
+                ('invoice_origin', '=', order.name),
+                '&',
+                ('invoice_origin', 'in', [False, '']),
                 ('invoice_line_ids.product_id', 'in', order.order_line.mapped('product_id').ids),
             ], limit=1)
             if existing:
@@ -445,6 +465,7 @@ class SaleOrder(models.Model):
                 move = self.env['account.move'].sudo().create({
                     'move_type': 'out_invoice',
                     'partner_id': order.partner_id.id,
+                    'invoice_origin': order.name,
                     'invoice_date': date(target_year, 1, 1),
                     'invoice_line_ids': [
                         (0, 0, {
