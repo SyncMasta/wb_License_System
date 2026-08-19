@@ -1,6 +1,6 @@
 {
     'name': 'WB Subscription & License Platform',
-    'version': '19.0.2.9.1',
+    'version': '19.0.2.9.2',
     'category': 'Sales/Subscriptions',
     'summary': 'Vertriebs-Backend für WISSEN BERATUNG Produkt-Module',
     'description': """

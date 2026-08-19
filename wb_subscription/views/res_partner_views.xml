@@ -7,6 +7,13 @@
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
             <div name="button_box" position="inside">
+                <!-- Die beiden Zählfelder steuern nur die Sichtbarkeit der
+                     Knöpfe. Ab Odoo 17 muss ein Feld, das in einem
+                     invisible-Ausdruck vorkommt, auch in der Ansicht stehen;
+                     sonst bricht der Client beim Öffnen des Formulars mit
+                     "field is undefined" ab. -->
+                <field name="wb_license_count" invisible="1"/>
+                <field name="wb_migration_count" invisible="1"/>
                 <button name="action_view_wb_licenses" type="object"
                         class="oe_stat_button" icon="fa-key"
                         invisible="wb_license_count == 0">
