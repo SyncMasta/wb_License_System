@@ -11,17 +11,25 @@
                      Knöpfe. Ab Odoo 17 muss ein Feld, das in einem
                      invisible-Ausdruck vorkommt, auch in der Ansicht stehen;
                      sonst bricht der Client beim Öffnen des Formulars mit
-                     "field is undefined" ab. -->
-                <field name="wb_license_count" invisible="1"/>
-                <field name="wb_migration_count" invisible="1"/>
+                     "field is undefined" ab. Die Felder tragen am Modell
+                     groups=..., deshalb muss dieselbe Gruppe auch an den
+                     Knöpfen stehen: sonst entfernt Odoo für Benutzer ohne die
+                     Gruppe das Feld und lässt den Knopf stehen, der es
+                     auswertet. Feld und Knopf gehören zusammen. -->
+                <field name="wb_license_count" invisible="1"
+                       groups="wb_subscription.group_wb_subscription_user"/>
+                <field name="wb_migration_count" invisible="1"
+                       groups="wb_subscription.group_wb_subscription_user"/>
                 <button name="action_view_wb_licenses" type="object"
                         class="oe_stat_button" icon="fa-key"
+                        groups="wb_subscription.group_wb_subscription_user"
                         invisible="wb_license_count == 0">
                     <field name="wb_active_license_count" widget="statinfo"
                            string="Aktive Lizenzen"/>
                 </button>
                 <button name="action_view_wb_migrations" type="object"
                         class="oe_stat_button" icon="fa-exchange"
+                        groups="wb_subscription.group_wb_subscription_user"
                         invisible="wb_migration_count == 0">
                     <field name="wb_pending_migration_count" widget="statinfo"
                            string="Pending Migrations"/>
