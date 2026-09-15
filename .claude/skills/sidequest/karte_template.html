@@ -1,0 +1,318 @@
+<title>sidequest Zweigkarte</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --navy: #1D3C6E;
+    --blue: #1A8BC4;
+    --cyan: #00C8E8;
+
+    --ink:      #0f1928;
+    --ink-soft: #3d4c63;
+    --muted:    #66748b;
+    --ground:   #eef2f7;
+    --surface:  #ffffff;
+    --rule:     #d3dbe6;
+    --rule-soft:#e4eaf2;
+    --plate:    #f7f9fc;
+
+    --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink:      #e7edf6;
+      --ink-soft: #b3c0d4;
+      --muted:    #8494ab;
+      --ground:   #0b1220;
+      --surface:  #131d2e;
+      --rule:     #2a3850;
+      --rule-soft:#1e2a3d;
+      --plate:    #0f1828;
+      --navy:     #6f9ad6;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink:      #e7edf6;
+    --ink-soft: #b3c0d4;
+    --muted:    #8494ab;
+    --ground:   #0b1220;
+    --surface:  #131d2e;
+    --rule:     #2a3850;
+    --rule-soft:#1e2a3d;
+    --plate:    #0f1828;
+    --navy:     #6f9ad6;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: 48px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  /* ---- header ---- */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-size: clamp(30px, 6vw, 40px);
+    font-weight: 700;
+    letter-spacing: -0.024em;
+    line-height: 1.12;
+    text-wrap: balance;
+    margin: 0 0 14px;
+  }
+  .lede {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--ink-soft);
+    font-size: 16px;
+  }
+
+  /* ---- tally strip ---- */
+  .tally {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 28px;
+    margin-top: 26px;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule);
+  }
+  .tally div {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .tally b {
+    font-family: var(--font-mono);
+    font-size: 19px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .tally span {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .t-open b   { color: var(--cyan); }
+  .t-merged b { color: var(--blue); }
+  .t-drop b   { color: var(--muted); }
+
+  /* ---- sections ---- */
+  section { display: flex; flex-direction: column; gap: 16px; }
+  .branch + .branch { margin-top: 0; }
+  h2 {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  /* ---- diagram plate ---- */
+  .plate {
+    background: var(--plate);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 28px 20px;
+    overflow-x: auto;
+  }
+  .mermaid { display: flex; justify-content: center; min-width: 300px; }
+
+  /* ---- legend ---- */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .legend div { display: flex; align-items: center; gap: 9px; }
+  .swatch {
+    width: 13px; height: 13px;
+    border-radius: 2px;
+    border: 1px solid var(--navy);
+    flex: none;
+  }
+  .sw-open   { background: var(--cyan); }
+  .sw-merged { background: var(--blue); }
+  .sw-drop   { background: #cfd6e0; border-color: #7a8699; }
+
+  /* ---- branch record ---- */
+  .branch {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--rule);
+    border-radius: 3px;
+    padding: 22px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .branch-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 12px;
+  }
+  .branch-id {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .b-open   { border-left-color: var(--cyan); }
+  .b-merged { border-left-color: var(--blue); }
+  .b-drop   { border-left-color: var(--rule); opacity: .66; }
+  .b-open   .branch-id, .b-open   .pill { color: var(--cyan); }
+  .b-merged .branch-id, .b-merged .pill { color: var(--blue); }
+  .b-drop   .branch-id, .b-drop   .pill { color: var(--muted); }
+  .b-open   .pill { border-color: var(--cyan); }
+  .b-merged .pill { border-color: var(--blue); }
+  .b-drop   .pill { border-color: var(--muted); text-decoration: line-through; }
+  .branch-title {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.012em;
+    margin: 0;
+  }
+  .pill {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 2px 7px;
+    white-space: nowrap;
+  }
+  blockquote {
+    margin: 0;
+    padding-left: 16px;
+    border-left: 2px solid var(--rule);
+    color: var(--ink-soft);
+    font-size: 15px;
+  }
+  dl {
+    margin: 0;
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 7px 20px;
+    font-size: 13px;
+  }
+  dt {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-top: 2px;
+  }
+  dd {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-soft);
+    overflow-wrap: anywhere;
+  }
+  @media (max-width: 460px) {
+    dl { grid-template-columns: 1fr; gap: 2px 0; }
+    dt { padding-top: 10px; }
+  }
+
+  /* ---- note ---- */
+  .note {
+    font-size: 14px;
+    color: var(--ink-soft);
+    max-width: 62ch;
+    margin: 0;
+  }
+  .note code, .inline-code {
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+    background: var(--plate);
+    border: 1px solid var(--rule-soft);
+    border-radius: 2px;
+    padding: 1px 5px;
+  }
+
+  footer {
+    border-top: 1px solid var(--rule-soft);
+    padding-top: 18px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow"><!--PROJEKT--></p>
+    <h1>sidequest Zweigkarte</h1>
+    <p class="lede">
+      Seitenfragen, die aus dem Hauptverlauf abgezweigt wurden. Jeder Zweig wird
+      von einem Subagenten in eigenem Kontext beantwortet — im Hauptverlauf
+      landet nur die Kernaussage.
+    </p>
+    <div class="tally">
+<!--TALLY-->
+    </div>
+  </header>
+
+  <section>
+    <h2>Zweigbaum</h2>
+    <div class="plate">
+      <pre class="mermaid">
+<!--MERMAID-->
+      </pre>
+    </div>
+    <div class="legend">
+      <div><i class="swatch sw-open"></i>offen — Antwort liegt vor, nicht zurückgeführt</div>
+      <div><i class="swatch sw-merged"></i>zurückgeführt — gestrichelte Kante zurück zum Hauptverlauf</div>
+      <div><i class="swatch sw-drop"></i>verworfen — nur mit <span class="inline-code">--all</span> sichtbar</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Zweige</h2>
+<!--BRANCHES-->
+  </section>
+
+<!--STAND-->
+
+  <footer>
+<!--META-->
+  </footer>
+
+</div>

@@ -44,6 +44,53 @@ zu dem Projekt, in dem sie entstehen, auch bei global installiertem Skill.
 
 IDs sind tolerant: `3`, `sq3`, `sq-3` und `sq-003` meinen dasselbe.
 
+Neben der SKILL.md und `sq.py` gehoert `karte_template.html` zum Skill —
+die Vorlage fuer die grafische Zweigkarte.
+
+## Wo laeuft der Zweig — vorher fragen
+
+Bevor du einen Zweig anlegst, **frag mit `AskUserQuestion` nach**, wie er laufen
+soll. Eine Frage, zwei Optionen:
+
+- **Subagent (hier)** — empfohlener Default. Laeuft in dieser Unterhaltung,
+  hat den Kontext des Hauptverlaufs, das Ergebnis landet direkt in der
+  Zweigdatei. Kein Fensterwechsel.
+- **Eigene Session (neues Fenster)** — eine separate Unterhaltung, die der
+  Nutzer in einem neuen Tab oeffnet. Sinnvoll, wenn die Seitenfrage laenger
+  wird, eigene Dateiaenderungen braucht oder der Nutzer parallel weiterarbeiten
+  will.
+
+Ausnahmen, in denen du **nicht** fragst: der Nutzer hat die Variante schon
+genannt ("mach das in einer eigenen Session"), oder es laeuft keine
+Nachfrage-Moeglichkeit — dann nimm den Subagenten.
+
+### Eigene Session anlegen
+
+Nur moeglich, wenn das Tool `create_session` (claude-code-remote) vorhanden
+ist — also in Claude Code on the web / Remote-Sessions. **Im lokalen CLI gibt
+es das nicht**; dort sag das offen und nimm den Subagenten, statt etwas zu
+versprechen, was nicht geht.
+
+1. Zweig wie ueblich mit `"$SQ" new` anlegen.
+2. `create_session` aufrufen mit:
+   - `title`: `sidequest <id>: <titel>`
+   - `prompt`: **vollstaendig eigenstaendig** — die neue Session sieht diese
+     Unterhaltung nicht. Also: die Frage im Wortlaut, der noetige Kontext in
+     ein paar Saetzen, und der Hinweis, dass das Ergebnis am Ende kompakt
+     zusammengefasst werden soll.
+   - `tags`: `["sidequest", "<id>"]`
+3. Die zurueckgegebene Session mit dem Zweig verknuepfen:
+   ```bash
+   "$SQ" link <id> --url "https://claude.ai/code/<session_id>" --session-id <session_id>
+   ```
+4. Dem Nutzer den Link geben. **Sag dazu klar, dass sich das Fenster nicht von
+   selbst oeffnet** — er klickt den Link, der Tab geht auf.
+
+Die neue Session kann **nicht** in die Zweigdatei zurueckschreiben: sie laeuft
+in einem eigenen Container ohne Zugriff auf diese Ablage. Das Ergebnis kommt
+zurueck, indem der Nutzer es herueberreicht oder du es beim Zurueckfuehren
+abfragst. Stell das nicht anders dar.
+
 ## Aufrufe
 
 ### `/sidequest <frage>` — neuen Zweig anlegen (Default)
@@ -117,21 +164,36 @@ sie zusaetzlich nach `DECISIONS.md` — aber nur, wenn der Nutzer das bestaetigt
 ```
 `reopen <id>` macht das rueckgaengig.
 
-### `/sidequest map` — grafische Uebersicht
+### `/sidequest map` — Zweigkarte
+
+**Als Text** (Default, im Terminal):
 
 ```bash
 "$SQ" map
 ```
-Liefert ein Mermaid-`flowchart`: Hauptverlauf als Wurzel, Zweige als Knoten,
-rueckgefuehrte Zweige mit gestrichelter Kante zurueck zum Hauptverlauf. Farben
-nach WB-Palette (Navy `#1D3C6E`, Blue `#1A8BC4`, Cyan `#00C8E8`).
+Mermaid-`flowchart` in einem ```mermaid-Fence ausgeben. Hauptverlauf als Wurzel,
+Zweige als Knoten, rueckgefuehrte Zweige mit gestrichelter Kante zurueck.
+`--all` nimmt verworfene Zweige mit.
 
-- **Im Terminal:** den Mermaid-Block direkt ausgeben — in einem ```mermaid-Fence.
-- **Als Bild:** das Ergebnis in eine HTML-Seite legen und per `Artifact`
-  veroeffentlichen. Artifacts rendern ```mermaid-Fences nativ, ohne Library.
-  Nur machen, wenn der Nutzer eine Grafik will (`/sidequest map --artifact` oder
-  entsprechend formuliert) — sonst reicht der Textblock.
-- `--all` nimmt verworfene Zweige mit dazu.
+**Als Grafik** (wenn der Nutzer eine Grafik will, `--artifact`, "zeig mir die
+Karte" o.ae.):
+
+```bash
+"$SQ" map --html /tmp/zweigkarte.html
+```
+Das erzeugt die **fertige Seite** aus `karte_template.html` — Zweigbaum,
+Legende, Zaehler und einen Datensatz pro Zweig, in WB-Farben und mit
+Hell/Dunkel-Variante. Diese Datei dann unveraendert per `Artifact`
+veroeffentlichen, `favicon: "🌿"`.
+
+Die Seite nicht von Hand nachbauen und das Template nicht pro Aufruf
+umschreiben — es ist die eine Stelle, an der das Aussehen der Karte
+definiert ist. Aendert der Nutzer das Design, aendere `karte_template.html`,
+nicht die erzeugte Datei.
+
+Veroeffentlichst du eine Karte erneut, nimm denselben Dateipfad wie beim
+letzten Mal, damit das Artifact an seiner URL aktualisiert wird statt ein
+zweites anzulegen.
 
 ## Regeln
 

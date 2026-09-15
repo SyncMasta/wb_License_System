@@ -113,6 +113,8 @@ def cmd_new(args: argparse.Namespace) -> None:
         "updated": now(),
         "merged_note": None,
         "tags": args.tag or [],
+        "session_id": None,
+        "session_url": None,
     }
     data["entries"].append(entry)
     save_index(data)
@@ -183,6 +185,26 @@ def cmd_reopen(args: argparse.Namespace) -> None:
     print(f"{entry['id']}: {STATUS_OPEN}")
 
 
+def cmd_link(args: argparse.Namespace) -> None:
+    """Attach a separate Claude session to a branch."""
+    data = load_index()
+    entry = find(data, args.id)
+    entry["session_url"] = args.url
+    if args.session_id:
+        entry["session_id"] = args.session_id
+    entry["updated"] = now()
+    save_index(data)
+
+    body = body_path(entry["id"])
+    if body.exists():
+        body.write_text(
+            body.read_text(encoding="utf-8").rstrip()
+            + f"\n\n---\n\n## Eigene Session\n\n{args.url}\n",
+            encoding="utf-8",
+        )
+    print(f"{entry['id']}: Session verknuepft -> {args.url}")
+
+
 def cmd_list(args: argparse.Namespace) -> None:
     data = load_index()
     entries = data["entries"]
@@ -198,7 +220,8 @@ def cmd_list(args: argparse.Namespace) -> None:
         glyph = STATUS_GLYPH.get(e["status"], "?")
         parent = "" if e["parent"] == "main" else f"  (aus {e['parent']})"
         tags = f"  [{', '.join(e['tags'])}]" if e.get("tags") else ""
-        print(f"{glyph} {e['id']}  {e['title']}{parent}{tags}")
+        sess = "  ⧉ eigene Session" if e.get("session_url") else ""
+        print(f"{glyph} {e['id']}  {e['title']}{parent}{tags}{sess}")
 
 
 def cmd_show(args: argparse.Namespace) -> None:
@@ -243,11 +266,109 @@ def _mermaid(entries: list[dict]) -> str:
     return "\n".join(lines)
 
 
+# --------------------------------------------------------------------------
+# HTML-Karte
+# --------------------------------------------------------------------------
+
+STATUS_LABEL = {STATUS_OPEN: "offen", STATUS_MERGED: "zurückgeführt", STATUS_DROPPED: "verworfen"}
+STATUS_CLASS = {STATUS_OPEN: "open", STATUS_MERGED: "merged", STATUS_DROPPED: "drop"}
+
+
+def esc(text: str) -> str:
+    """Escape for HTML text nodes and quoted attributes."""
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def _stamp(iso: str) -> str:
+    return iso.replace("T", " ").replace("Z", " UTC") if iso else "—"
+
+
+def _render_branch(e: dict) -> str:
+    cls = STATUS_CLASS[e["status"]]
+    rows = [
+        ("Abzweig von", e["parent"]),
+        ("Erstellt", _stamp(e["created"])),
+        ("Geändert", _stamp(e["updated"])),
+        ("Ablage", f".claude/sidequests/{e['id']}.md"),
+    ]
+    if e.get("session_url"):
+        rows.append(("Eigene Session", e["session_url"]))
+    dl = "".join(f"<dt>{esc(k)}</dt><dd>{esc(v)}</dd>" for k, v in rows)
+    note = ""
+    if e.get("merged_note"):
+        label = "Rückführung" if e["status"] == STATUS_MERGED else "Grund"
+        note = f'<p class="note"><strong>{label}:</strong> {esc(e["merged_note"])}</p>'
+    return (
+        f'    <article class="branch b-{cls}">\n'
+        f'      <div class="branch-head">\n'
+        f'        <span class="branch-id">{esc(e["id"])}</span>\n'
+        f'        <h3 class="branch-title">{esc(e["title"])}</h3>\n'
+        f'        <span class="pill">{esc(STATUS_LABEL[e["status"]])}</span>\n'
+        f'      </div>\n'
+        f'      <blockquote>{esc(e["question"])}</blockquote>\n'
+        f'      <dl>{dl}</dl>\n'
+        f'      {note}\n'
+        f'    </article>'
+    )
+
+
+def render_html(entries: list[dict], project: str) -> str:
+    tpl = (Path(__file__).resolve().parent / "karte_template.html").read_text(encoding="utf-8")
+    counts = {st: sum(1 for e in entries if e["status"] == st) for st in STATUSES}
+
+    tally = "\n".join(
+        f'      <div class="t-{STATUS_CLASS[st]}"><b>{counts[st]}</b>'
+        f'<span>{STATUS_LABEL[st]}</span></div>'
+        for st in STATUSES
+    )
+    visible = [e for e in entries if e["status"] != STATUS_DROPPED]
+    branches = "\n".join(_render_branch(e) for e in entries) or (
+        '    <p class="note">Noch keine Zweige. <code>/sidequest &lt;frage&gt;</code> legt den ersten an.</p>'
+    )
+    if not entries:
+        stand = ""
+    else:
+        offen = counts[STATUS_OPEN]
+        stand = (
+            '  <section>\n    <h2>Stand</h2>\n    <p class="note">'
+            f'{len(entries)} Zweig(e), davon {offen} offen und '
+            f'{counts[STATUS_MERGED]} zurückgeführt. Zurückgeführte Zweige bekommen eine '
+            'gestrichelte Kante zurück zum Hauptverlauf, verschachtelte hängen an ihrem '
+            'Elternzweig statt an <code>main</code>.'
+            '</p>\n  </section>'
+        )
+    meta = "\n".join([
+        "    <span>erzeugt aus: sq.py map --html</span>",
+        "    <span>Ablage: .claude/sidequests/</span>",
+        f"    <span>Stand {now()[:10]}</span>",
+    ])
+
+    return (
+        tpl.replace("<!--PROJEKT-->", esc(project))
+        .replace("<!--TALLY-->", tally)
+        .replace("<!--MERMAID-->", esc(_mermaid(visible)))
+        .replace("<!--BRANCHES-->", branches)
+        .replace("<!--STAND-->", stand)
+        .replace("<!--META-->", meta)
+    )
+
+
 def cmd_map(args: argparse.Namespace) -> None:
     data = load_index()
     entries = data["entries"]
     if not args.all:
         entries = [e for e in entries if e["status"] != STATUS_DROPPED]
+    if args.html:
+        project = Path.cwd().name
+        Path(args.html).write_text(render_html(data["entries"], project), encoding="utf-8")
+        print(args.html)
+        return
     out = _mermaid(entries)
     if args.out:
         Path(args.out).write_text(out + "\n", encoding="utf-8")
@@ -286,6 +407,12 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("id")
     r.set_defaults(func=cmd_reopen)
 
+    lk = sub.add_parser("link", help="eigene Claude-Session mit einem Zweig verknuepfen")
+    lk.add_argument("id")
+    lk.add_argument("--url", required=True, help="URL der Session")
+    lk.add_argument("--session-id", dest="session_id")
+    lk.set_defaults(func=cmd_link)
+
     l = sub.add_parser("list", help="Zweige auflisten")
     l.add_argument("--status", choices=[*STATUSES, "all"], default="all")
     l.add_argument("--json", action="store_true")
@@ -298,6 +425,8 @@ def build_parser() -> argparse.ArgumentParser:
     mp = sub.add_parser("map", help="Mermaid-Diagramm des Zweigbaums")
     mp.add_argument("--all", action="store_true", help="auch verworfene Zweige")
     mp.add_argument("--out", help="Zieldatei statt stdout")
+    mp.add_argument("--html", metavar="DATEI",
+                    help="komplette HTML-Zweigkarte schreiben (zum Veroeffentlichen als Artifact)")
     mp.set_defaults(func=cmd_map)
 
     return p
