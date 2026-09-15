@@ -195,7 +195,9 @@ class TestLicenseKeyApiSecret(TransactionCase):
         """Das Secret darf nirgends im Klartext landen — auch nicht im Chatter."""
         self.license.action_generate_api_secret()
         secret = self.license._get_api_secret()
-        bodies = ' '.join(self.license.message_ids.mapped('body') or [])
+        # Leere Felder herausfiltern: Odoo liefert fuer nicht gesetzte
+        # Char-/Html-Felder False, und join akzeptiert nur Strings.
+        bodies = ' '.join(b for b in self.license.message_ids.mapped('body') if b)
         self.assertNotIn(secret, bodies)
 
     def test_events_are_logged(self):
@@ -204,5 +206,5 @@ class TestLicenseKeyApiSecret(TransactionCase):
         types_logged = self.license.event_ids.mapped('event_type')
         self.assertIn('api_secret_issued', types_logged)
         self.assertIn('api_secret_revoked', types_logged)
-        details = ' '.join(self.license.event_ids.mapped('details') or [])
+        details = ' '.join(d for d in self.license.event_ids.mapped('details') if d)
         self.assertNotIn(self.license.api_secret_hint or 'WBS-', details)
