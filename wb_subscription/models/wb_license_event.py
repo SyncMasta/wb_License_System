@@ -82,6 +82,86 @@ class WbLicenseEvent(models.Model):
     )
     created_by_id = fields.Many2one('res.users', string='Ausgelöst durch')
 
+    # ----------------------------------------
+    # Aufbewahrung (DSGVO Art. 5 Abs. 1 lit. e)
+    # ----------------------------------------
+
+    # Fristen aus docs/guides/security.md. Ueber ir.config_parameter
+    # uebersteuerbar, damit sie ohne Code-Aenderung nachgezogen werden koennen.
+    RETENTION_PII_DAYS_DEFAULT = 90
+    RETENTION_PING_DAYS_DEFAULT = 400
+
+    @api.model
+    def _retention_days(self, param, default):
+        raw = self.env['ir.config_parameter'].sudo().get_param(param)
+        try:
+            wert = int(raw)
+        except (TypeError, ValueError):
+            return default
+        # 0 oder negativ schaltet die jeweilige Stufe ab, statt alles sofort
+        # zu loeschen — ein Tippfehler in der Konfiguration darf kein
+        # Massenloeschen ausloesen.
+        return wert if wert > 0 else 0
+
+    @api.model
+    def _cron_apply_retention(self):
+        """Zwei Stufen, bewusst getrennt.
+
+        1. Nach 90 Tagen werden IP und User-Agent genullt. Das Event selbst
+           bleibt: es traegt den Nachweis, dass etwas passiert ist, und den
+           braucht man auch nach Jahren noch (Aktivierung, Sperrung, NFR).
+        2. Nach 400 Tagen werden reine ``ping``-Events geloescht. Sie sind die
+           Masse (rund vier pro Mandant und Tag) und haben nach Ablauf keinen
+           Aussagewert mehr. Alle anderen Event-Typen bleiben erhalten.
+
+        Laeuft komplett in try/except: ein Cron, der wirft, wird von Odoo nach
+        fuenf Fehlversuchen deaktiviert — dann waechst die Tabelle still
+        weiter, und genau das soll dieser Cron ja verhindern.
+        """
+        pii_tage = self._retention_days(
+            'wb_subscription.retention_event_pii_days',
+            self.RETENTION_PII_DAYS_DEFAULT)
+        ping_tage = self._retention_days(
+            'wb_subscription.retention_event_ping_days',
+            self.RETENTION_PING_DAYS_DEFAULT)
+
+        if pii_tage:
+            try:
+                self.env.cr.execute(
+                    "UPDATE wb_license_event "
+                    "SET ip_address = NULL, user_agent = NULL "
+                    "WHERE timestamp < (NOW() - (%s * INTERVAL '1 day')) "
+                    "AND (ip_address IS NOT NULL OR user_agent IS NOT NULL)",
+                    (pii_tage,),
+                )
+                _logger.info(
+                    "[wb_subscription] Event-Retention: %d Eintraege "
+                    "anonymisiert (aelter als %d Tage)",
+                    self.env.cr.rowcount, pii_tage,
+                )
+            except Exception as exc:
+                _logger.exception(
+                    "[wb_subscription] Event-Anonymisierung fehlgeschlagen, "
+                    "naechster Lauf versucht es erneut: %s", exc)
+
+        if ping_tage:
+            try:
+                self.env.cr.execute(
+                    "DELETE FROM wb_license_event "
+                    "WHERE event_type = 'ping' "
+                    "AND timestamp < (NOW() - (%s * INTERVAL '1 day'))",
+                    (ping_tage,),
+                )
+                _logger.info(
+                    "[wb_subscription] Event-Retention: %d Ping-Events "
+                    "geloescht (aelter als %d Tage)",
+                    self.env.cr.rowcount, ping_tage,
+                )
+            except Exception as exc:
+                _logger.exception(
+                    "[wb_subscription] Ping-Loeschung fehlgeschlagen, "
+                    "naechster Lauf versucht es erneut: %s", exc)
+
     @api.model
     def log_event(self, license, event_type, **kwargs):
         """Komfort-Methode um Events zu loggen.

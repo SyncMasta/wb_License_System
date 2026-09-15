@@ -52,6 +52,26 @@
             <field name="active" eval="True"/>
         </record>
 
+        <record id="ir_cron_event_retention" model="ir.cron">
+            <field name="name">WB Subscription: Aufbewahrungsfristen Audit-Log</field>
+            <field name="model_id" ref="model_wb_license_event"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_apply_retention()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <record id="ir_cron_install_retention" model="ir.cron">
+            <field name="name">WB Subscription: Aufbewahrungsfristen Lead-Daten</field>
+            <field name="model_id" ref="model_wb_license_install"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_apply_retention()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+
         <record id="ir_cron_rate_limit_cleanup" model="ir.cron">
             <field name="name">WB Subscription: Rate-Limit Cleanup</field>
             <field name="model_id" ref="model_wb_rate_limit_entry"/>
