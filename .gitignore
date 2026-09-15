@@ -17,4 +17,8 @@ Thumbs.db
 *.log
 
 # Claude / AI tools
-.claude/
+# Lokales ignorieren, aber versionierte Skills durchlassen.
+.claude/*
+!.claude/skills/
+# sidequest-Ablage: Session-Notizen, nicht versionieren
+.claude/sidequests/
