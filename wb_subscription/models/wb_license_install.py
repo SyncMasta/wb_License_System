@@ -17,6 +17,7 @@ Sicherheits-/DSGVO-Hinweis:
 """
 
 import logging
+from datetime import timedelta
 
 from odoo import _, api, fields, models
 
@@ -514,6 +515,64 @@ class WbLicenseInstall(models.Model):
             'converted_at': fields.Datetime.now(),
         })
 
+    # ----------------------------------------
+    # Aufbewahrung (DSGVO Art. 5 Abs. 1 lit. e)
+    # ----------------------------------------
+
+    # security.md: Lead-Daten 2 Jahre nach letztem Kontakt.
+    RETENTION_PII_DAYS_DEFAULT = 730
+
+    # Nur diese Felder werden geleert. Produkt-Code, Domain, db_uuid und die
+    # Zaehler bleiben: sie sind kein Personenbezug und tragen die Statistik.
+    RETENTION_PII_FIELDS = (
+        'contact_email', 'contact_name', 'contact_phone',
+        'company_vat', 'company_street', 'company_zip', 'company_city',
+        'last_seen_ip', 'last_seen_user_agent', 'lead_notes',
+    )
+
+    @api.model
+    def _cron_apply_retention(self):
+        """Loescht die personenbezogenen Felder alter Lead-Eintraege.
+
+        Der Record bleibt bestehen, damit Auswertungen ueber Installationen
+        und Konversionsraten nicht rueckwirkend kaputtgehen. Eintraege mit
+        verknuepfter Lizenz (``state = converted``) werden ausgenommen: dort
+        besteht ein Vertragsverhaeltnis, die Frist laeuft ueber den Partner
+        und nicht ueber diesen Eintrag.
+
+        ``company_name`` bleibt ebenfalls stehen — eine Firma ist fuer sich
+        genommen kein Personenbezug, und ohne sie waere der Eintrag fuer die
+        Statistik wertlos.
+        """
+        self.env.flush_all()
+
+        tage = int(self.env['ir.config_parameter'].sudo().get_param(
+            'wb_subscription.retention_install_pii_days',
+            self.RETENTION_PII_DAYS_DEFAULT) or 0)
+        if tage <= 0:
+            return
+
+        grenze = fields.Datetime.now() - timedelta(days=tage)
+        alte = self.sudo().search([
+            ('state', '!=', 'converted'),
+            ('last_seen_at', '<', grenze),
+            ('contact_email', '!=', False),
+        ])
+        if not alte:
+            return
+
+        try:
+            alte.write({feld: False for feld in self.RETENTION_PII_FIELDS})
+            _logger.info(
+                "[wb_subscription] Install-Retention: %d Eintraege "
+                "anonymisiert (kein Kontakt seit %d Tagen)",
+                len(alte), tage,
+            )
+        except Exception as exc:
+            _logger.exception(
+                "[wb_subscription] Install-Anonymisierung fehlgeschlagen, "
+                "naechster Lauf versucht es erneut: %s", exc)
+
     @api.model
     def _cron_mark_churned(self):
         """Setzt unlicensed Installs ohne Ping seit 60 Tagen auf 'churned'.
@@ -521,7 +580,6 @@ class WbLicenseInstall(models.Model):
         Lead-Hygiene: alte Einträge werden ausgeblendet, bleiben aber
         für Reporting erhalten.
         """
-        from datetime import timedelta
         threshold = fields.Datetime.now() - timedelta(days=60)
         stale = self.sudo().search([
             ('state', '=', 'unlicensed'),

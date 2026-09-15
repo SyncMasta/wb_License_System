@@ -393,10 +393,14 @@ zu testen.
    mit `wb_is_license_product = True` und vierstelligem `wb_technical_code` (Vorschlag `UMAN`)
    muss vor dem Smoke-Test existieren. Key als NFR oder direkt `active` anlegen, damit kein
    Activation-Code-Flow nötig wird.
-5. **Kein Retention-Cron.** `ir_cron_data.xml` enthält elf Crons, keiner löscht oder anonymisiert
-   `wb.license.install` oder `wb.license.event`; `_cron_mark_churned` setzt nur einen State. Die
-   Fristen in `docs/guides/security.md` sind damit dokumentiert, aber nicht gebaut. Kein
-   Client-Thema, ein offener Punkt fürs Serverrepo.
-6. **Betriebsfrage `ping_count_total`:** Bei 15-Minuten-Cache und 6-Stunden-Heartbeat pro Mandant
-   entstehen pro Mandant ~4 Events/Tag im `wb.license.event`-Audit-Log. Bei vielen Mandanten ist
-   das eine wachsende Tabelle ohne Aufräum-Cron — bitte im Serverrepo vormerken.
+5. ~~Kein Retention-Cron.~~ **Gebaut** (`wb_subscription` 19.0.2.11.0). Zwei tägliche Crons:
+   `wb.license.event._cron_apply_retention` nullt nach 90 Tagen `ip_address` und `user_agent`
+   und löscht reine `ping`-Events nach 400 Tagen; `wb.license.install._cron_apply_retention`
+   leert nach 730 Tagen ohne Kontakt die personenbezogenen Felder, nimmt aber
+   `state = converted` aus. Fristen über `ir.config_parameter`
+   (`wb_subscription.retention_event_pii_days`, `…retention_event_ping_days`,
+   `…retention_install_pii_days`), eine 0 schaltet die jeweilige Stufe ab.
+6. **Betriebsgröße `wb.license.event`:** Bei 15-Minuten-Cache und 6-Stunden-Heartbeat entstehen
+   je Mandant rund 4 Events pro Tag. Die Tabelle wächst also, wird durch den Retention-Cron
+   (Punkt 5) aber begrenzt: `ping`-Einträge verschwinden nach 400 Tagen, alle anderen Event-Typen
+   bleiben als Audit erhalten.

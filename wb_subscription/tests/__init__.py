@@ -17,3 +17,4 @@ from . import test_license_create_wizard
 from . import test_auto_bind_lookup
 from . import test_nfr_license
 from . import test_hmac_signature
+from . import test_retention
