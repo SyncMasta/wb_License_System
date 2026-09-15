@@ -173,6 +173,13 @@ vendor/bin/phpstan analyse # Level 8 auf src/ ohne src/Laravel
 vendor/bin/pint --test
 ```
 
+> **Offen:** Pint ist noch nie über diesen Code gelaufen — die Umgebung, in
+> der er entstanden ist, kam nicht an die Composer-Pakete. Der Pint-Schritt in
+> CI ist deshalb vorerst beratend geschaltet. Wer als Erster `composer install`
+> ausführen kann: einmal `vendor/bin/pint` laufen lassen, das Ergebnis
+> commiten und in `.github/workflows/php-client.yml` das
+> `continue-on-error` wieder entfernen.
+
 Ohne Composer und ohne Netzwerk lauffähig — deckt dieselben Szenarien ab:
 
 ```bash
