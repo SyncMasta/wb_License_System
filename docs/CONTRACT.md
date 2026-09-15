@@ -155,6 +155,18 @@ LF-getrennt, kein abschließender Umbruch. Signatur = `HMAC-SHA256(secret, base)
 | `optional` | **Default.** Gültige Signatur wird vermerkt, ungültige abgewiesen, fehlende toleriert. |
 | `required` | Auf `/check` zusätzlich: Schlüssel **mit** hinterlegtem Secret müssen signieren. Schlüssel ohne Secret bleiben zugelassen — sonst sperrt der Schalter jede Bestandsinstanz aus. |
 
+**Umstellen nur über das ORM, nie per SQL.** Odoo puffert Systemparameter je Worker-Prozess.
+Ein `UPDATE ir_config_parameter` wirkt deshalb erst nach einem Dienstneustart — der Schalter sieht
+aus, als greife er nicht, und man sucht den Fehler im Signaturcode. Richtig ist ein `set_param`
+in der Odoo-Shell:
+
+```python
+env['ir.config_parameter'].sudo().set_param('wb_subscription.hmac_enforcement', 'required')
+env.cr.commit()
+```
+
+Zurück auf den Default heißt: den Parameter löschen, nicht auf einen leeren String setzen.
+
 `/lead` verlangt **nie** eine Signatur: wer eine Lizenz anfragt, hat per Definition noch keinen
 Schlüssel und kein Secret. Ein Bestandskunde kann signieren, was den Eingang serverseitig von
 `unverified` auf `hmac` hebt. Eine *falsche* Signatur wird überall abgewiesen.
