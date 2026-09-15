@@ -255,6 +255,12 @@ Meldepflichtig gemäß §0 der Übergabe:
    Authentifizierung einen `crm.lead` bzw. eine Verkaufschance an (`wb.license.install.submit_lead`
    → `_ensure_crm_lead`), gedrosselt nur durch 5/h pro IP. Er ist damit das Muster, das im April
    2026 zum Dublettenproblem geführt hat. Der PHP-Client spricht ihn **nicht** an.
+   Der Endpunkt legt zwar selbst keinen `res.partner` an, aber `wb.license.install._compute_partner_id`
+   sucht per `('email', '=ilike', contact_email)` einen bestehenden Partner, und `_ensure_crm_lead`
+   schreibt den Treffer als `lead_vals['partner_id']`. Wer die E-Mail eines Bestandskunden kennt,
+   hängt damit eine fremde Verkaufschance an dessen Stammsatz. Zusätzlich fehlen — anders als in
+   `api_trial.py` — E-Mail-Regex und Feldlängenbegrenzungen, und das frei wählbare `db_uuid` macht
+   die Unique-Constraint des Install-Records wirkungslos.
 2. **`/api/wb_subscription/order` matcht `res.partner` per `email =ilike`** und legt bei
    Nichttreffer einen neuen Partner an — genau der E-Mail-basierte Identitätsabgleich, vor dem die
    Übergabe warnt. Immerhin hinter `X-API-Key`. Kein Client-Thema, aber ein offener Punkt für das
@@ -301,13 +307,20 @@ zu testen.
    Nutzung so bleiben, oder soll der Server vorher ein Shared Secret bzw. eine HMAC-Signatur
    über den Body bekommen? Das ist eine Serverrepo-Entscheidung und blockiert den Client nicht —
    ein `Http/Signature.php` wird aber nur dann gebaut, wenn die Antwort „ja" lautet.
-3. **`db_uuid`-Schema.** Vorschlag bestätigt: `hash('sha256', $tenantSlug . '|' . $serviceInstanceId)`,
+   Eine ausgearbeitete Empfehlung dazu liegt vor (Install-Secret aus `/announce`, HMAC über das
+   kanonisierte `params`-Objekt mit Timestamp und Nonce, Übergangsfenster mit
+   `trust='unverified'`); sie ist noch nicht entschieden.
+3. **`db_uuid`-Schema.** Vorschlag: `hash('sha256', $tenantSlug . '|' . $serviceInstanceId)`,
    damit die Pipe-Konvention des Servers gespiegelt wird. `domain` = der feste Hostname des
    Dienstes, nicht die Kundendomäne.
 4. **Anlage der Keys im Odoo.** `wb.license.key` enthält null Datensätze; ein `product.product`
    mit `wb_is_license_product = True` und vierstelligem `wb_technical_code` (Vorschlag `UMAN`)
    muss vor dem Smoke-Test existieren. Key als NFR oder direkt `active` anlegen, damit kein
    Activation-Code-Flow nötig wird.
-5. **Betriebsfrage `ping_count_total`:** Bei 15-Minuten-Cache und 6-Stunden-Heartbeat pro Mandant
+5. **Kein Retention-Cron.** `ir_cron_data.xml` enthält elf Crons, keiner löscht oder anonymisiert
+   `wb.license.install` oder `wb.license.event`; `_cron_mark_churned` setzt nur einen State. Die
+   Fristen in `docs/guides/security.md` sind damit dokumentiert, aber nicht gebaut. Kein
+   Client-Thema, ein offener Punkt fürs Serverrepo.
+6. **Betriebsfrage `ping_count_total`:** Bei 15-Minuten-Cache und 6-Stunden-Heartbeat pro Mandant
    entstehen pro Mandant ~4 Events/Tag im `wb.license.event`-Audit-Log. Bei vielen Mandanten ist
    das eine wachsende Tabelle ohne Aufräum-Cron — bitte im Serverrepo vormerken.
