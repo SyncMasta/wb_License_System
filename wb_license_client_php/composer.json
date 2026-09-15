@@ -38,5 +38,24 @@
             "php-http/discovery": true
         }
     },
-    "minimum-stability": "stable"
+    "minimum-stability": "stable",
+    "extra": {
+        "laravel": {
+            "providers": [
+                "WissenBeratung\\LicenseClient\\Laravel\\LicenseServiceProvider"
+            ]
+        }
+    },
+    "suggest": {
+        "illuminate/support": "Nur für die Laravel-Bridge (ServiceProvider und wb:license:ping). Der Kern braucht sie nicht.",
+        "guzzlehttp/guzzle": "PSR-18-Client, falls der Dienst noch keinen hat.",
+        "nyholm/psr7": "PSR-17-Factories, falls der Dienst noch keine hat."
+    },
+    "scripts": {
+        "test": "pest",
+        "test:offline": "@php tests/standalone/run.php",
+        "test:interop": "@php tests/interop/verify_vectors.php",
+        "analyse": "phpstan analyse",
+        "format": "pint"
+    }
 }

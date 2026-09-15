@@ -10,6 +10,7 @@ use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use WissenBeratung\LicenseClient\Contracts\LicenseTransport;
 
 /**
  * Transport für die Odoo-Endpunkte des WB-Lizenzservers.
@@ -27,7 +28,7 @@ use Psr\Log\NullLogger;
  * und wirft keine Exceptions in den Aufrufpfad: Transportfehler werden zu
  * einer Response mit `transportError`.
  */
-final class Transport
+final class Transport implements LicenseTransport
 {
     public function __construct(
         private readonly string $baseUrl,

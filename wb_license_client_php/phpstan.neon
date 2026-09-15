@@ -1,0 +1,11 @@
+parameters:
+    level: 8
+    paths:
+        - src
+    excludePaths:
+        analyse:
+            # Die Laravel-Bridge referenziert illuminate/*, das im Kern-Setup
+            # nicht installiert ist. Sie wird separat mit installiertem
+            # Laravel geprüft, nicht im Kern-Lauf.
+            - src/Laravel
+    treatPhpDocTypesAsCertain: false
