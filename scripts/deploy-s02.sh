@@ -165,7 +165,10 @@ echo "odoo-bin Exit: $rc"
 # Odoo schreibt nach logfile aus der Config, nicht nach stdout. Wer nur stdout
 # auswertet, sieht bei einem Fehlschlag nichts.
 echo "--- Meldungen aus $ODOO_LOG seit $marke:"
-awk -v ab="$marke" '$0 >= ab' "$ODOO_LOG" 2>/dev/null \
+# Nur Zeilen ab der Marke. Der Vergleich darf nur auf Zeilen MIT Zeitstempel
+# laufen: Fortsetzungszeilen eines Tracebacks beginnen mit Text, und "ERROR:"
+# ist als String groesser als "2026-..." — sie rutschten sonst alle durch.
+awk -v ab="$marke" '/^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] /{aktiv=($0>=ab)} aktiv' "$ODOO_LOG" 2>/dev/null \
     | grep -E "ERROR|CRITICAL|failures|odoo.tests.stats" \
     | grep -v "Mute this logger" \
     | tail -20
