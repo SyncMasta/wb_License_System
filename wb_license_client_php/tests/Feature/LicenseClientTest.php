@@ -335,3 +335,56 @@ it('behandelt unbekannte Mandanten und unbekannte States als unknown', function 
     $h['transport']->always(ok('irgendein_neuer_state'));
     expect($h['client']->refresh(T)->state)->toBe(LicenseState::Unknown);
 });
+
+it('meldet beim Heartbeat, ob der Server erreicht wurde', function (): void {
+    $h = harness();
+    $h['transport']->queue(ok('active'));
+
+    expect($h['client']->ping(T))->toBeTrue();
+
+    $h['clock']->advance(1000);
+    $h['transport']->always(TransportResponse::transportFailure('timeout'));
+
+    expect($h['client']->ping(T))->toBeFalse('ohne Serverkontakt kein erfolgreicher Ping');
+});
+
+it('erkennt, wann ein Heartbeat fällig ist', function (): void {
+    $h = harness(new LicenseConfig(pingInterval: 21600, retries: 0));
+
+    expect($h['client']->isPingDue(T))->toBeTrue('ohne Cache immer fällig');
+
+    $h['transport']->queue(ok('active'));
+    $h['client']->refresh(T);
+    expect($h['client']->isPingDue(T))->toBeFalse();
+
+    $h['clock']->advance(21600);
+    expect($h['client']->isPingDue(T))->toBeTrue();
+});
+
+it('streut den Heartbeat deterministisch über das Intervall', function (): void {
+    $h = harness(new LicenseConfig(pingInterval: 21600));
+    $offset = $h['client']->pingOffsetFor(T);
+
+    expect($offset)->toBe($h['client']->pingOffsetFor(T))
+        ->and($offset)->toBeGreaterThanOrEqual(0)
+        ->and($offset)->toBeLessThan(21600)
+        ->and($h['client']->pingOffsetFor('anderer-mandant'))->not->toBe($offset);
+});
+
+it('nutzt eine hinterlegte Instanzkennung statt der abgeleiteten', function (): void {
+    $clock = new FrozenClock();
+    $transport = new FakeTransport();
+    $transport->always(ok('active'));
+
+    $client = new LicenseClient(
+        config: new LicenseConfig(retries: 0, serviceInstanceId: 'inst'),
+        transport: $transport,
+        resolver: new ArrayTenantKeyResolver([T => ['key' => K, 'instance_id' => 'feste-kennung']]),
+        cache: new InMemoryStatusCache(),
+        clock: $clock,
+    );
+
+    $client->refresh(T);
+
+    expect($transport->received[0]['params']['db_uuid'])->toBe('feste-kennung');
+});
