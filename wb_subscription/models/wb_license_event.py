@@ -94,6 +94,11 @@ class WbLicenseEvent(models.Model):
     @api.model
     def _retention_days(self, param, default):
         raw = self.env['ir.config_parameter'].sudo().get_param(param)
+        # get_param liefert bei fehlendem Parameter False, nicht None. int(False)
+        # ist 0 und wirft nicht — ohne diese Abfrage waere der Default nie
+        # gegriffen und die Retention still abgeschaltet gewesen.
+        if raw in (False, None, ''):
+            return default
         try:
             wert = int(raw)
         except (TypeError, ValueError):

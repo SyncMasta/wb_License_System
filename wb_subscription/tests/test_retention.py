@@ -158,3 +158,15 @@ class TestInstallRetention(TransactionCase):
         alt = self._install(9999)
         self.Install._cron_apply_retention()
         self.assertEqual(alt.contact_email, 'kunde@example.com')
+
+    def test_default_greift_wenn_parameter_fehlt(self):
+        """get_param liefert False, nicht None — int(False) ist 0 und wirft
+        nicht. Ohne Sonderbehandlung waere die Retention still abgeschaltet."""
+        self.env['ir.config_parameter'].sudo().search([
+            ('key', '=', 'wb_subscription.retention_event_pii_days'),
+        ]).unlink()
+        self.assertEqual(
+            self.Event._retention_days(
+                'wb_subscription.retention_event_pii_days', 90),
+            90,
+        )
