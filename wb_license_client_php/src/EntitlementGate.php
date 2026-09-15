@@ -32,8 +32,8 @@ final readonly class EntitlementGate
 {
     public function __construct(
         private LicenseConfig $config,
-        private EventDispatcher $events = new NullEventDispatcher(),
-        private LoggerInterface $logger = new NullLogger(),
+        private EventDispatcher $events = new NullEventDispatcher,
+        private LoggerInterface $logger = new NullLogger,
     ) {}
 
     public function decide(LicenseStatus $status): Decision
@@ -51,7 +51,7 @@ final readonly class EntitlementGate
         if ($effective !== $base) {
             $this->logger->warning(
                 '[wb-license] {tenant}: Entscheidung {base} wird im Modus {mode} zu {effective} '
-                . '(State {state}, Quelle {source})',
+                .'(State {state}, Quelle {source})',
                 [
                     'tenant' => $status->tenant,
                     'base' => $base->value,
@@ -83,12 +83,12 @@ final readonly class EntitlementGate
             LicenseState::Trial => 'Testlizenz aktiv.',
             LicenseState::Grace => 'Rechnung überfällig — Lizenz läuft in der Nachfrist weiter.',
             LicenseState::Issued => 'Lizenzschlüssel existiert, wurde aber nie aktiviert. '
-                . 'Für einen serverseitig angelegten Schlüssel ist das ein Einrichtungsfehler.',
+                .'Für einen serverseitig angelegten Schlüssel ist das ein Einrichtungsfehler.',
             LicenseState::Expired => 'Lizenz abgelaufen.',
             LicenseState::Revoked => 'Lizenz gesperrt.',
             LicenseState::Cancelled => 'Lizenz gekündigt.',
             LicenseState::Unknown => 'Kein Lizenzstatus verfügbar — Lizenzserver nicht erreichbar '
-                . 'und Local Grace erschöpft.',
+                .'und Local Grace erschöpft.',
         };
     }
 

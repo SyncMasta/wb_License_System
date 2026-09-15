@@ -124,7 +124,7 @@ it('macht aus kaputten Cache-Einträgen null statt eines Fatals', function (mixe
 })->with([
     ['kein array'],
     [['kaputt' => true]],
-    [[ 'tenant' => 'x', 'state' => 'gibtsnicht', 'checked_at' => 1]],
+    [['tenant' => 'x', 'state' => 'gibtsnicht', 'checked_at' => 1]],
     [null],
 ]);
 
@@ -218,7 +218,7 @@ it('behandelt einen werfenden Callback als unbekannten Mandanten', function (): 
 // ------------------------------------------------------------------ Cache
 
 it('legt Status über einen PSR-16-Cache ab und liest sie zurück', function (): void {
-    $clock = new FrozenClock();
+    $clock = new FrozenClock;
     $cache = new PsrStatusCache(new ArrayCache($clock));
     $status = LicenseStatus::fromServerPayload('t', 'k', ['state' => 'active'], $clock->now());
 
@@ -232,7 +232,7 @@ it('legt Status über einen PSR-16-Cache ab und liest sie zurück', function ():
 });
 
 it('lässt abgelaufene Cache-Einträge verfallen', function (): void {
-    $clock = new FrozenClock();
+    $clock = new FrozenClock;
     $cache = new PsrStatusCache(new ArrayCache($clock));
     $cache->put(LicenseStatus::fromServerPayload('t', 'k', ['state' => 'active'], $clock->now()), 60);
 
@@ -242,7 +242,7 @@ it('lässt abgelaufene Cache-Einträge verfallen', function (): void {
 });
 
 it('liefert die Systemzeit in UTC', function (): void {
-    $now = (new SystemClock())->now();
+    $now = (new SystemClock)->now();
 
     expect($now->getTimezone()->getName())->toBe('UTC')
         ->and(abs($now->getTimestamp() - time()))->toBeLessThan(5);
@@ -263,7 +263,7 @@ it('steigert den Backoff und bleibt im Rahmen', function (): void {
 });
 
 it('öffnet den Circuit erst ab der Schwelle und schließt ihn nach dem Cooldown', function (): void {
-    $clock = new FrozenClock();
+    $clock = new FrozenClock;
     $breaker = new CircuitBreaker(new ArrayCache($clock), $clock, threshold: 3, cooldownSeconds: 300);
 
     expect($breaker->isOpen('t'))->toBeFalse()
@@ -283,7 +283,7 @@ it('öffnet den Circuit erst ab der Schwelle und schließt ihn nach dem Cooldown
 });
 
 it('setzt den Circuit nach einem Erfolg zurück', function (): void {
-    $clock = new FrozenClock();
+    $clock = new FrozenClock;
     $breaker = new CircuitBreaker(new ArrayCache($clock), $clock, threshold: 2, cooldownSeconds: 300);
 
     $breaker->recordFailure('t');
@@ -295,7 +295,7 @@ it('setzt den Circuit nach einem Erfolg zurück', function (): void {
 });
 
 it('sperrt auf Zuruf für eine feste Zeit', function (): void {
-    $clock = new FrozenClock();
+    $clock = new FrozenClock;
     $breaker = new CircuitBreaker(new ArrayCache($clock), $clock, threshold: 5, cooldownSeconds: 300);
 
     $breaker->tripFor('t', 900);
@@ -311,7 +311,7 @@ it('sperrt auf Zuruf für eine feste Zeit', function (): void {
 // ------------------------------------------------------------------- Gate
 
 it('erklärt jeden State in einem verwertbaren Satz', function (): void {
-    $gate = new EntitlementGate(new LicenseConfig());
+    $gate = new EntitlementGate(new LicenseConfig);
 
     foreach (LicenseState::cases() as $state) {
         $status = new LicenseStatus(

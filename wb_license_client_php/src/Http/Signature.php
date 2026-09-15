@@ -93,7 +93,7 @@ final class Signature
             self::HEADER_KEY => $key,
             self::HEADER_TIMESTAMP => (string) $timestamp,
             self::HEADER_NONCE => $nonce,
-            self::HEADER_SIGNATURE => self::PREFIX . self::compute($secret, $key, $timestamp, $nonce, $body),
+            self::HEADER_SIGNATURE => self::PREFIX.self::compute($secret, $key, $timestamp, $nonce, $body),
         ];
     }
 
@@ -147,6 +147,6 @@ final class Signature
             return str_repeat('*', max($length, 4));
         }
 
-        return substr($value, 0, 7) . '****' . substr($value, -4);
+        return substr($value, 0, 7).'****'.substr($value, -4);
     }
 }

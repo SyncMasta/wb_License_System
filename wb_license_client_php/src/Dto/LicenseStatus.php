@@ -148,7 +148,7 @@ final readonly class LicenseStatus
             key: (string) ($data['key'] ?? ''),
             state: $state,
             source: StatusSource::tryFrom((string) ($data['source'] ?? '')) ?? StatusSource::Cache,
-            checkedAt: (new DateTimeImmutable('@' . (int) $data['checked_at'])),
+            checkedAt: (new DateTimeImmutable('@'.(int) $data['checked_at'])),
             validFrom: self::parseDate($data['valid_from'] ?? null),
             validTo: self::parseDate($data['valid_to'] ?? null),
             graceUntil: self::parseDate($data['grace_until'] ?? null),

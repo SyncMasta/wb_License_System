@@ -31,7 +31,6 @@ use WissenBeratung\LicenseClient\Tests\Support\RecordingLogger;
  * Alle gegen Test-Doubles, keine echten Aufrufe — der Kern wirft keine
  * Exceptions in den Aufrufpfad, das lässt sich nur so prüfen.
  */
-
 const T = 'umantis-kunde-a';
 const K = 'WB-UMAN-1a2b3c4dQF';
 const S = 'WBS-TESTSECRETTESTSECRETTESTSECRETTESTSECRET';
@@ -43,12 +42,12 @@ const S = 'WBS-TESTSECRETTESTSECRETTESTSECRETTESTSECRET';
  */
 function harness(?LicenseConfig $config = null, int $circuitThreshold = 2): array
 {
-    $clock = new FrozenClock();
+    $clock = new FrozenClock;
     $config ??= new LicenseConfig(retries: 0, serviceInstanceId: 'test-instance');
-    $transport = new FakeTransport();
-    $events = new RecordingDispatcher();
-    $cache = new InMemoryStatusCache();
-    $logger = new RecordingLogger();
+    $transport = new FakeTransport;
+    $events = new RecordingDispatcher;
+    $cache = new InMemoryStatusCache;
+    $logger = new RecordingLogger;
     $breaker = new CircuitBreaker(new ArrayCache($clock), $clock, $circuitThreshold, 300);
 
     return [
@@ -85,7 +84,7 @@ function ok(string $state = 'active', array $overrides = []): TransportResponse
 
 function gate(EnforcementMode $mode, ?RecordingDispatcher $events = null): EntitlementGate
 {
-    return new EntitlementGate(new LicenseConfig(enforcement: $mode), $events ?? new RecordingDispatcher());
+    return new EntitlementGate(new LicenseConfig(enforcement: $mode), $events ?? new RecordingDispatcher);
 }
 
 it('liefert bei active Process, setzt den Cache und meldet source Live', function (): void {
@@ -121,7 +120,7 @@ it('hält bei revoked im Modus enforce an und meldet LicenseBlocked', function (
     $h['transport']->queue(ok('revoked'));
     $status = $h['client']->refresh(T);
 
-    $events = new RecordingDispatcher();
+    $events = new RecordingDispatcher;
 
     expect(gate(EnforcementMode::Enforce, $events)->decide($status))->toBe(Decision::Hold)
         ->and($events->countOf(LicenseBlocked::class))->toBe(1);
@@ -132,7 +131,7 @@ it('verarbeitet bei revoked im Modus warn weiter, meldet aber trotzdem', functio
     $h['transport']->queue(ok('revoked'));
     $status = $h['client']->refresh(T);
 
-    $events = new RecordingDispatcher();
+    $events = new RecordingDispatcher;
 
     expect(gate(EnforcementMode::Warn, $events)->decide($status))->toBe(Decision::Process)
         ->and($events->countOf(LicenseBlocked::class))->toBe(1);
@@ -262,9 +261,9 @@ it('meldet jeden Statuswechsel genau einmal', function (): void {
 });
 
 it('hält Cache und Circuit je Mandant getrennt', function (): void {
-    $clock = new FrozenClock();
-    $transport = new FakeTransport();
-    $cache = new InMemoryStatusCache();
+    $clock = new FrozenClock;
+    $transport = new FakeTransport;
+    $cache = new InMemoryStatusCache;
     $breaker = new CircuitBreaker(new ArrayCache($clock), $clock, 1, 300);
 
     $client = new LicenseClient(
@@ -372,15 +371,15 @@ it('streut den Heartbeat deterministisch über das Intervall', function (): void
 });
 
 it('nutzt eine hinterlegte Instanzkennung statt der abgeleiteten', function (): void {
-    $clock = new FrozenClock();
-    $transport = new FakeTransport();
+    $clock = new FrozenClock;
+    $transport = new FakeTransport;
     $transport->always(ok('active'));
 
     $client = new LicenseClient(
         config: new LicenseConfig(retries: 0, serviceInstanceId: 'inst'),
         transport: $transport,
         resolver: new ArrayTenantKeyResolver([T => ['key' => K, 'instance_id' => 'feste-kennung']]),
-        cache: new InMemoryStatusCache(),
+        cache: new InMemoryStatusCache,
         clock: $clock,
     );
 

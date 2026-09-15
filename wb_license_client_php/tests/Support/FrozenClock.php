@@ -14,7 +14,7 @@ final class FrozenClock implements Clock
 
     public function now(): DateTimeImmutable
     {
-        return new DateTimeImmutable('@' . $this->timestamp, new DateTimeZone('UTC'));
+        return new DateTimeImmutable('@'.$this->timestamp, new DateTimeZone('UTC'));
     }
 
     public function advance(int $seconds): void

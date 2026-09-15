@@ -36,14 +36,14 @@ final class Transport implements LicenseTransport
         private readonly RequestFactoryInterface $requestFactory,
         private readonly StreamFactoryInterface $streamFactory,
         private readonly string $userAgent,
-        private readonly LoggerInterface $logger = new NullLogger(),
+        private readonly LoggerInterface $logger = new NullLogger,
     ) {}
 
     /**
      * Setzt einen signierten (oder unsignierten) Request ab.
      *
      * @param  array<string, mixed>  $params  Inhalt des JSON-RPC-`params`-Objekts
-     * @param  string  $key     Public Key; leer, wenn der Aufruf keinen hat
+     * @param  string  $key  Public Key; leer, wenn der Aufruf keinen hat
      * @param  string  $secret  API-Secret; leer lassen, um unsigniert zu senden
      */
     public function call(string $endpoint, array $params, string $key = '', string $secret = ''): TransportResponse
@@ -53,7 +53,7 @@ final class Transport implements LicenseTransport
         $body = $this->encodeEnvelope($params);
 
         $request = $this->requestFactory
-            ->createRequest('POST', rtrim($this->baseUrl, '/') . $endpoint)
+            ->createRequest('POST', rtrim($this->baseUrl, '/').$endpoint)
             ->withHeader('Content-Type', 'application/json')
             ->withHeader('Accept', 'application/json')
             ->withHeader('User-Agent', $this->userAgent)

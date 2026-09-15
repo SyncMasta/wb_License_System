@@ -1,6 +1,8 @@
 <?php
 
 declare(strict_types=1);
+use Psr\Log\LoggerInterface;
+use Psr\SimpleCache\CacheInterface;
 
 /**
  * Bootstrap für den Offline-Selbsttest.
@@ -12,12 +14,11 @@ declare(strict_types=1);
  * Die hier definierten Interfaces sind bewusst minimal und entsprechen den
  * Signaturen, die dieses Paket tatsächlich verwendet.
  */
-
-$vendor = __DIR__ . '/../../vendor/autoload.php';
+$vendor = __DIR__.'/../../vendor/autoload.php';
 if (is_file($vendor)) {
     require $vendor;
 } else {
-    if (! interface_exists(\Psr\Log\LoggerInterface::class)) {
+    if (! interface_exists(LoggerInterface::class)) {
         eval('
             namespace Psr\Log;
             interface LoggerInterface {
@@ -45,7 +46,7 @@ if (is_file($vendor)) {
         ');
     }
 
-    if (! interface_exists(\Psr\SimpleCache\CacheInterface::class)) {
+    if (! interface_exists(CacheInterface::class)) {
         eval('
             namespace Psr\SimpleCache;
             interface InvalidArgumentException extends \Throwable {}
@@ -71,11 +72,11 @@ spl_autoload_register(static function (string $class): void {
     }
 
     $relative = substr($class, strlen($prefix));
-    $path = __DIR__ . '/../../src/' . str_replace('\\', '/', $relative) . '.php';
+    $path = __DIR__.'/../../src/'.str_replace('\\', '/', $relative).'.php';
     if (is_file($path)) {
         require $path;
     }
 });
 
-require __DIR__ . '/fakes.php';
-require __DIR__ . '/assert.php';
+require __DIR__.'/fakes.php';
+require __DIR__.'/assert.php';

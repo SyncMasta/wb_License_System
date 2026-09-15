@@ -53,7 +53,7 @@ final readonly class LicenseConfig
             ? $values[$key]
             : $default;
 
-        $defaults = new self();
+        $defaults = new self;
 
         return new self(
             baseUrl: rtrim($str('base_url', $defaults->baseUrl), '/'),
@@ -94,6 +94,6 @@ final readonly class LicenseConfig
      */
     public function instanceIdFor(string $tenant): string
     {
-        return hash('sha256', $tenant . '|' . $this->serviceInstanceId);
+        return hash('sha256', $tenant.'|'.$this->serviceInstanceId);
     }
 }

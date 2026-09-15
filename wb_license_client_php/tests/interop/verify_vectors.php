@@ -13,11 +13,11 @@ declare(strict_types=1);
  * Exit-Code 0 = alles gleich, 1 = Abweichung.
  */
 
-require __DIR__ . '/../../src/Http/Signature.php';
+require __DIR__.'/../../src/Http/Signature.php';
 
 use WissenBeratung\LicenseClient\Http\Signature;
 
-$path = __DIR__ . '/vectors.json';
+$path = __DIR__.'/vectors.json';
 if (! is_file($path)) {
     fwrite(STDERR, "vectors.json fehlt: {$path}\n");
     exit(1);
@@ -29,7 +29,7 @@ $secret = (string) $vectors['secret'];
 $failures = 0;
 
 if ($vectors['scheme'] !== Signature::SCHEME) {
-    fwrite(STDERR, "Schema-Mismatch: {$vectors['scheme']} != " . Signature::SCHEME . "\n");
+    fwrite(STDERR, "Schema-Mismatch: {$vectors['scheme']} != ".Signature::SCHEME."\n");
     $failures++;
 }
 
@@ -44,15 +44,15 @@ foreach ($vectors['cases'] as $case) {
         'body_sha256' => hash('sha256', $body) === $case['body_sha256'],
         'signature_base' => Signature::base($key, $timestamp, $nonce, $body) === $case['signature_base'],
         'signature' => Signature::compute($secret, $key, $timestamp, $nonce, $body) === $case['signature'],
-        'verify' => Signature::verify($secret, $key, $timestamp, $nonce, $body, 'v1=' . $case['signature']),
-        'tampered_rejected' => ! Signature::verify($secret, $key, $timestamp, $nonce, $body . ' ', (string) $case['signature']),
-        'wrong_secret_rejected' => ! Signature::verify('WBS-' . str_repeat('x', 43), $key, $timestamp, $nonce, $body, (string) $case['signature']),
+        'verify' => Signature::verify($secret, $key, $timestamp, $nonce, $body, 'v1='.$case['signature']),
+        'tampered_rejected' => ! Signature::verify($secret, $key, $timestamp, $nonce, $body.' ', (string) $case['signature']),
+        'wrong_secret_rejected' => ! Signature::verify('WBS-'.str_repeat('x', 43), $key, $timestamp, $nonce, $body, (string) $case['signature']),
     ];
 
     $failed = array_keys(array_filter($checks, static fn (bool $ok): bool => ! $ok));
     if ($failed !== []) {
         $failures++;
-        fwrite(STDERR, "FAIL {$name}: " . implode(', ', $failed) . "\n");
+        fwrite(STDERR, "FAIL {$name}: ".implode(', ', $failed)."\n");
     } else {
         echo "OK   {$name}\n";
     }
