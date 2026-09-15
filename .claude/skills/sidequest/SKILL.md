@@ -18,16 +18,30 @@ Recherche landet also nicht im Haupttranskript. Die Dateiablage unter
 `.claude/sidequests/` macht das Ganze ueber Sessions hinweg haltbar und
 rueckfuehrbar.
 
-## Helfer
+## Helfer finden
 
-Alle Zustandsaenderungen laufen ueber `sq.py` im Skill-Verzeichnis — nie die
-JSON-Datei von Hand editieren.
+Alle Zustandsaenderungen laufen ueber `sq.py` aus diesem Skill-Verzeichnis —
+nie die JSON-Datei von Hand editieren.
+
+Der Skill kann projektlokal, rechnerweit oder ueber den Account-Sync
+installiert sein. **Loese den Pfad einmal pro Session auf** und nutze danach
+`$SQ`:
 
 ```bash
-python3 .claude/skills/sidequest/sq.py --help
+SQ="python3 $(ls -d "$PWD"/.claude/skills/sidequest/sq.py \
+                   ~/.claude/skills/sidequest/sq.py \
+                   ~/.claude/skills/synced/*/sidequest/sq.py 2>/dev/null | head -1)"
+"$SQ" --help
 ```
 
-Ablage: `.claude/sidequests/index.json` plus `sq-NNN.md` pro Zweig.
+Findet das nichts, ist der Skill nicht korrekt installiert — sag das dem
+Nutzer, statt einen Pfad zu raten.
+
+**Ablage:** `<aktuelles Verzeichnis>/.claude/sidequests/` — Zweige gehoeren
+zu dem Projekt, in dem sie entstehen, auch bei global installiertem Skill.
+`index.json` plus `sq-NNN.md` pro Zweig. Mit der Umgebungsvariable
+`SIDEQUEST_DIR` laesst sich ein anderer Ort erzwingen.
+
 IDs sind tolerant: `3`, `sq3`, `sq-3` und `sq-003` meinen dasselbe.
 
 ## Aufrufe
@@ -37,7 +51,7 @@ IDs sind tolerant: `3`, `sq3`, `sq-3` und `sq-003` meinen dasselbe.
 1. Titel formulieren: 3–6 Woerter, die die Frage benennen.
 2. Zweig anlegen:
    ```bash
-   python3 .claude/skills/sidequest/sq.py new --title "<titel>" --question "<frage>"
+   "$SQ" new --title "<titel>" --question "<frage>"
    ```
    Gibt die ID und den Pfad der Zweigdatei aus.
 3. **Subagent starten** (`Agent`-Tool, `subagent_type: "general-purpose"`, oder
@@ -54,7 +68,7 @@ IDs sind tolerant: `3`, `sq3`, `sq-3` und `sq-003` meinen dasselbe.
    Nutzers direkt von der Antwort abhaengt, `run_in_background: false`.
 4. Wenn die Antwort da ist, anhaengen und die Zwischendatei aufraeumen:
    ```bash
-   python3 .claude/skills/sidequest/sq.py answer <id> --file .claude/sidequests/<id>.answer.md
+   "$SQ" answer <id> --file .claude/sidequests/<id>.answer.md
    rm .claude/sidequests/<id>.answer.md
    ```
 5. Im Hauptverlauf **maximal 3–5 Zeilen** berichten: die Kernaussage plus
@@ -67,14 +81,14 @@ an: `--parent sq-002`.
 ### `/sidequest list [offen|merged|verworfen]`
 
 ```bash
-python3 .claude/skills/sidequest/sq.py list --status all
+"$SQ" list --status all
 ```
 Statuswerte: `open`, `merged`, `dropped`, `all`. Ausgabe unveraendert zeigen.
 
 ### `/sidequest show <id>`
 
 ```bash
-python3 .claude/skills/sidequest/sq.py show <id>
+"$SQ" show <id>
 ```
 Die komplette Zweigdatei. Erst hier landet die Langfassung im Hauptverlauf —
 weil der Nutzer sie ausdruecklich angefordert hat.
@@ -88,7 +102,7 @@ Der Zweig ist erledigt und sein Ergebnis soll den Hauptfaden beeinflussen.
    Entscheidung, eine konkrete Aufgabe. Nicht der ganze Zweig.
 3. Markieren:
    ```bash
-   python3 .claude/skills/sidequest/sq.py merge <id> --note "<was zurueckfliesst>"
+   "$SQ" merge <id> --note "<was zurueckfliesst>"
    ```
 4. Im Hauptverlauf ansagen, was das fuer die laufende Arbeit aendert — und es
    dann auch tun, wenn daraus eine Aufgabe folgt.
@@ -99,14 +113,14 @@ sie zusaetzlich nach `DECISIONS.md` — aber nur, wenn der Nutzer das bestaetigt
 ### `/sidequest drop <id> [grund]`
 
 ```bash
-python3 .claude/skills/sidequest/sq.py drop <id> --note "<grund>"
+"$SQ" drop <id> --note "<grund>"
 ```
 `reopen <id>` macht das rueckgaengig.
 
 ### `/sidequest map` — grafische Uebersicht
 
 ```bash
-python3 .claude/skills/sidequest/sq.py map
+"$SQ" map
 ```
 Liefert ein Mermaid-`flowchart`: Hauptverlauf als Wurzel, Zweige als Knoten,
 rueckgefuehrte Zweige mit gestrichelter Kante zurueck zum Hauptverlauf. Farben
