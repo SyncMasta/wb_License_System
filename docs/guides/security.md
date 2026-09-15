@@ -391,8 +391,9 @@ _logger.warning(f"Failed activation: wrong_code for license {license.id}")
 | Kunden-Adressen | res.partner | Art. 6.1.b (Vertrag) | Vertragsende + 10 Jahre (§ 147 AO) |
 | E-Mail-Adressen | res.partner, wb.license.trial.request | Art. 6.1.b / 6.1.f | Trial: 1 Jahr nach Expire |
 | USt-IDs | res.partner | Art. 6.1.c (Gesetzl. Pflicht) | Vertragsende + 10 Jahre |
-| IP-Adressen | wb.license.event | Art. 6.1.f (Berechtigtes Interesse) | 90 Tage |
+| IP-Adressen | wb.license.event | Art. 6.1.f (Berechtigtes Interesse) | 90 Tage (Cron `ir_cron_event_retention`, nullt `ip_address` und `user_agent`) |
 | Lead-Data | crm.lead, wb.license.trial.request | Art. 6.1.a (Einwilligung) | 2 Jahre nach letztem Kontakt |
+| Lead-Data | wb.license.install | Art. 6.1.f (Berechtigtes Interesse) | 2 Jahre nach letztem Kontakt (Cron `ir_cron_install_retention`, leert die Kontaktfelder; `converted` ausgenommen) |
 
 ### Pflichten
 
