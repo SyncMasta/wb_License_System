@@ -53,6 +53,9 @@ EVENT_TYPES = [
     ('auto_bind_resolved', 'Auto-Bind via Lookup gebunden'),
     ('auto_bind_lookup_failed', 'Auto-Bind Lookup-Versuch ohne Match'),
     ('nfr_issued', 'NFR-Lizenz ausgestellt'),
+    ('api_secret_issued', 'API-Secret erzeugt/rotiert'),
+    ('api_secret_revoked', 'API-Secret entzogen'),
+    ('signature_failed', 'HMAC-Signatur ungültig oder abgelaufen'),
 ]
 
 

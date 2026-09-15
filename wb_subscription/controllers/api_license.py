@@ -22,6 +22,8 @@ import psycopg2
 from odoo import http
 from odoo.http import request, Response
 
+from . import api_signature
+
 _logger = logging.getLogger(__name__)
 
 CORS_ANY = '*'
@@ -93,11 +95,24 @@ class ApiLicenseController(http.Controller):
         if not license:
             return {'error': 'KEY_NOT_FOUND'}
 
+        # HMAC-Signatur (optional oder Pflicht, je nach Enforcement-Modus).
+        # Vor record_ping, damit ein abgewiesener Request die Ping-Metadaten
+        # der Lizenz nicht anfasst — genau das war der Hebel, den ein
+        # blosser Key-Kenner bisher hatte.
+        trust, sig_error = api_signature.verify_signature(
+            expected_key=key, license=license)
+        if sig_error:
+            return {'error': sig_error}
+        if (trust != api_signature.TRUST_HMAC
+                and api_signature.signature_required_for(license)):
+            return {'error': api_signature.ERROR_REQUIRED}
+
         license.record_ping(ip=_client_ip(), user_agent=_client_ua())
         request.env['wb.license.event'].sudo().log_event(
             license, 'ping',
             ip_address=_client_ip(), user_agent=_client_ua(),
             domain=kw.get('domain'), db_uuid=kw.get('db_uuid'),
+            details={'trust': trust},
         )
 
         domain = (kw.get('domain') or '').strip()
@@ -320,6 +335,15 @@ class ApiLicenseController(http.Controller):
             if not contact_email or not contact_name or not company_name:
                 return {'error': 'MISSING_REQUIRED_FIELDS'}
 
+        # Signatur ist hier bewusst OPTIONAL und nie Pflicht: wer eine Lizenz
+        # anfragt, hat per Definition noch keinen Key und damit kein Secret.
+        # Ein Bestandskunde, der ein zweites Produkt anfragt, kann signieren —
+        # das hebt den Eingang von 'unverified' auf 'hmac'. Eine *falsche*
+        # Signatur wird dagegen immer abgewiesen.
+        trust, sig_error = api_signature.verify_signature()
+        if sig_error:
+            return {'error': sig_error}
+
         payload = {
             'product_code': product_code,
             'domain': domain,
@@ -347,9 +371,10 @@ class ApiLicenseController(http.Controller):
                 False, 'lead_received',
                 ip_address=_client_ip(), user_agent=_client_ua(),
                 domain=domain, db_uuid=db_uuid,
-                details='intent=%s product=%s install_id=%s lead=%s' % (
+                details='intent=%s product=%s install_id=%s lead=%s trust=%s' % (
                     intent, product_code, install.id,
-                    install.crm_lead_id.id if install.crm_lead_id else '-'),
+                    install.crm_lead_id.id if install.crm_lead_id else '-',
+                    trust),
             )
         except (psycopg2.IntegrityError, psycopg2.OperationalError):
             # Sprint 5 / L-M3: DB-Konsistenzfehler nicht silently

@@ -37,6 +37,13 @@ class WbLicenseActivateWizard(models.TransientModel):
         required=True,
         help="25 Zeichen in 5er-Gruppen, aus dem Portal-Download.",
     )
+    api_secret = fields.Char(
+        string='API-Secret (optional)',
+        help="Signiert die Anfragen dieser Instanz an den Lizenz-Server "
+             "(Format WBS-...). Wird von WISSEN BERATUNG zusammen mit dem "
+             "Schlüssel ausgegeben. Leer lassen, wenn keines vorliegt — "
+             "die Lizenzprüfung funktioniert auch unsigniert.",
+    )
 
     # ----------------------- Activation-Consents (Pflicht + Optional) ------
     contact_email = fields.Char(
@@ -150,9 +157,23 @@ class WbLicenseActivateWizard(models.TransientModel):
             'contact_email': email,
         }
 
-        info = self.env['wb.license.client'].activate_license(
-            product_code, key, code, consents=consents,
-        )
+        # Secret VOR dem Activate ablegen: der Server kann so eingerichtet
+        # sein, dass er signierte Requests verlangt — dann muss schon der
+        # erste Folge-Ping signiert rausgehen.
+        secret = (self.api_secret or '').strip()
+        if secret:
+            self.env['wb.license.client']._store_secret(product_code, secret)
+
+        try:
+            info = self.env['wb.license.client'].activate_license(
+                product_code, key, code, consents=consents,
+            )
+        except Exception:
+            # Aktivierung gescheitert: ein gerade eingetragenes Secret wieder
+            # entfernen, damit kein halber Zustand zurueckbleibt.
+            if secret:
+                self.env['wb.license.client']._store_secret(product_code, '')
+            raise
 
         suffix = ''
         if self.subscribe_newsletter:

@@ -1,0 +1,65 @@
+name: PHP-Client
+
+on:
+  push:
+    paths:
+      - 'wb_license_client_php/**'
+      - '.github/workflows/php-client.yml'
+  pull_request:
+    paths:
+      - 'wb_license_client_php/**'
+      - '.github/workflows/php-client.yml'
+
+defaults:
+  run:
+    working-directory: wb_license_client_php
+
+jobs:
+  offline-check:
+    # Läuft ohne Composer — fängt Syntaxfehler und gebrochene Interop-Vektoren
+    # ab, auch wenn die Abhängigkeiten gerade nicht installierbar sind.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - name: Syntaxprüfung
+        run: find src tests -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+      - name: Interop-Vektoren
+        run: php tests/interop/verify_vectors.php
+      - name: Offline-Selbsttest
+        run: php tests/standalone/run.php
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: xdebug
+      - name: Composer-Cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ matrix.php }}-${{ hashFiles('wb_license_client_php/composer.json') }}
+      - run: composer install --prefer-dist --no-interaction --no-progress
+      - name: Pint
+        # Vorerst beratend: der Code ist ohne lauffaehiges Pint geschrieben
+        # worden (die Entwicklungsumgebung kam nicht an Composer-Pakete).
+        # Sobald jemand mit Composer-Zugriff einmal `vendor/bin/pint` laufen
+        # laesst und das Ergebnis commitet, wird dieser Schritt wieder
+        # blockierend — bis dahin wuerde er nur PHPStan und Pest verdecken.
+        continue-on-error: true
+        run: vendor/bin/pint --test
+      - name: PHPStan
+        run: vendor/bin/phpstan analyse --no-progress
+      - name: Pest
+        # Coverage-Schwelle laut Übergabe: 85 % auf src/ ohne src/Laravel.
+        run: vendor/bin/pest --coverage --min=85

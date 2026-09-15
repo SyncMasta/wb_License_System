@@ -167,27 +167,59 @@ self.message_post(
    python3 -m py_compile <file.py>
    python3 -c "import xml.etree.ElementTree as ET; ET.parse('<file.xml>')"
    ```
-3. **tar.gz bauen** und per scp auf s02:
+3. **Commit und Push.** Der Server zieht aus GitHub, nicht von deinem Rechner.
+   Ungepushte Arbeit landet dort nicht.
+4. **Ausrollen mit dem Skript:**
    ```bash
-   tar -czf /tmp/wb_<modul>.tar.gz wb_<modul>/
-   scp /tmp/wb_<modul>.tar.gz root@s02:/tmp/
+   scripts/deploy-s02.sh --branch <branch> --modules wb_subscription --tests wb_hmac
+   scripts/deploy-s02.sh --dry-run          # zeigt nur, was passieren würde
    ```
-4. **Auf s02 deployen:**
+5. **Log prüfen** (das Skript zeigt den relevanten Ausschnitt schon selbst):
    ```bash
-   cd /opt/odoo19/custom_addons/
-   rm -rf wb_<modul> && tar -xzf /tmp/wb_<modul>.tar.gz
-   chown -R odoo19:odoo19 wb_<modul>/
-   find wb_<modul> -name __pycache__ -exec rm -rf {} +
+   ssh s02 'tail -f /var/log/odoo/odoo19.log | grep -E "(wb_<modul>|ERROR)"'
+   ```
 
-   systemctl stop odoo19
-   sudo -u odoo19 /opt/odoo19/venv/bin/python3.12 /opt/odoo19/odoo-bin \
-     -c /etc/odoo19.conf -u wb_<modul> -d Main --stop-after-init
-   systemctl start odoo19
-   ```
-5. **Log prüfen:**
-   ```bash
-   tail -f /var/log/odoo/odoo19.log | grep -E "(wb_<modul>|ERROR)"
-   ```
+### Wie das Deployment auf s02 wirklich funktioniert
+
+**Die Module auf s02 sind Symlinks in einen Git-Klon, keine Kopien:**
+
+```
+/opt/odoo19/custom_addons/wb_subscription
+    -> /opt/odoo19/src/wb_License_System/wb_subscription
+```
+
+Ausgerollt wird deshalb, indem der Klon unter `/opt/odoo19/src/wb_License_System`
+auf den gewünschten Stand gebracht wird (`git fetch`, `checkout`, `pull`).
+
+**Niemals `rm -rf wb_<modul>` und ein tar.gz darüber entpacken.** Das löscht den
+Symlink und legt eine Kopie an. Ab dann zeigt der Server nicht mehr auf den Klon,
+der nächste `git pull` dort wirkt nicht mehr, und beide Stände laufen
+auseinander. Das alte Verfahren in dieser Datei war genau so beschrieben und
+falsch (korrigiert am 15.09.2026).
+
+**Vier Fallen, die am 15.09.2026 Zeit gekostet haben:**
+
+1. **Odoo schreibt nicht nach stdout.** In `/etc/odoo19.conf` steht
+   `logfile = /var/log/odoo/odoo19.log`. Ein `> /tmp/irgendwas.log` bleibt leer,
+   und ein gescheitertes Update sieht aus, als wäre es nie gestartet.
+2. **`set -e` plus Neustart am Skriptende lässt Odoo unten.** Schlägt ein Test
+   fehl, bricht das Skript vor `systemctl start` ab und die Produktion bleibt
+   offline. Der Neustart gehört in einen `trap ... EXIT`, so wie in
+   `scripts/deploy-s02.sh`.
+3. **`-u` auf ein nicht installiertes Modul wird stillschweigend übergangen.**
+   `wb_license_client` ist auf s02 `uninstalled` (es gehört auf Kundeninstanzen,
+   nicht auf den Lizenzserver). Seine Tests laufen dort also nie, auch wenn man
+   es in `-u` schreibt. Das Skript prüft den Installationszustand und sagt es an.
+4. **Testdateien, die Daten außerhalb ihres Moduls lesen**, brauchen einen
+   Symlink im Addons-Verzeichnis. `wb_license_client_php` ist kein Odoo-Modul
+   (kein Manifest, wird nicht geladen), liefert den HMAC-Tests aber
+   `tests/interop/vectors.json`. Fehlt der Symlink, überspringen sich die
+   Interop-Tests selbst, statt zu scheitern — man hält sie fälschlich für
+   gelaufen. Das Skript setzt ihn.
+
+**Downtime:** Das Update stoppt Odoo für rund eine Minute, nginx gibt in diesem
+Fenster 502. Der Uptime-Watchdog auf s01 hat eine Schwelle von zwei Läufen und
+schlägt deshalb keinen Fehlalarm.
 
 ---
 
