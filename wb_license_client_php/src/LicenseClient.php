@@ -256,7 +256,10 @@ final class LicenseClient
 
     private function emitTransitions(?LicenseStatus $previous, LicenseStatus $current): void
     {
-        $previousState = $previous?->state ?? LicenseState::Unknown;
+        // Explizit statt `$previous?->state ?? ...`: `??` fängt den
+        // Property-Zugriff auf null ohnehin ab, das `?->` wäre doppelt
+        // gemoppelt (PHPStan nullsafe.neverNull).
+        $previousState = $previous !== null ? $previous->state : LicenseState::Unknown;
         if ($previousState === $current->state) {
             return;
         }
