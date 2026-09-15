@@ -21,8 +21,13 @@ importiert werden:
         ...
 """
 
+import hashlib
+import hmac
+import json
 import logging
 import random
+import secrets
+import time
 import uuid
 from datetime import timedelta
 from functools import wraps
@@ -37,6 +42,8 @@ _logger = logging.getLogger(__name__)
 
 DEFAULT_SERVER_URL = 'https://wissen-beratung.de'
 KEY_PARAM_PREFIX = 'wb_license_client.key_'
+SECRET_PARAM_PREFIX = 'wb_license_client.secret_'
+SIGNATURE_SCHEME = 'WB-HMAC-V1'
 SERVER_URL_PARAM = 'wb_license_client.server_url'
 DEBUG_PARAM = 'wb_license_client.debug_mode'
 INSTALL_REGISTRY_OPT_OUT_PARAM = 'wb_license_client.disable_install_registry'
@@ -212,8 +219,15 @@ class WbLicenseClient(models.AbstractModel):
                 "ermitteln — bitte System-Administrator informieren."
             ))
 
+        # Signatur ist hier optional: ein Interessent hat noch keinen Key.
+        # Ein Bestandskunde, der ein zweites Produkt anfragt, signiert mit
+        # dem Secret des vorhandenen Schluessels und hebt den Eingang damit
+        # serverseitig von 'unverified' auf 'hmac'.
+        lead_key = self._get_stored_key(body['product_code'])
         data, status = self._do_request(
             '/api/license/lead', body, timeout=DEFAULT_ACTIVATE_TIMEOUT,
+            key=lead_key or None,
+            secret=self._get_stored_secret(body['product_code']) if lead_key else None,
         )
 
         if status == 200 and data and data.get('status') == 'ok':
@@ -461,15 +475,25 @@ class WbLicenseClient(models.AbstractModel):
         module_version = self._get_module_version_for(info.module_technical_name)
         if module_version:
             payload['module_version'] = module_version
-        data, status = self._do_request('/api/license/check', payload)
+        data, status = self._do_request(
+            '/api/license/check', payload,
+            key=key, secret=self._get_stored_secret(product_code),
+        )
         if status == 200 and data:
             info.apply_server_response(data)
         else:
             info.record_check_failure(status, data)
 
     @api.model
-    def _do_request(self, endpoint, payload, timeout=DEFAULT_CHECK_TIMEOUT):
+    def _do_request(self, endpoint, payload, timeout=DEFAULT_CHECK_TIMEOUT,
+                    key=None, secret=None):
         """HTTP-POST mit Timeout und Error-Handling.
+
+        :param key: Public Key fuer die HMAC-Signatur. Ohne key/secret geht
+            der Request unsigniert raus — der Server toleriert das, solange
+            ``wb_subscription.hmac_enforcement`` nicht auf ``required`` steht
+            und fuer diesen Key ein Secret hinterlegt ist.
+        :param secret: API-Secret aus ir.config_parameter.
 
         Returns:
             (response_json_or_None, status_code_or_0)
@@ -491,9 +515,18 @@ class WbLicenseClient(models.AbstractModel):
             'X-WB-Domain': self._get_domain() or '',
             'X-Odoo-Database': self.env.cr.dbname or '',
         }
+        # HMAC-Signatur, wenn fuer dieses Produkt ein Secret hinterlegt ist.
+        # Signiert wird der rohe Body — deshalb wird hier selbst serialisiert
+        # und ``data=`` statt ``json=`` verwendet: requests wuerde sonst neu
+        # serialisieren und die Signatur passte nicht mehr zum Body.
+        envelope = {'jsonrpc': '2.0', 'method': 'call', 'params': payload}
+        body = json.dumps(envelope, separators=(',', ':'), ensure_ascii=False)
+        body_bytes = body.encode('utf-8')
+        if secret and key:
+            headers.update(self._signature_headers(secret, key, body_bytes))
+
         try:
-            envelope = {'jsonrpc': '2.0', 'method': 'call', 'params': payload}
-            response = requests.post(url, json=envelope, headers=headers, timeout=timeout)
+            response = requests.post(url, data=body_bytes, headers=headers, timeout=timeout)
             try:
                 data = response.json()
             except ValueError:
@@ -561,6 +594,47 @@ class WbLicenseClient(models.AbstractModel):
     def _store_key(self, product_code, key):
         self.env['ir.config_parameter'].sudo().set_param(
             KEY_PARAM_PREFIX + product_code, key)
+
+    @api.model
+    def _signature_headers(self, secret, key, body_bytes):
+        """Baut die Signatur-Header (Schema v1).
+
+        Gegenstueck zu ``wb.key.generator.build_signature_base`` im
+        wb_subscription-Modul und zu ``Signature.php`` im PHP-Client.
+        Signiert wird der SHA256 des rohen Bodys, zusammen mit Key,
+        Timestamp und einer Einmal-Nonce — der Server lehnt eine zweite
+        Verwendung derselben Nonce ab.
+        """
+        timestamp = str(int(time.time()))
+        nonce = secrets.token_hex(16)
+        base = '\n'.join([
+            SIGNATURE_SCHEME, key, timestamp, nonce,
+            hashlib.sha256(body_bytes).hexdigest(),
+        ])
+        signature = hmac.new(
+            secret.encode('utf-8'), base.encode('utf-8'), hashlib.sha256,
+        ).hexdigest()
+        return {
+            'X-WB-Key': key,
+            'X-WB-Timestamp': timestamp,
+            'X-WB-Nonce': nonce,
+            'X-WB-Signature': 'v1=' + signature,
+        }
+
+    @api.model
+    def _get_stored_secret(self, product_code):
+        """API-Secret fuer HMAC-signierte Requests.
+
+        Wird von WB zusammen mit dem Lizenzschluessel ausgegeben und hier
+        eingetragen. Fehlt es, laeuft alles unsigniert weiter.
+        """
+        return self.env['ir.config_parameter'].sudo().get_param(
+            SECRET_PARAM_PREFIX + product_code) or False
+
+    @api.model
+    def _store_secret(self, product_code, secret):
+        self.env['ir.config_parameter'].sudo().set_param(
+            SECRET_PARAM_PREFIX + product_code, secret or '')
 
     @api.model
     def _get_server_url(self):

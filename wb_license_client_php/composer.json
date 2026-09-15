@@ -1,0 +1,42 @@
+{
+    "name": "wissen-beratung/wb-license-client",
+    "description": "Client-Seite des WB-Lizenzsystems für PHP-Dienste (Entitlement, kein Kopierschutz).",
+    "type": "library",
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "WISSEN BERATUNG (Tobias Wissen)",
+            "email": "info@wissen-beratung.de"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "psr/http-client": "^1.0",
+        "psr/http-factory": "^1.0",
+        "psr/log": "^3.0",
+        "psr/simple-cache": "^3.0",
+        "php-http/discovery": "^1.19"
+    },
+    "require-dev": {
+        "pestphp/pest": "^3.0",
+        "phpstan/phpstan": "^2.0",
+        "laravel/pint": "^1.18"
+    },
+    "autoload": {
+        "psr-4": {
+            "WissenBeratung\\LicenseClient\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "WissenBeratung\\LicenseClient\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "stable"
+}

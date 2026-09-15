@@ -8,10 +8,12 @@ Implementiert alle Algorithmen aus ARCHITECTURE.md Kapitel 4:
 - Ticket-Token (TCKT-{base64url(uuid4)})
 - Email-OTP (6-stellig)
 - Fingerprint (SHA256 über domain + db_uuid)
+- API-Secret und HMAC-Signatur für authentifizierte Client-Requests
 """
 
 import base64
 import hashlib
+import hmac
 import logging
 import os
 import re
@@ -29,6 +31,17 @@ KEY_FORMAT_RE = re.compile(r'^WB-([A-Z0-9]{4})-([a-f0-9]{8})([A-Z2-7]{2})$')
 CODE_FORMAT_RE = re.compile(r'^[A-HJ-NP-Z2-9]{5}(-[A-HJ-NP-Z2-9]{5}){4}$')
 
 CHECKSUM_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+
+# API-Secret fuer HMAC-signierte Client-Requests. 32 Byte Entropie,
+# base64url ohne Padding, mit sprechendem Praefix damit ein versehentlich
+# geleaktes Secret im Log sofort als solches erkennbar ist.
+API_SECRET_PREFIX = 'WBS-'
+API_SECRET_FORMAT_RE = re.compile(r'^WBS-[A-Za-z0-9_\-]{43}$')
+
+# Signatur-Schema. Version im String, damit ein spaeterer Wechsel des
+# Verfahrens nicht an der Header-Syntax scheitert.
+SIGNATURE_SCHEME = 'WB-HMAC-V1'
+SIGNATURE_PREFIX = 'v1='
 CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
 
@@ -199,6 +212,82 @@ class WbKeyGenerator(models.AbstractModel):
                 "(aktuell + History). Bitte Support kontaktieren — entweder "
                 "ist das Ticket beschädigt oder der zugehörige Key wurde aus "
                 "der History entfernt."))
+
+    # ----------------------------------------
+    # API-Secret + HMAC-Signatur (DECISION: HMAC fuer /check und /lead)
+    # ----------------------------------------
+
+    @api.model
+    def generate_api_secret(self):
+        """Erzeugt ein API-Secret fuer HMAC-signierte Client-Requests.
+
+        32 Byte aus ``secrets.token_urlsafe`` ergeben 43 base64url-Zeichen.
+        Das Secret wird Fernet-verschluesselt gespeichert (nicht gehasht) —
+        der Server braucht den Klartext, um die Signatur nachzurechnen.
+        """
+        return API_SECRET_PREFIX + secrets.token_urlsafe(32)[:43]
+
+    @api.model
+    def validate_api_secret_format(self, secret):
+        """Format-Check ohne DB-Zugriff."""
+        return bool(secret) and bool(API_SECRET_FORMAT_RE.match(secret))
+
+    @api.model
+    def build_signature_base(self, key, timestamp, nonce, body):
+        """Baut den zu signierenden String.
+
+        Signiert wird der **rohe Request-Body**, nicht ein kanonisiertes
+        Objekt: Client und Server sehen damit garantiert dieselben Bytes,
+        ohne sich ueber Key-Reihenfolge, Zahlenformate oder Unicode-Escaping
+        einig werden zu muessen. Genau daran scheitern sprachuebergreifende
+        HMAC-Implementierungen sonst.
+
+        Aufbau (LF-getrennt, kein Trailing-Newline)::
+
+            WB-HMAC-V1
+            <public key>
+            <unix timestamp>
+            <nonce>
+            <sha256-hex des Request-Bodys>
+
+        :param body: Request-Body als bytes oder str.
+        """
+        if isinstance(body, str):
+            body = body.encode('utf-8')
+        body_hash = hashlib.sha256(body or b'').hexdigest()
+        return '\n'.join([
+            SIGNATURE_SCHEME, key or '', str(timestamp or ''),
+            nonce or '', body_hash,
+        ])
+
+    @api.model
+    def compute_request_signature(self, secret, key, timestamp, nonce, body):
+        """HMAC-SHA256 ueber ``build_signature_base``, hex lowercase."""
+        base = self.build_signature_base(key, timestamp, nonce, body)
+        return hmac.new(
+            secret.encode('utf-8'), base.encode('utf-8'), hashlib.sha256,
+        ).hexdigest()
+
+    @api.model
+    def verify_request_signature(self, secret, key, timestamp, nonce, body,
+                                 signature):
+        """Konstantzeit-Vergleich der Signatur.
+
+        Akzeptiert den Header mit und ohne ``v1=``-Praefix. Gibt False
+        statt zu werfen, damit der Controller einen sauberen Fehlercode
+        zurueckgeben kann.
+        """
+        if not secret or not signature:
+            return False
+        provided = signature.strip()
+        if provided.startswith(SIGNATURE_PREFIX):
+            provided = provided[len(SIGNATURE_PREFIX):]
+        try:
+            expected = self.compute_request_signature(
+                secret, key, timestamp, nonce, body)
+        except (AttributeError, TypeError, ValueError):
+            return False
+        return hmac.compare_digest(expected, provided.lower())
 
     @api.model
     def generate_ticket_token(self):

@@ -65,6 +65,28 @@ class WbLicenseKey(models.Model):
         help="Code kann bis zu diesem Datum verwendet werden.",
     )
 
+    # ----------------------- API-Secret für HMAC-signierte Requests -------
+    # Fernet-verschlüsselt, NICHT gehasht: der Server muss die Signatur
+    # nachrechnen können und braucht dafür den Klartext. Klartext wird
+    # ausschließlich beim Erzeugen einmalig angezeigt.
+    api_secret_enc = fields.Binary(
+        string='API-Secret (verschlüsselt)',
+        attachment=False, copy=False,
+        groups='wb_subscription.group_wb_subscription_manager',
+        help="Fernet-verschlüsseltes Secret für HMAC-signierte Client-Requests.",
+    )
+    api_secret_hint = fields.Char(
+        string='API-Secret (Hinweis)', copy=False, readonly=True,
+        help="Letzte 4 Zeichen des Secrets — zum Abgleich ohne Klartext.",
+    )
+    api_secret_issued_at = fields.Datetime(
+        string='API-Secret erzeugt am', copy=False, readonly=True,
+    )
+    has_api_secret = fields.Boolean(
+        string='API-Secret gesetzt',
+        compute='_compute_has_api_secret', store=True,
+    )
+
     # ----------------------- Activation-Consents (DSGVO + Vertragsrecht) ---
     eula_accepted_at = fields.Datetime(
         string='EULA bestätigt am', readonly=True, copy=False,
@@ -1107,6 +1129,88 @@ class WbLicenseKey(models.Model):
             'url': f'/web/content/{attachment.id}?download=true',
             'target': 'self',
         }
+
+    @api.depends('api_secret_hint')
+    def _compute_has_api_secret(self):
+        """Ob ein Secret hinterlegt ist — ohne das Binary-Feld zu lesen.
+
+        Der Hint wird zusammen mit dem Secret gesetzt und mit ihm gelöscht,
+        ist also ein verlässlicher Indikator und für alle Nutzer lesbar.
+        """
+        for rec in self:
+            rec.has_api_secret = bool(rec.api_secret_hint)
+
+    def action_generate_api_secret(self):
+        """Erzeugt ein neues API-Secret und zeigt es EINMALIG an.
+
+        Rotation ist ausdrücklich erlaubt: das alte Secret wird sofort
+        ungültig, der Client muss das neue eingetragen bekommen. Deshalb
+        Warn-Text in der Notification statt stiller Rotation.
+
+        Das Secret landet NICHT im Chatter, nicht im Log und nicht per
+        Mail — dieselbe Regel wie beim Activation-Code.
+        """
+        self.ensure_one()
+        gen = self.env['wb.key.generator'].sudo()
+        secret = gen.generate_api_secret()
+        # Vor dem Schreiben merken — danach ist api_secret_issued_at immer
+        # gesetzt und die Unterscheidung Erstausgabe/Rotation dahin.
+        is_rotation = bool(self.api_secret_issued_at)
+        self.sudo().write({
+            'api_secret_enc': gen.encrypt_code(secret),
+            'api_secret_hint': secret[-4:],
+            'api_secret_issued_at': fields.Datetime.now(),
+        })
+        self.env['wb.license.event'].sudo().log_event(
+            self, 'api_secret_issued',
+            details={'rotated': is_rotation},
+        )
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("API-Secret erzeugt"),
+                'message': _(
+                    "%s\n\nJetzt kopieren — es wird nie wieder angezeigt. "
+                    "Ein zuvor ausgegebenes Secret ist ab sofort ungültig."
+                ) % secret,
+                'type': 'warning',
+                'sticky': True,
+            },
+        }
+
+    def action_revoke_api_secret(self):
+        """Entfernt das Secret. Signierte Requests dieses Keys scheitern danach."""
+        self.ensure_one()
+        if not self.api_secret_hint:
+            return False
+        self.sudo().write({
+            'api_secret_enc': False,
+            'api_secret_hint': False,
+            'api_secret_issued_at': False,
+        })
+        self.env['wb.license.event'].sudo().log_event(self, 'api_secret_revoked')
+        return True
+
+    def _get_api_secret(self):
+        """Entschlüsselt das Secret für die Signaturprüfung.
+
+        Nur aus dem Verifikationspfad aufrufen. Rückgabe niemals loggen,
+        in Events schreiben oder an den Client zurückgeben.
+        """
+        self.ensure_one()
+        raw = self.sudo().api_secret_enc
+        if not raw:
+            return None
+        try:
+            return self.env['wb.key.generator'].sudo().decrypt_code(raw)
+        except Exception:
+            # Key-Rotation ohne History, korruptes Feld: als "kein Secret"
+            # behandeln statt den Request mit einer Exception zu killen.
+            _logger.exception(
+                "[wb_subscription] API-Secret von %s nicht entschlüsselbar",
+                self.name)
+            return None
 
     def record_ping(self, ip=None, user_agent=None):
         """Trägt Ping-Metadaten ein. Wird vom Check-Endpoint aufgerufen."""

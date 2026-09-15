@@ -16,6 +16,8 @@
                         <field name="activation_code"
                                placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"/>
                         <field name="contact_email" widget="email"/>
+                        <field name="api_secret" password="True"
+                               placeholder="WBS-... (nur wenn vorhanden)"/>
                     </group>
 
                     <group string="Pflicht-Bestätigungen">

@@ -1,0 +1,47 @@
+{
+    "scheme": "WB-HMAC-V1",
+    "secret": "WBS-TESTSECRETTESTSECRETTESTSECRETTESTSECRET",
+    "note": "Generiert von generate_vectors.php. Testdaten, kein echtes Secret.",
+    "cases": [
+        {
+            "name": "check_minimal",
+            "key": "WB-UMAN-1a2b3c4dQF",
+            "timestamp": 1789000000,
+            "nonce": "0123456789abcdef0123456789abcdef",
+            "body": "{\"jsonrpc\":\"2.0\",\"method\":\"call\",\"params\":{\"key\":\"WB-UMAN-1a2b3c4dQF\"}}",
+            "body_sha256": "f9366d48d58a14c9069a5645d26868896e168adeb5425e5c19ebbbec864afe64",
+            "signature_base": "WB-HMAC-V1\nWB-UMAN-1a2b3c4dQF\n1789000000\n0123456789abcdef0123456789abcdef\nf9366d48d58a14c9069a5645d26868896e168adeb5425e5c19ebbbec864afe64",
+            "signature": "83ee6565d8ac8712e1aadd43e89fdaabdf57253c752e858e1c09406a31b51934"
+        },
+        {
+            "name": "check_with_instance",
+            "key": "WB-UMAN-1a2b3c4dQF",
+            "timestamp": 1789000123,
+            "nonce": "fedcba9876543210fedcba9876543210",
+            "body": "{\"jsonrpc\":\"2.0\",\"method\":\"call\",\"params\":{\"key\":\"WB-UMAN-1a2b3c4dQF\",\"domain\":\"wissen-api.wissen-beratung.de\",\"db_uuid\":\"9f1c2d3e4f5a6b7c\"}}",
+            "body_sha256": "4af5b9953ff9dcc1861a00853e1567a103effbe61af2c39b6311c4402bdbb7f4",
+            "signature_base": "WB-HMAC-V1\nWB-UMAN-1a2b3c4dQF\n1789000123\nfedcba9876543210fedcba9876543210\n4af5b9953ff9dcc1861a00853e1567a103effbe61af2c39b6311c4402bdbb7f4",
+            "signature": "2843a68648b3aeab9feb64d15e64303e1669f7c381b71dad35cbe7073335e176"
+        },
+        {
+            "name": "umlauts_and_slashes",
+            "key": "WB-BITW-00ff11eeAB",
+            "timestamp": 1789000456,
+            "nonce": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+            "body": "{\"jsonrpc\":\"2.0\",\"method\":\"call\",\"params\":{\"company_name\":\"Müller & Söhne GmbH\",\"notes\":\"Straße/Weg — Test\"}}",
+            "body_sha256": "916061e12e544ec0d6a519514b02dfd75bb53efa752149e4745dc5af7479f916",
+            "signature_base": "WB-HMAC-V1\nWB-BITW-00ff11eeAB\n1789000456\na1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6\n916061e12e544ec0d6a519514b02dfd75bb53efa752149e4745dc5af7479f916",
+            "signature": "a70fdbb469ead93d2ae0a241bce7f6df78e03766424ccd0e79436d49bde6fa9b"
+        },
+        {
+            "name": "empty_params",
+            "key": "WB-TELE-abcdef01GH",
+            "timestamp": 1789000789,
+            "nonce": "ffffffffffffffffffffffffffffffff",
+            "body": "{\"jsonrpc\":\"2.0\",\"method\":\"call\",\"params\":{}}",
+            "body_sha256": "8cf5b48b687a804afc4644e056298bb61752b38105588494287432c97bf3a0cb",
+            "signature_base": "WB-HMAC-V1\nWB-TELE-abcdef01GH\n1789000789\nffffffffffffffffffffffffffffffff\n8cf5b48b687a804afc4644e056298bb61752b38105588494287432c97bf3a0cb",
+            "signature": "a65a779430e5def03e504df7d4c84a955529caa3b1c8203c4a1b5aa6671e24a5"
+        }
+    ]
+}

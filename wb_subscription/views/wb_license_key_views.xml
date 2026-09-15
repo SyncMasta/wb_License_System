@@ -48,6 +48,21 @@
                     <button name="action_disarm_auto_bind" string="Auto-Bind zuruecksetzen"
                             type="object" class="btn-secondary"
                             invisible="not auto_bind_armed"/>
+                    <button name="action_generate_api_secret" type="object"
+                            string="API-Secret erzeugen" class="btn-secondary"
+                            groups="wb_subscription.group_wb_subscription_manager"
+                            invisible="has_api_secret"
+                            confirm="Ein API-Secret erzeugen? Es wird genau einmal angezeigt."/>
+                    <button name="action_generate_api_secret" type="object"
+                            string="API-Secret rotieren" class="btn-secondary"
+                            groups="wb_subscription.group_wb_subscription_manager"
+                            invisible="not has_api_secret"
+                            confirm="Secret rotieren? Das bisherige Secret wird sofort ungueltig — der Client kommt bis zum Eintragen des neuen Secrets nicht mehr signiert durch."/>
+                    <button name="action_revoke_api_secret" type="object"
+                            string="API-Secret entziehen" class="btn-secondary"
+                            groups="wb_subscription.group_wb_subscription_manager"
+                            invisible="not has_api_secret"
+                            confirm="Secret entziehen? Signierte Requests dieses Schluessels werden danach abgewiesen."/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="issued,trial,active,grace,expired"/>
                 </header>
@@ -84,6 +99,14 @@
                             <field name="activation_expires_at" readonly="1"/>
                             <field name="activated_fingerprint" readonly="1"
                                    groups="wb_subscription.group_wb_subscription_manager"/>
+                        </group>
+                        <group string="API-Secret (HMAC)"
+                               groups="wb_subscription.group_wb_subscription_manager">
+                            <field name="has_api_secret" readonly="1"/>
+                            <field name="api_secret_hint" readonly="1"
+                                   invisible="not has_api_secret"/>
+                            <field name="api_secret_issued_at" readonly="1"
+                                   invisible="not has_api_secret"/>
                         </group>
                         <group string="Instanz-Bindung">
                             <field name="bound_domain" readonly="1"/>

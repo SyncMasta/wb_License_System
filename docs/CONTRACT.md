@@ -103,8 +103,8 @@ Damit sind die Antworten auf die offenen Fragen aus §0 der Übergabe:
 
 | Frage | Antwort aus dem Code |
 |---|---|
-| Wie authentifiziert sich der Client? | Gar nicht. Nur Public Key im Body. Kein Shared Secret, kein HMAC, keine Signatur über den Body. |
-| Signiert der Server seine Antwort? | Nein. Kein Signatur-Feld, kein JWS, keine Header. Vertrauen hängt allein an TLS. |
+| Wie authentifiziert sich der Client? | **Seit `wb_subscription` 19.0.2.10.0: optional per HMAC-Signatur** (Schema v1, siehe §3a). Ohne Signatur bleibt der Public Key im Body das einzige Geheimnis. |
+| Signiert der Server seine Antwort? | Nein. Response-Signing ist nicht gebaut; Vertrauen in die Antwort hängt allein an TLS. Die Signatur schützt nur die Richtung Client → Server. |
 | Fingerprint-Schema exakt? | `sha256(f"{domain.lower().strip()}\|{db_uuid.strip()}")` als Hex-Digest (`wb.key.generator.compute_fingerprint`). Trennzeichen ist ein Pipe, **Protokoll und Trailing Slash werden hier _nicht_ entfernt** — nur beim Auto-Bind-Matching (`_normalize_domain`: lowercase, `http(s)://` ab, Trailing Slash ab). **Für den PHP-Client irrelevant:** der Fingerprint wird ausschließlich serverseitig berechnet und nie übertragen. |
 | Ist `bound_db_uuid` produktweit eindeutig? | Nein. Einzige DB-Constraint ist `UNIQUE(name)` auf dem Key. Eine Lizenz bindet aber genau **eine** `bound_db_uuid` (`_lookup_for_auto_bind` matcht nur bei `bound_db_uuid = False` oder identisch). Bei mehreren Mandanten auf einer Dienstinstanz braucht also **jeder Mandant eine eigene synthetische Instanzkennung** — der Vorschlag `SHA256(tenant_slug \| service_instance_id)` trägt. |
 | Reiner Statusendpunkt ohne Seiteneffekt? | **Existiert nicht.** `/api/license/check` ist Status _und_ Ping in einem: er schreibt `last_seen_at`, `last_seen_ip`, `last_seen_user_agent`, inkrementiert `ping_count_total` und legt pro Aufruf ein `wb.license.event` vom Typ `ping` an. |
@@ -113,6 +113,85 @@ Konsequenz für den PHP-Client: `status()`, `refresh()` und `ping()` treffen **d
 Endpunkt. `ping()` ist kein separater Call, sondern ein `refresh()`, dessen Ergebnis verworfen
 werden kann. Jeder Cache-Miss erzeugt eine Audit-Zeile im Odoo — das spricht für den 15-Minuten-Cache
 und gegen aggressives Refreshen.
+
+---
+
+## 3a. HMAC-Signatur (Schema v1)
+
+Seit `wb_subscription` 19.0.2.10.0 kann ein Client seine Requests signieren. Das Secret hängt
+am **Lizenzschlüssel** (`wb.license.key.api_secret_enc`, Fernet-verschlüsselt) und wird im Odoo
+über den Button „API-Secret erzeugen" ausgegeben — einmalig angezeigt, wie der Activation-Code.
+
+### Header
+
+| Header | Inhalt |
+|---|---|
+| `X-WB-Key` | Public Key. Muss bei `/check` mit `params.key` übereinstimmen, sonst `SIGNATURE_INVALID`. |
+| `X-WB-Timestamp` | Unix-Sekunden. Drift-Fenster ±300 s. |
+| `X-WB-Nonce` | Pro Request einmalig, max. 64 Zeichen. Wird 900 s gegen Wiederverwendung gesperrt. |
+| `X-WB-Signature` | `v1=<hex>`, HMAC-SHA256 |
+
+### Signierter String
+
+Signiert wird der **rohe Request-Body**, nicht ein kanonisiertes Objekt. Damit entfällt jede
+Einigung über Key-Reihenfolge, Zahlenformate und Unicode-Escaping — genau daran scheitern
+sprachübergreifende HMAC-Implementierungen sonst. **Der Client muss exakt die Bytes senden,
+die er signiert hat** (in PHP: einmal `json_encode`, das Ergebnis signieren *und* senden;
+in Python: `data=` statt `json=`, sonst serialisiert `requests` neu).
+
+```
+WB-HMAC-V1\n<public key>\n<unix timestamp>\n<nonce>\n<sha256-hex des Bodys>
+```
+
+LF-getrennt, kein abschließender Umbruch. Signatur = `HMAC-SHA256(secret, base)`, hex lowercase.
+
+### Enforcement
+
+`ir.config_parameter wb_subscription.hmac_enforcement`:
+
+| Wert | Verhalten |
+|---|---|
+| `off` | Header werden ignoriert. Verhalten wie vor dem Rollout. |
+| `optional` | **Default.** Gültige Signatur wird vermerkt, ungültige abgewiesen, fehlende toleriert. |
+| `required` | Auf `/check` zusätzlich: Schlüssel **mit** hinterlegtem Secret müssen signieren. Schlüssel ohne Secret bleiben zugelassen — sonst sperrt der Schalter jede Bestandsinstanz aus. |
+
+`/lead` verlangt **nie** eine Signatur: wer eine Lizenz anfragt, hat per Definition noch keinen
+Schlüssel und kein Secret. Ein Bestandskunde kann signieren, was den Eingang serverseitig von
+`unverified` auf `hmac` hebt. Eine *falsche* Signatur wird überall abgewiesen.
+
+### Fehlercodes
+
+| Code | Bedeutung | Retry sinnvoll? |
+|---|---|---|
+| `SIGNATURE_INVALID` | Signatur falsch, Key/Header-Mismatch, unbekannter Key oder kein Secret hinterlegt | nein — Konfigurationsfehler |
+| `SIGNATURE_REQUIRED` | Modus `required`, Key hat ein Secret, Request kam unsigniert | nein |
+| `SIGNATURE_TIMESTAMP` | Zeitdrift > 300 s oder unparsbarer Timestamp | erst nach Zeitkorrektur |
+| `SIGNATURE_REPLAY` | Nonce innerhalb von 900 s wiederverwendet | nein — Nonce-Erzeugung prüfen |
+
+Alle vier kommen wie jeder andere Fehler als `result.error` mit HTTP 200.
+
+### Interop-Vektoren
+
+`wb_license_client_php/tests/interop/vectors.json` nagelt das Schema über drei Implementierungen
+fest: PHP erzeugt die Vektoren, `wb_subscription/tests/test_hmac_signature.py` und
+`wb_license_client/tests/test_signature.py` prüfen dagegen. Ändert jemand das Schema, brechen
+die Tests, statt still eine inkompatible Version auszurollen.
+
+### Beispiel
+
+```bash
+BODY='{"jsonrpc":"2.0","method":"call","params":{"key":"WB-UMAN-1a2b3c4dQF"}}'
+TS=$(date +%s); NONCE=$(openssl rand -hex 16)
+BASE=$(printf 'WB-HMAC-V1\n%s\n%s\n%s\n%s' "WB-UMAN-1a2b3c4dQF" "$TS" "$NONCE" \
+       "$(printf '%s' "$BODY" | sha256sum | cut -d' ' -f1)")
+SIG=$(printf '%s' "$BASE" | openssl dgst -sha256 -hmac "$WB_SECRET" -hex | sed 's/.*= //')
+
+curl -sS https://my.wissen-beratung.de/api/license/check \
+  -H 'Content-Type: application/json' \
+  -H "X-WB-Key: WB-UMAN-1a2b3c4dQF" -H "X-WB-Timestamp: $TS" \
+  -H "X-WB-Nonce: $NONCE" -H "X-WB-Signature: v1=$SIG" \
+  -d "$BODY"
+```
 
 ---
 
@@ -286,7 +365,7 @@ Meldepflichtig gemäß §0 der Übergabe:
 | Aussagekräftige HTTP-Statuscodes (401/403/404/429/500) | praktisch immer 200; Fehler als String-Code in `result.error` |
 | HTTP 429 mit `Retry-After` | existiert nicht — `{"error":"TOO_MANY_REQUESTS"}` |
 | HTTP 404 bei unbekanntem Key | `{"error":"KEY_NOT_FOUND"}` mit Status 200 |
-| HTTP 401/403 | existiert nicht, weil es keine Authentifizierung gibt |
+| HTTP 401/403 | existiert nicht; Auth-Fehler kommen als `SIGNATURE_*` in `result.error` mit HTTP 200 |
 | separater Ping-Endpunkt | `/api/license/check` ist Status und Ping zugleich |
 | `validFrom`/`validTo`/`graceUntil` als Zeitstempel | reine Datumswerte (`YYYY-MM-DD`) |
 | Client berechnet Fingerprint | Client überträgt nur `domain` + `db_uuid`; Fingerprint entsteht serverseitig |
@@ -303,13 +382,10 @@ zu testen.
 
 1. **Bestätigung, dass der PHP-Client ausschließlich `/api/license/check` nutzt.** Alles andere
    ist entweder schreibend auf Lizenzbindungen oder CRM-relevant.
-2. **Keine Auth heißt: der Key ist das einzige Geheimnis.** Soll das für die erste produktive
-   Nutzung so bleiben, oder soll der Server vorher ein Shared Secret bzw. eine HMAC-Signatur
-   über den Body bekommen? Das ist eine Serverrepo-Entscheidung und blockiert den Client nicht —
-   ein `Http/Signature.php` wird aber nur dann gebaut, wenn die Antwort „ja" lautet.
-   Eine ausgearbeitete Empfehlung dazu liegt vor (Install-Secret aus `/announce`, HMAC über das
-   kanonisierte `params`-Objekt mit Timestamp und Nonce, Übergangsfenster mit
-   `trust='unverified'`); sie ist noch nicht entschieden.
+2. ~~Auth-Frage~~ — **entschieden und gebaut.** HMAC-Signatur mit einem Secret je
+   Lizenzschlüssel, Pflicht-fähig auf `/check`, optional auf `/lead`. Siehe §3a.
+   Der Rollout-Pfad ist: Server auf `optional` (Default) → Secrets ausgeben → Clients
+   eintragen → erst dann `required` schalten.
 3. **`db_uuid`-Schema.** Vorschlag: `hash('sha256', $tenantSlug . '|' . $serviceInstanceId)`,
    damit die Pipe-Konvention des Servers gespiegelt wird. `domain` = der feste Hostname des
    Dienstes, nicht die Kundendomäne.
