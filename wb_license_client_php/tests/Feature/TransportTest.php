@@ -44,7 +44,7 @@ final class FakeClientException extends RuntimeException implements ClientExcept
 
 function transportWith(?ResponseInterface $response, ?ClientExceptionInterface $exception = null): array
 {
-    $factory = new Psr17Factory();
+    $factory = new Psr17Factory;
     $client = new FakeHttpClient($response, $exception);
 
     return [
@@ -77,7 +77,7 @@ it('verpackt die Parameter in einen JSON-RPC-Envelope', function (): void {
 
 it('signiert genau die Bytes, die es auch sendet', function (): void {
     [$transport, $client] = transportWith(new Response(200, [], '{"result":{}}'));
-    $secret = 'WBS-' . str_repeat('a', 43);
+    $secret = 'WBS-'.str_repeat('a', 43);
     $key = 'WB-UMAN-1a2b3c4dQF';
 
     $transport->call('/api/license/check', ['key' => $key], $key, $secret);

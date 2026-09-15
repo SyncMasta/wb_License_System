@@ -18,7 +18,7 @@ declare(strict_types=1);
  * Aufruf: php tests/interop/generate_vectors.php > tests/interop/vectors.json
  */
 
-require __DIR__ . '/../../src/Http/Signature.php';
+require __DIR__.'/../../src/Http/Signature.php';
 
 use WissenBeratung\LicenseClient\Http\Signature;
 

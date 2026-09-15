@@ -42,7 +42,7 @@ final readonly class CircuitBreaker
             return false;
         }
 
-        return $state['opened_at'] + $this->cooldownSeconds > $this->clock->now()->getTimestamp();
+        return $this->clock->now()->getTimestamp() < $state['opened_at'] + $this->cooldownSeconds;
     }
 
     public function recordSuccess(string $tenant): void
@@ -120,6 +120,6 @@ final readonly class CircuitBreaker
 
     private function key(string $tenant): string
     {
-        return $this->prefix . hash('sha256', $tenant);
+        return $this->prefix.hash('sha256', $tenant);
     }
 }

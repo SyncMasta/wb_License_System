@@ -62,6 +62,6 @@ final readonly class PsrStatusCache implements StatusCache
      */
     private function key(string $tenant): string
     {
-        return $this->prefix . 'status:' . hash('sha256', $tenant);
+        return $this->prefix.'status:'.hash('sha256', $tenant);
     }
 }

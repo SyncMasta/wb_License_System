@@ -66,7 +66,7 @@ final class PingCommand extends Command
             ));
 
             if (! $reached) {
-                $this->warn('    ' . $gate->explain($status));
+                $this->warn('    '.$gate->explain($status));
             }
         }
 

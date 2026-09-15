@@ -11,7 +11,7 @@ declare(strict_types=1);
  * Exit-Code 0 = alles grün.
  */
 
-require __DIR__ . '/bootstrap.php';
+require __DIR__.'/bootstrap.php';
 
 use WissenBeratung\LicenseClient\Cache\InMemoryStatusCache;
 use WissenBeratung\LicenseClient\Config\LicenseConfig;
@@ -48,12 +48,12 @@ const SECRET = 'WBS-TESTSECRETTESTSECRETTESTSECRETTESTSECRET';
  */
 function makeClient(?LicenseConfig $config = null, ?FrozenClock $clock = null, bool $withCircuit = true): array
 {
-    $clock ??= new FrozenClock();
+    $clock ??= new FrozenClock;
     $config ??= new LicenseConfig(retries: 0, serviceInstanceId: 'test-instance');
-    $transport = new FakeTransport();
-    $events = new RecordingDispatcher();
-    $cache = new InMemoryStatusCache();
-    $logger = new RecordingLogger();
+    $transport = new FakeTransport;
+    $events = new RecordingDispatcher;
+    $cache = new InMemoryStatusCache;
+    $logger = new RecordingLogger;
 
     $breaker = $withCircuit
         ? new CircuitBreaker(new ArrayCache($clock), $clock, threshold: 2, cooldownSeconds: 300)
@@ -85,7 +85,7 @@ function serverOk(string $state = 'active', array $overrides = []): TransportRes
     ], $overrides));
 }
 
-$t = new TestRunner();
+$t = new TestRunner;
 
 // ---------------------------------------------------------------- Szenarien
 
@@ -127,7 +127,7 @@ $t->test('Antwort revoked bei enforce → Hold, Event Blocked', function (TestRu
     $transport->queue(serverOk('revoked'));
     $status = $client->refresh(TENANT);
 
-    $events = new RecordingDispatcher();
+    $events = new RecordingDispatcher;
     $gate = new EntitlementGate(new LicenseConfig(enforcement: EnforcementMode::Enforce), $events);
 
     $t->same(Decision::Hold, $gate->decide($status), 'Entscheidung');
@@ -139,7 +139,7 @@ $t->test('Antwort revoked bei warn → Process, Event Blocked trotzdem', functio
     $transport->queue(serverOk('revoked'));
     $status = $client->refresh(TENANT);
 
-    $events = new RecordingDispatcher();
+    $events = new RecordingDispatcher;
     $gate = new EntitlementGate(new LicenseConfig(enforcement: EnforcementMode::Warn), $events);
 
     $t->same(Decision::Process, $gate->decide($status), 'Entscheidung');
@@ -288,10 +288,10 @@ $t->test('Statuswechsel active → grace → active: je genau ein StateChanged',
 });
 
 $t->test('Mehrere Mandanten: Cache-Keys und Circuit sauber getrennt', function (TestRunner $t): void {
-    $clock = new FrozenClock();
+    $clock = new FrozenClock;
     $config = new LicenseConfig(cacheTtl: 900, localGrace: 259200, retries: 0);
-    $transport = new FakeTransport();
-    $cache = new InMemoryStatusCache();
+    $transport = new FakeTransport;
+    $cache = new InMemoryStatusCache;
     $breaker = new CircuitBreaker(new ArrayCache($clock), $clock, threshold: 1, cooldownSeconds: 300);
 
     $client = new LicenseClient(
@@ -409,13 +409,13 @@ $t->test('Heartbeat-Versatz ist deterministisch und im Intervall', function (Tes
 });
 
 $t->test('Gate erklärt jeden State in einem Satz', function (TestRunner $t): void {
-    $gate = new EntitlementGate(new LicenseConfig());
+    $gate = new EntitlementGate(new LicenseConfig);
     foreach (LicenseState::cases() as $state) {
         $status = new LicenseStatus(
             tenant: TENANT, key: KEY, state: $state,
             source: StatusSource::Live, checkedAt: new DateTimeImmutable('@1789000000'),
         );
-        $t->assert(strlen($gate->explain($status)) > 10, 'kein Text für ' . $state->value);
+        $t->assert(strlen($gate->explain($status)) > 10, 'kein Text für '.$state->value);
     }
 });
 

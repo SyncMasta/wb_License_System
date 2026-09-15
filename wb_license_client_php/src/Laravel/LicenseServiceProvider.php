@@ -7,6 +7,7 @@ namespace WissenBeratung\LicenseClient\Laravel;
 use Http\Discovery\Psr17FactoryDiscovery;
 use Http\Discovery\Psr18ClientDiscovery;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\ServiceProvider;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
@@ -41,7 +42,7 @@ final class LicenseServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__ . '/../../config/wb-license.php', 'wb-license');
+        $this->mergeConfigFrom(__DIR__.'/../../config/wb-license.php', 'wb-license');
 
         $this->app->singleton(LicenseConfig::class, function (): LicenseConfig {
             /** @var array<string, mixed> $config */
@@ -115,7 +116,7 @@ final class LicenseServiceProvider extends ServiceProvider
         // Default: Events gehen in den Laravel-Event-Bus. Der Dienst hängt
         // dort seine Listener für Zabbix bzw. MonitorHub an.
         $this->app->bindIf(EventDispatcher::class, fn (): EventDispatcher => new LaravelEventDispatcher(
-            $this->app->make(\Illuminate\Contracts\Events\Dispatcher::class)
+            $this->app->make(Dispatcher::class)
         ));
     }
 
@@ -123,7 +124,7 @@ final class LicenseServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->publishes([
-                __DIR__ . '/../../config/wb-license.php' => $this->app->configPath('wb-license.php'),
+                __DIR__.'/../../config/wb-license.php' => $this->app->configPath('wb-license.php'),
             ], 'wb-license-config');
 
             $this->commands([PingCommand::class]);

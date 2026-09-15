@@ -51,8 +51,8 @@ final class LicenseClient
         private readonly StatusCache $cache,
         private readonly Clock $clock,
         private readonly ?CircuitBreaker $circuitBreaker = null,
-        private readonly EventDispatcher $events = new NullEventDispatcher(),
-        private readonly LoggerInterface $logger = new NullLogger(),
+        private readonly EventDispatcher $events = new NullEventDispatcher,
+        private readonly LoggerInterface $logger = new NullLogger,
         ?RetryPolicy $retryPolicy = null,
     ) {
         $this->retryPolicy = $retryPolicy ?? new RetryPolicy(
@@ -288,7 +288,7 @@ final class LicenseClient
         if ($response->errorCode === 'KEY_NOT_FOUND') {
             $this->logger->error(
                 '[wb-license] Server kennt den Schlüssel für {tenant} nicht ({key}) — '
-                . 'im Odoo angelegt und dem richtigen Mandanten zugeordnet?',
+                .'im Odoo angelegt und dem richtigen Mandanten zugeordnet?',
                 $context,
             );
 
@@ -298,7 +298,7 @@ final class LicenseClient
         if ($response->isSignatureProblem()) {
             $this->logger->error(
                 '[wb-license] Signatur für {tenant} abgelehnt ({error}) — Secret korrekt '
-                . 'hinterlegt? Systemzeit korrekt? Der Server toleriert 300s Drift.',
+                .'hinterlegt? Systemzeit korrekt? Der Server toleriert 300s Drift.',
                 $context,
             );
 

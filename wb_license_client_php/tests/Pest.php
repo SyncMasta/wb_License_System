@@ -8,5 +8,4 @@ declare(strict_types=1);
  * Die Test-Doubles liegen in tests/Support/ und kommen über autoload-dev.
  * Dieselben Klassen nutzt der Offline-Runner in tests/standalone/.
  */
-
 uses()->in('Feature');
