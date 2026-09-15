@@ -118,6 +118,11 @@ class WbLicenseEvent(models.Model):
         fuenf Fehlversuchen deaktiviert — dann waechst die Tabelle still
         weiter, und genau das soll dieser Cron ja verhindern.
         """
+        # Vor rohem SQL zwingend flushen: der ORM haelt Schreibvorgaenge
+        # zurueck, und eine direkte Query sieht sie sonst nicht. Ohne das
+        # trifft der erste Lauf nach frischen Events ins Leere.
+        self.env.flush_all()
+
         pii_tage = self._retention_days(
             'wb_subscription.retention_event_pii_days',
             self.RETENTION_PII_DAYS_DEFAULT)

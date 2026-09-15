@@ -30,6 +30,7 @@ class TestEventRetention(TransactionCase):
             'ip_address': '203.0.113.7',
             'user_agent': 'pytest',
         }, **kwargs))
+        self.env.flush_all()
         self.env.cr.execute(
             "UPDATE wb_license_event SET timestamp = %s WHERE id = %s",
             (fields.Datetime.now() - timedelta(days=tage_alt), ev.id),

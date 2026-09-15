@@ -544,6 +544,8 @@ class WbLicenseInstall(models.Model):
         genommen kein Personenbezug, und ohne sie waere der Eintrag fuer die
         Statistik wertlos.
         """
+        self.env.flush_all()
+
         tage = int(self.env['ir.config_parameter'].sudo().get_param(
             'wb_subscription.retention_install_pii_days',
             self.RETENTION_PII_DAYS_DEFAULT) or 0)
