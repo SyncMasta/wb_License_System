@@ -199,6 +199,16 @@ class WbLicenseKey(models.Model):
     bound_db_uuid = fields.Char(string='Gebundene DB-UUID')
     instance_limit = fields.Integer(default=1, required=True)
     instance_current = fields.Integer(compute='_compute_instance_current', store=False)
+    instance_ids = fields.One2many(
+        'wb.license.instance', 'license_id', string='Fremde Instanzen', readonly=True,
+        help="Test-Datenbanken, Kopien und Umzuege, die sich mit diesem Key melden.",
+    )
+    parent_license_id = fields.Many2one(
+        'wb.license.key', string='Produktivlizenz', readonly=True,
+        ondelete='restrict', index=True,
+        help="Gesetzt bei Testlizenzen: die Lizenz der Produktiv-Datenbank. "
+             "Eine Testlizenz gilt nur fuer eine neutralisierte Datenbank.",
+    )
 
     last_seen_at = fields.Datetime()
     last_seen_ip = fields.Char()
@@ -1221,6 +1231,53 @@ class WbLicenseKey(models.Model):
             'last_seen_user_agent': user_agent,
             'ping_count_total': self.ping_count_total + 1,
         })
+
+    def _matches_binding(self, domain, db_uuid):
+        """True wenn (domain, db_uuid) die gebundene Instanz ist.
+
+        Fehlende Domain auf einer Seite zaehlt nicht als Abweichung, damit
+        Clients ohne web.base.url (z. B. PHP mit synthetischer Kennung)
+        nicht als fremd gelten.
+        """
+        self.ensure_one()
+        if db_uuid != self.bound_db_uuid:
+            return False
+        if not domain or not self.bound_domain:
+            return True
+        return self._normalize_domain(domain) == self._normalize_domain(self.bound_domain)
+
+    def resolve_instance(self, domain, db_uuid, is_neutralized):
+        """Prueft beim Check, ob der Ping von der gebundenen Instanz kommt.
+
+        :return: None fuer die gebundene Instanz (Antwort wie bisher), sonst
+            dict ``{'status': ..., 'until': date|None}`` aus
+            ``wb.license.instance``. Siehe DECISIONS.md #80-82.
+        """
+        self.ensure_one()
+        if self.state not in ('active', 'grace', 'trial'):
+            return None
+        if not db_uuid or not self.bound_db_uuid:
+            # Ohne Bindung oder Kennung laesst sich nichts vergleichen.
+            return None
+        if self._matches_binding(domain, db_uuid):
+            if self.parent_license_id and not is_neutralized:
+                return {'status': 'test_not_neutralized', 'until': None}
+            return None
+        if self.parent_license_id:
+            # Testlizenz in einer anderen DB als ihrer eigenen: gesperrt.
+            return {'status': 'mismatch', 'until': None}
+        return self.env['wb.license.instance']._resolve(
+            self, domain, db_uuid, is_neutralized)
+
+    def _log_instance_event(self, event_type, instance, details=None):
+        self.ensure_one()
+        payload = {'status': instance.status or '', 'neutralized': instance.is_neutralized}
+        payload.update(details or {})
+        self.env['wb.license.event'].log_event(
+            self, event_type,
+            domain=instance.domain, db_uuid=instance.db_uuid,
+            details=payload,
+        )
 
     # ----------------------------------------
     # Notification-Helfer

@@ -41,6 +41,18 @@ STATE_SELECTION = [
     ('unlicensed', 'Kein Key konfiguriert'),
 ]
 
+# Status einer fremden Instanz (Test-DB, Kopie, Umzug), vom Server im Feld
+# ``instance`` gemeldet. Siehe wb_License_System/DECISIONS.md #80-82.
+INSTANCE_STATUS = [
+    ('eval', 'Eval (Testsystem)'),
+    ('eval_expired', 'Eval abgelaufen'),
+    ('eval_limit', 'Eval-Limit erreicht'),
+    ('test', 'Testlizenz'),
+    ('test_not_neutralized', 'Testlizenz, DB nicht neutralisiert'),
+    ('mismatch_grace', 'Nicht lizenzierte Instanz (Kulanz)'),
+    ('mismatch', 'Nicht lizenzierte Instanz'),
+]
+
 
 class WbLicenseInfo(models.Model):
     _name = 'wb.license.info'
@@ -76,6 +88,14 @@ class WbLicenseInfo(models.Model):
         compute='_compute_days_remaining',
         store=False,
     )
+
+    instance_status = fields.Selection(
+        INSTANCE_STATUS,
+        string='Instanz-Status',
+        help="Leer, wenn diese Datenbank die lizenzierte Instanz ist. Sonst "
+             "meldet der Server hier Eval, Testlizenz oder Abweichung.",
+    )
+    instance_until = fields.Date(string='Instanz-Status gültig bis')
 
     last_server_check = fields.Datetime(
         string='Letzter erfolgreicher Check',
@@ -234,10 +254,13 @@ class WbLicenseInfo(models.Model):
             else:
                 rec.is_valid = False
 
-    @api.depends('state', 'grace_until', 'valid_to', 'last_server_check')
+    @api.depends('state', 'grace_until', 'valid_to', 'last_server_check',
+                 'instance_status', 'instance_until')
     def _compute_user_message(self):
         for rec in self:
-            if rec.state == 'active':
+            if rec.instance_status:
+                rec.user_message = rec._instance_message()
+            elif rec.state == 'active':
                 rec.user_message = False
             elif rec.state == 'grace':
                 rec.user_message = _(
@@ -263,6 +286,43 @@ class WbLicenseInfo(models.Model):
                 ) % rec.product_code
             else:
                 rec.user_message = False
+
+    def _instance_message(self):
+        self.ensure_one()
+        code = self.product_code
+        until = self.instance_until or '-'
+        support = 'support@wissen-beratung.de'
+        status = self.instance_status
+        if status == 'eval':
+            return _(
+                "Testsystem: %s läuft auf dieser Datenbank zur Probe bis %s. "
+                "Danach brauchen Sie für sie eine Testlizenz (%s)."
+            ) % (code, until, support)
+        if status == 'eval_expired':
+            return _(
+                "Die Probezeit für %s auf diesem Testsystem ist abgelaufen. "
+                "Für diese Datenbank brauchen Sie eine Testlizenz (%s)."
+            ) % (code, support)
+        if status == 'eval_limit':
+            return _(
+                "Für %s laufen schon so viele Testsysteme zur Probe wie möglich. "
+                "Für diese Datenbank brauchen Sie eine Testlizenz (%s)."
+            ) % (code, support)
+        if status == 'test':
+            return _("Testsystem: %s läuft mit Testlizenz bis %s.") % (code, until)
+        if status == 'test_not_neutralized':
+            return _(
+                "Die Testlizenz für %s gilt nur für neutralisierte Datenbanken. "
+                "Diese Datenbank ist nicht neutralisiert."
+            ) % code
+        message = _(
+            "Diese Datenbank ist nicht die lizenzierte Instanz für %s. Ist sie "
+            "ein Testsystem, neutralisieren Sie sie. Nach einem Umzug beantragen "
+            "Sie bitte die Migration (%s)."
+        ) % (code, support)
+        if status == 'mismatch_grace':
+            return message + ' ' + _("Bis %s läuft %s hier weiter.") % (until, code)
+        return message
 
     def apply_cache_age_policy(self, min_cache_age_days):
         """Wird von wb.license.client.check_license gerufen, damit is_valid
@@ -300,6 +360,10 @@ class WbLicenseInfo(models.Model):
             'latest_module_version': (data.get('latest_module_version') or '').strip() or False,
             'download_url': (data.get('download_url') or '').strip() or False,
         }
+        instance = data.get('instance') if isinstance(data.get('instance'), dict) else {}
+        status = instance.get('status')
+        vals['instance_status'] = status if status in dict(INSTANCE_STATUS) else False
+        vals['instance_until'] = (instance.get('until') or False) if vals['instance_status'] else False
         if anomaly_detected:
             vals['last_clock_anomaly_at'] = now
             _logger.warning(

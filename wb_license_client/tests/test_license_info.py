@@ -112,3 +112,56 @@ class TestLicenseInfo(TransactionCase):
         self._create_info(product_code='TEST')
         with mute_logger('odoo.sql_db'), self.assertRaises(IntegrityError):
             self._create_info(product_code='TEST')
+
+    def test_instance_eval_is_valid_with_message(self):
+        info = self._create_info()
+        info.apply_server_response({
+            'state': 'active',
+            'valid_to': '2026-12-31',
+            'instance': {'status': 'eval', 'until': '2026-12-18'},
+        })
+        self.assertTrue(info.is_valid)
+        self.assertEqual(info.instance_status, 'eval')
+        self.assertEqual(info.instance_until.isoformat(), '2026-12-18')
+        self.assertIn('2026-12-18', info.user_message)
+
+    def test_instance_mismatch_blocks(self):
+        info = self._create_info()
+        info.apply_server_response({
+            'state': 'expired',
+            'instance': {'status': 'mismatch', 'until': None},
+        })
+        self.assertFalse(info.is_valid)
+        self.assertEqual(info.instance_status, 'mismatch')
+        self.assertIn('Migration', info.user_message)
+
+    def test_instance_status_cleared_without_instance_block(self):
+        info = self._create_info(instance_status='eval',
+                                 instance_until=fields.Date.today())
+        info.apply_server_response({'state': 'active'})
+        self.assertFalse(info.instance_status)
+        self.assertFalse(info.instance_until)
+        self.assertFalse(info.user_message)
+
+    def test_unknown_instance_status_is_ignored(self):
+        info = self._create_info()
+        info.apply_server_response({'state': 'active', 'instance': {'status': 'garbage'}})
+        self.assertFalse(info.instance_status)
+
+    def test_ping_sends_neutralized_flag(self):
+        Client = self.env['wb.license.client']
+        ICP = self.env['ir.config_parameter'].sudo()
+        info = self._create_info(state='active')
+        sent = []
+
+        def fake_request(endpoint, payload, **kwargs):
+            sent.append(payload)
+            return {'state': 'active'}, 200
+
+        with patch.object(type(Client), '_do_request', side_effect=fake_request):
+            ICP.set_param('database.is_neutralized', False)
+            Client._do_ping(info, 'TEST', 'WB-TEST-key')
+            ICP.set_param('database.is_neutralized', 'true')
+            Client._do_ping(info, 'TEST', 'WB-TEST-key')
+        self.assertIs(sent[0]['is_neutralized'], False)
+        self.assertIs(sent[1]['is_neutralized'], True)

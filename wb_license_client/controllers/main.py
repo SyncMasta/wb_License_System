@@ -30,4 +30,5 @@ class WbLicenseClientController(http.Controller):
             'days_remaining': info.days_remaining,
             'is_valid': info.is_valid,
             'user_message': info.user_message,
+            'instance_status': info.instance_status or None,
         } for info in infos]

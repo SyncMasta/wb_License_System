@@ -471,6 +471,7 @@ class WbLicenseClient(models.AbstractModel):
             'domain': self._get_domain(),
             'db_uuid': self._get_db_uuid(),
             'client_version': self._get_module_version(),
+            'is_neutralized': self._is_neutralized(),
         }
         module_version = self._get_module_version_for(info.module_technical_name)
         if module_version:
@@ -644,6 +645,17 @@ class WbLicenseClient(models.AbstractModel):
     @api.model
     def _get_db_uuid(self):
         return self.env['ir.config_parameter'].sudo().get_param('database.uuid')
+
+    @api.model
+    def _is_neutralized(self):
+        """True für neutralisierte Datenbanken (Kopie, Staging, Testsystem).
+
+        Gleiche Auswertung wie Odoo selbst in ir_cron: der Wahrheitswert von
+        ``database.is_neutralized``. Der Server vergibt daraufhin Eval oder
+        Testlizenz statt einer zweiten Produktivinstanz.
+        """
+        return bool(self.env['ir.config_parameter'].sudo().get_param(
+            'database.is_neutralized'))
 
     @api.model
     def _get_domain(self):

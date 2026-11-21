@@ -48,6 +48,8 @@
                             <field name="valid_to" readonly="1"/>
                             <field name="grace_until" readonly="1"/>
                             <field name="days_remaining" readonly="1"/>
+                            <field name="instance_status" readonly="1" invisible="not instance_status"/>
+                            <field name="instance_until" readonly="1" invisible="not instance_until"/>
                         </group>
                         <group string="Server-Sync">
                             <field name="last_server_check" readonly="1"/>
