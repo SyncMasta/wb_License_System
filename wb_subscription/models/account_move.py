@@ -70,12 +70,14 @@ class AccountMove(models.Model):
         store=False,
     )
 
-    @api.depends('invoice_line_ids.wb_license_ids')
+    @api.depends('invoice_line_ids.wb_license_ids', 'invoice_line_ids.product_id')
     def _compute_wb_license_ids(self):
         for move in self:
-            keys = move.invoice_line_ids.mapped('wb_license_ids')
-            move.wb_license_ids = keys
-            move.wb_has_license_lines = bool(keys)
+            move.wb_license_ids = move.invoice_line_ids.mapped('wb_license_ids')
+            # Am Produkt festmachen, nicht an vorhandenen Keys: beim Erstkauf
+            # gibt es noch keinen Key, der Zahlungs-Hook muss trotzdem greifen.
+            move.wb_has_license_lines = any(
+                move.invoice_line_ids.product_id.mapped('wb_is_license_product'))
 
     def _invoice_paid_hook(self):
         """Override: nach Zahlungseingang Lizenz-Issuance auslösen.

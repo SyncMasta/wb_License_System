@@ -31,6 +31,21 @@ class ProductTemplate(models.Model):
         help="4-stelliger alphanumerischer Code (A-Z, 0-9), z.B. 'TELE', 'TEST' "
              "oder 'MCP1'. Geht in das Public-Key-Format WB-{CODE}-xxx ein.",
     )
+    wb_dev_of_tmpl_id = fields.Many2one(
+        'product.template',
+        string='DEV-Lizenz für',
+        domain=[('wb_is_license_product', '=', True), ('wb_dev_of_tmpl_id', '=', False)],
+        ondelete='restrict',
+        index=True,
+        help="Gesetzt am DEV-Produkt: das Produktivprodukt, zu dem es gehört. "
+             "Das DEV-Produkt hat keinen eigenen technischen Code; der DEV-Key "
+             "läuft unter dem Produktivprodukt, damit Key-Format und Client "
+             "gleich bleiben. Preis und Rechnungstext kommen vom DEV-Produkt "
+             "(DECISIONS.md #91).",
+    )
+    wb_dev_tmpl_ids = fields.One2many(
+        'product.template', 'wb_dev_of_tmpl_id', string='DEV-Produkte',
+    )
     wb_module_technical_name = fields.Char(
         string='Odoo-Modul-Name',
         help="Technischer Name des auszuliefernden Odoo-Moduls, z.B. 'wb_telnyx_voip'.",
@@ -149,6 +164,18 @@ class ProductTemplate(models.Model):
          'Technischer Produkt-Code muss einzigartig sein.'),
     ]
 
+    @api.constrains('wb_dev_of_tmpl_id', 'wb_technical_code', 'wb_is_license_product')
+    def _check_wb_dev_product(self):
+        for rec in self.filtered('wb_dev_of_tmpl_id'):
+            if not rec.wb_is_license_product:
+                raise ValidationError(_("Ein DEV-Produkt muss ein Lizenz-Produkt sein."))
+            if rec.wb_technical_code:
+                raise ValidationError(_(
+                    "Ein DEV-Produkt hat keinen eigenen technischen Code. Der "
+                    "Code kommt vom Produktivprodukt."))
+            if rec.wb_dev_of_tmpl_id.wb_dev_of_tmpl_id or rec.wb_dev_of_tmpl_id == rec:
+                raise ValidationError(_("Ein DEV-Produkt muss auf ein Produktivprodukt verweisen."))
+
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
@@ -198,10 +225,10 @@ class ProductTemplate(models.Model):
                 "[wb_subscription] Mailinglisten-Erzeugung fuer %s "
                 "fehlgeschlagen: %s", self.display_name, e)
 
-    @api.constrains('wb_is_license_product', 'wb_technical_code')
+    @api.constrains('wb_is_license_product', 'wb_technical_code', 'wb_dev_of_tmpl_id')
     def _check_wb_license_fields(self):
         for rec in self:
-            if rec.wb_is_license_product:
+            if rec.wb_is_license_product and not rec.wb_dev_of_tmpl_id:
                 if not rec.wb_technical_code:
                     raise ValidationError(_(
                         "Lizenz-Produkt '%s' benötigt einen technischen Code "

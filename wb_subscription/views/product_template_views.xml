@@ -25,10 +25,13 @@
                     <group>
                         <group>
                             <field name="wb_is_license_product"/>
+                            <field name="wb_dev_of_tmpl_id"
+                                   invisible="not wb_is_license_product"
+                                   options="{'no_create': True}"/>
                             <field name="wb_technical_code"
                                    placeholder="z.B. TELE"
-                                   invisible="not wb_is_license_product"
-                                   required="wb_is_license_product"/>
+                                   invisible="not wb_is_license_product or wb_dev_of_tmpl_id"
+                                   required="wb_is_license_product and not wb_dev_of_tmpl_id"/>
                             <field name="wb_module_technical_name"
                                    placeholder="z.B. wb_telnyx_voip"
                                    invisible="not wb_is_license_product"/>

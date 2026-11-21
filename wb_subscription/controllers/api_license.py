@@ -157,7 +157,15 @@ class ApiLicenseController(http.Controller):
         # richtig sperren; ``instance`` traegt die Details fuer neue Clients.
         instance = license.resolve_instance(
             domain, db_uuid, kw.get('is_neutralized') is True)
-        if instance:
+        if instance and instance['status'] == 'production':
+            # Umgewandelte DEV-DB: Antwort wie fuer eine eigene Produktivlizenz,
+            # ohne instance-Block (DECISIONS.md #92). Der Client muss den Key
+            # nicht wechseln.
+            response['state'] = instance['state']
+            response['valid_to'] = instance['until'].isoformat()
+            response['grace_until'] = (
+                instance['grace_until'].isoformat() if instance.get('grace_until') else None)
+        elif instance:
             until = instance['until']
             status = instance['status']
             response['instance'] = {

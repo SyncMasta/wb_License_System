@@ -99,6 +99,8 @@ class WbLicenseMigrationRequest(models.Model):
                 'bound_db_uuid': rec.new_db_uuid,
                 'activated_fingerprint': rec.new_fingerprint,
             })
+            # DEV-Lizenz der Ziel-DB wird frei (DECISIONS.md #93).
+            rec.license_id._release_dev_licenses(rec.new_db_uuid)
             rec.write({
                 'state': 'approved',
                 'reviewed_by_id': self.env.user.id,

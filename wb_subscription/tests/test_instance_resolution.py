@@ -7,7 +7,6 @@ from datetime import timedelta
 
 from cryptography.fernet import Fernet
 from odoo import fields
-from odoo.exceptions import UserError
 from odoo.tests import HttpCase, TransactionCase, tagged
 
 from odoo.addons.wb_subscription.models.wb_license_instance import (
@@ -127,34 +126,19 @@ class TestInstanceResolution(_InstanceSetup, TransactionCase):
         self.license.state = 'revoked'
         self.assertIsNone(self._resolve('https://kopie.example.com', 'db-copy-4', True))
 
-    def test_dev_license(self):
-        self._resolve('https://test.example.com', 'db-test', True)
-        inst = self._instance('db-test')
-        inst.action_issue_dev_license()
-        test = inst.dev_license_id
-        self.assertEqual(test.parent_license_id, self.license)
-        self.assertEqual(test.bound_db_uuid, 'db-test')
-        self.assertEqual(test.valid_to, self.env['sale.order']._wb_compute_valid_to())
-
-        res = self._resolve('https://test.example.com', 'db-test', True)
-        self.assertEqual(res['status'], 'dev')
-        res = self._resolve('https://test.example.com', 'db-test', False)
-        self.assertEqual(res['status'], 'dev_not_neutralized')
-
-        # Mit dem eigenen Key der DEV-Lizenz gelten dieselben Regeln.
-        self.assertIsNone(self._resolve('https://test.example.com', 'db-test', True, test))
-        res = self._resolve('https://test.example.com', 'db-test', False, test)
-        self.assertEqual(res['status'], 'dev_not_neutralized')
-        res = self._resolve(PROD_DOMAIN, PROD_UUID, True, test)
+    def test_unbound_dev_license_is_not_valid(self):
+        dev = self.env['wb.license.key'].create({
+            'product_id': self.license.product_id.id,
+            'partner_id': self.license.partner_id.id,
+            'parent_license_id': self.license.id,
+            'state': 'active',
+            'valid_from': fields.Date.today(),
+            'valid_to': fields.Date.today() + timedelta(days=30),
+            'activated_at': fields.Datetime.now(),
+            'activation_hash_method': 'dev',
+        })
+        res = self._resolve('https://irgendwo.example.com', 'db-any', True, dev)
         self.assertEqual(res['status'], 'mismatch')
-
-        with self.assertRaises(UserError):
-            inst.action_issue_dev_license()
-
-    def test_dev_license_requires_neutralized_db(self):
-        self._resolve('https://kopie.example.com', 'db-copy-5', False)
-        with self.assertRaises(UserError):
-            self._instance('db-copy-5').action_issue_dev_license()
 
 
 @tagged('wb_subscription', 'wb_instance', 'post_install', '-at_install')
