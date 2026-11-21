@@ -63,10 +63,20 @@
                             groups="wb_subscription.group_wb_subscription_manager"
                             invisible="not has_api_secret"
                             confirm="Secret entziehen? Signierte Requests dieses Schluessels werden danach abgewiesen."/>
+                    <button name="action_upgrade_to_production" type="object"
+                            string="Upgrade auf Produktiv" class="btn-primary"
+                            groups="wb_subscription.group_wb_subscription_manager"
+                            invisible="not parent_license_id or converted_to_license_id or state not in ('active', 'grace') or not bound_db_uuid"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="issued,trial,active,grace,expired"/>
                 </header>
                 <sheet>
+                    <div class="alert alert-info" role="status"
+                         invisible="not converted_to_license_id">
+                        Umgewandelt in <field name="converted_to_license_id" readonly="1" class="oe_inline"/>
+                        am <field name="converted_at" readonly="1" class="oe_inline"/>.
+                        Diese DEV-Lizenz bleibt nur für die Historie.
+                    </div>
                     <div class="oe_title">
                         <label for="name" string="Lizenzschlüssel"/>
                         <h1>
@@ -181,7 +191,7 @@
                               invisible="parent_license_id">
                             <field name="instance_ids">
                                 <list create="false" delete="false"
-                                      decoration-success="status in ('eval', 'dev')"
+                                      decoration-success="status in ('eval', 'dev', 'production')"
                                       decoration-warning="status == 'mismatch_grace'"
                                       decoration-danger="status in ('mismatch', 'eval_expired', 'eval_limit', 'dev_not_neutralized')">
                                     <field name="domain"/>
@@ -192,9 +202,9 @@
                                     <field name="mismatch_until"/>
                                     <field name="dev_license_id"/>
                                     <field name="last_seen_at"/>
-                                    <button name="action_issue_dev_license" type="object"
-                                            string="DEV-Lizenz ausstellen" icon="fa-flask"
-                                            invisible="not is_neutralized or status == 'dev'"
+                                    <button name="action_create_dev_quotation" type="object"
+                                            string="DEV-Angebot erstellen" icon="fa-flask"
+                                            invisible="not is_neutralized or status in ('dev', 'production')"
                                             groups="wb_subscription.group_wb_subscription_manager"/>
                                 </list>
                             </field>

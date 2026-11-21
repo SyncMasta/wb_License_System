@@ -209,6 +209,14 @@ class WbLicenseKey(models.Model):
         help="Gesetzt bei DEV-Lizenzen: die Lizenz der Produktiv-Datenbank. "
              "Eine DEV-Lizenz gilt nur fuer eine neutralisierte Datenbank.",
     )
+    converted_to_license_id = fields.Many2one(
+        'wb.license.key', string='Umgewandelt in', readonly=True, copy=False,
+        ondelete='set null', index=True,
+        help="Gesetzt an einer DEV-Lizenz, die per Upgrade zur Produktivlizenz "
+             "ihrer DB wurde. Die DEV-Lizenz ist danach storniert und bleibt nur "
+             "fuer die Historie (DECISIONS.md #92).",
+    )
+    converted_at = fields.Datetime(string='Umgewandelt am', readonly=True, copy=False)
 
     last_seen_at = fields.Datetime()
     last_seen_ip = fields.Char()
@@ -1256,6 +1264,10 @@ class WbLicenseKey(models.Model):
         self.ensure_one()
         if self.state not in ('active', 'grace', 'trial'):
             return None
+        if self.parent_license_id and not self.bound_db_uuid:
+            # Freie DEV-Lizenz (nach Umzug): gilt nirgends, bis eine
+            # neutralisierte Kopie sie uebernimmt (#93).
+            return {'status': 'mismatch', 'until': None}
         if not db_uuid or not self.bound_db_uuid:
             # Ohne Bindung oder Kennung laesst sich nichts vergleichen.
             return None
@@ -1268,6 +1280,121 @@ class WbLicenseKey(models.Model):
             return {'status': 'mismatch', 'until': None}
         return self.env['wb.license.instance']._resolve(
             self, domain, db_uuid, is_neutralized)
+
+    # ----------------------------------------
+    # DEV-Lizenz: Upgrade und Umzug (DECISIONS.md #91-93)
+    # ----------------------------------------
+
+    def _dev_order_line(self):
+        """Die DEV-Zeile im Abo dieser DEV-Lizenz."""
+        self.ensure_one()
+        return self.sale_order_id.order_line.filtered(
+            lambda l: l.product_id.product_tmpl_id.wb_dev_of_tmpl_id
+            == self.product_id.product_tmpl_id and l.product_uom_qty > 0)[:1]
+
+    def action_upgrade_to_production(self):
+        """Legt ein Upsell-Angebot DEV -> Produktiv auf das DEV-Abo an.
+
+        Odoos Upsell (sale_subscription) rechnet beide Zeilen anteilig bis zur
+        naechsten Abo-Rechnung: +1 Produktivprodukt, -1 DEV-Produkt. Der Kunde
+        zahlt so nur die Differenz, das Abo und sein Enddatum bleiben. Nach
+        Zahlungseingang wandelt ``_convert_to_production`` die Lizenz um.
+        """
+        self.ensure_one()
+        if not self.parent_license_id or self.converted_to_license_id:
+            raise UserError(_("Nur eine nicht umgewandelte DEV-Lizenz kann ein Upgrade bekommen."))
+        if self.state not in ('active', 'grace') or not self.bound_db_uuid:
+            raise UserError(_("Die DEV-Lizenz muss aktiv und an eine Datenbank gebunden sein."))
+        order = self.sale_order_id
+        dev_line = self._dev_order_line()
+        if not order or not dev_line or 'subscription_state' not in order._fields:
+            raise UserError(_("Die DEV-Lizenz hat kein Abo mit DEV-Zeile."))
+        upsell = order._create_renew_upsell_order(
+            '7_upsell', _("Upgrade der DEV-Lizenz %s auf Produktiv.", self.name))
+        upsell_dev = upsell.order_line.filtered(lambda l: l.parent_line_id == dev_line)
+        upsell_dev.product_uom_qty = -1
+        upsell.write({
+            'wb_upgrade_license_id': self.id,
+            'order_line': [(0, 0, {
+                'product_id': self.product_id.id,
+                'product_uom_qty': 1,
+            })],
+        })
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'sale.order',
+            'res_id': upsell.id,
+            'view_mode': 'form',
+        }
+
+    def _convert_to_production(self, order):
+        """Macht aus der DEV-Lizenz die Produktivlizenz ihrer DB.
+
+        Neuer Key unter dem Produktivprodukt, gleiche Bindung und gleiches
+        Enddatum, verknuepft mit dem Abo. Die DEV-Lizenz wird storniert und
+        bekommt den Verweis "Umgewandelt in". Ein Aktivierungscode ist nicht
+        noetig, die DB ist bereits gebunden.
+        """
+        self.ensure_one()
+        if self.converted_to_license_id:
+            return self.converted_to_license_id
+        gen = self.env['wb.key.generator'].sudo()
+        now = fields.Datetime.now()
+        prod = self.sudo().create([{
+            'product_id': self.product_id.id,
+            'partner_id': self.partner_id.id,
+            'company_id': self.company_id.id,
+            'sale_order_id': order.subscription_id.id or order.id,
+            'state': 'active',
+            'bound_domain': self.bound_domain,
+            'bound_db_uuid': self.bound_db_uuid,
+            'activated_fingerprint': gen.compute_fingerprint(
+                self.bound_domain or '', self.bound_db_uuid),
+            'valid_from': fields.Date.context_today(self),
+            'valid_to': self.valid_to,
+            'activated_at': now,
+            'activation_hash_method': 'upgrade',
+        }])
+        self.sudo().write({
+            'state': 'cancelled',
+            'converted_to_license_id': prod.id,
+            'converted_at': now,
+        })
+        self.env['wb.license.event'].log_event(
+            self, 'dev_license_converted',
+            domain=self.bound_domain, db_uuid=self.bound_db_uuid,
+            details={'production_license': prod.name, 'order': order.name},
+        )
+        prod._send_telegram(
+            "⬆️ DEV-Lizenz {dev} ({partner}) umgewandelt in {prod}.",
+            dev=self.name, partner=self.partner_id.name or '', prod=prod.name,
+        )
+        return prod
+
+    def _release_dev_licenses(self, db_uuid):
+        """Gibt DEV-Lizenzen frei, deren DB die neue Produktiv-DB wird.
+
+        Aufgerufen bei genehmigter Migration. Die DEV-Lizenz behaelt ihre
+        Restlaufzeit, verliert aber die Bindung; die naechste neutralisierte
+        Kopie uebernimmt sie (#93).
+        """
+        self.ensure_one()
+        devs = self.sudo().search([
+            ('parent_license_id', '=', self.id),
+            ('bound_db_uuid', '=', db_uuid),
+            ('state', 'in', ('active', 'grace')),
+        ])
+        for dev in devs:
+            self.env['wb.license.event'].log_event(
+                dev, 'dev_license_released',
+                domain=dev.bound_domain, db_uuid=dev.bound_db_uuid,
+                details={'reason': 'migration'},
+            )
+        devs.write({'bound_db_uuid': False, 'bound_domain': False})
+        self.env['wb.license.instance'].sudo().search([
+            ('dev_license_id', 'in', devs.ids),
+        ]).write({'dev_license_id': False})
+        return devs
 
     def _log_instance_event(self, event_type, instance, details=None):
         self.ensure_one()

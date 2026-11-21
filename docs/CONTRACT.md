@@ -252,6 +252,13 @@ Meldet sich ein Key aus einer anderen Datenbank als der gebundenen, bewertet der
 | `mismatch_grace` | `grace` (`grace_until` = `until`) | nicht neutralisierte Kopie oder gleiche DB unter neuer Domain, 7 Tage Kulanz |
 | `mismatch` | `expired` | Kulanz vorbei; Umzug über `/api/license/migrate` |
 
+Wurde die DEV-Lizenz einer DB in eine Produktivlizenz umgewandelt (Upgrade), antwortet `/check`
+für diese DB wie für eine gebundene Produktivlizenz: `state` und `valid_to` der neuen Lizenz,
+**ohne** `instance`-Block. Der Client muss den Key nicht wechseln.
+
+Eine DEV-Lizenz ohne Bindung (frei nach einem Umzug) gilt nirgends: ein Check mit ihrem eigenen
+Key liefert `instance.status = mismatch`, `state = expired`.
+
 Ohne `db_uuid` im Request oder ohne `bound_db_uuid` an der Lizenz findet keine Prüfung statt
 (Verhalten wie bisher). Fehlende `domain` auf einer Seite zählt nicht als Abweichung.
 

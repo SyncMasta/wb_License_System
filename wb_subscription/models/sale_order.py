@@ -50,6 +50,11 @@ class SaleOrder(models.Model):
         string='Anzahl Lizenzen',
         groups='wb_subscription.group_wb_subscription_user',
     )
+    wb_upgrade_license_id = fields.Many2one(
+        'wb.license.key', string='Upgrade der DEV-Lizenz', readonly=True, copy=False,
+        help="Gesetzt am Upsell DEV -> Produktiv. Nach Zahlungseingang wird "
+             "diese DEV-Lizenz in eine Produktivlizenz umgewandelt (DECISIONS.md #92).",
+    )
     wb_first_period_invoiced = fields.Boolean(
         string='Erste Periode bereits anteilig abgerechnet',
         default=False, copy=False, readonly=True,
@@ -155,9 +160,23 @@ class SaleOrder(models.Model):
 
     def action_confirm(self):
         """Override: bei Lizenz-Orders Subscription-Setup automatisch durchführen."""
+        # Plan vor dem Bestaetigen setzen: Odoo 19 lehnt eine Order mit
+        # wiederkehrendem Produkt ohne Plan schon in super() ab.
+        self._wb_set_default_plan()
         res = super().action_confirm()
         self._wb_promote_to_subscription()
         return res
+
+    def _wb_set_default_plan(self):
+        if 'plan_id' not in self._fields:
+            return
+        for order in self.filtered(lambda o: o.wb_is_license_sub and not o.plan_id):
+            if order._wb_is_upsell():
+                continue
+            plan = order.order_line.product_id.filtered(
+                'wb_is_license_product').wb_default_subscription_plan_id[:1]
+            if plan:
+                order.plan_id = plan.id
 
     def _wb_promote_to_subscription(self):
         """Setzt is_subscription + plan_id + Eckdaten bei Lizenz-Orders.
@@ -176,6 +195,9 @@ class SaleOrder(models.Model):
         - next_invoice_date = 1. der nächsten Kalenderperiode
         """
         for order in self.filtered('wb_is_license_sub'):
+            if order._wb_is_upsell():
+                # Upsells sind kein eigenes Abo; Plan und Daten kommen vom Abo.
+                continue
             if 'is_subscription' not in order._fields:
                 _logger.warning(
                     "[wb_subscription] sale.order.is_subscription nicht verfügbar "
@@ -236,6 +258,11 @@ class SaleOrder(models.Model):
                 order.next_invoice_date if 'next_invoice_date' in order._fields else '-',
             )
 
+    def _wb_is_upsell(self):
+        self.ensure_one()
+        return ('subscription_state' in self._fields
+                and self.subscription_state == '7_upsell')
+
     def _wb_issue_license_keys(self):
         """Erzeugt oder verlängert für jede Lizenz-Zeile einen wb.license.key.
 
@@ -258,13 +285,23 @@ class SaleOrder(models.Model):
         Ticket = self.env['wb.activation.ticket'].sudo()
         gen = self.env['wb.key.generator'].sudo()
 
+        if self._wb_is_upsell():
+            # Upsells erzeugen keine Keys aus ihren (vom Abo kopierten)
+            # Zeilen. Einzige Ausnahme: das Upgrade DEV -> Produktiv.
+            if self.wb_upgrade_license_id:
+                self.wb_upgrade_license_id._convert_to_production(self)
+            return
+
         for line in self.order_line:
-            if not line.product_id.wb_is_license_product:
+            if not line.product_id.wb_is_license_product or line.product_uom_qty <= 0:
                 continue
+            dev_of = line.product_id.product_tmpl_id.wb_dev_of_tmpl_id
+            # DEV-Keys laufen unter dem Produktivprodukt (#91).
+            key_product = dev_of.product_variant_id if dev_of else line.product_id
 
             existing = Key.search([
                 ('sale_order_id', '=', self.id),
-                ('product_id', '=', line.product_id.id),
+                ('product_id', '=', key_product.id),
             ], limit=1, order='create_date desc')
 
             if existing:
@@ -287,6 +324,19 @@ class SaleOrder(models.Model):
                 _logger.info(
                     "[wb_subscription] Key %s ist %s — keine Auto-Reaktivierung "
                     "auf Order %s.", existing.name, existing.state, self.name)
+                continue
+
+            if dev_of:
+                instance = line.wb_license_instance_id
+                if not instance:
+                    _logger.warning(
+                        "[wb_subscription] DEV-Zeile auf Order %s ohne Instanz — "
+                        "keine DEV-Lizenz erzeugt.", self.name)
+                    self.env['wb.telegram.notifier'].send_message(
+                        f"⚠️ DEV-Zeile auf {self.name} ohne Instanz bezahlt. "
+                        "Bitte DEV-Lizenz von Hand zuordnen.")
+                    continue
+                instance._issue_dev_license(self)
                 continue
 
             valid_from = fields.Date.context_today(self)
@@ -375,6 +425,9 @@ class SaleOrder(models.Model):
                 if not so:
                     continue
                 if not so.wb_is_license_sub:
+                    continue
+                if so._wb_is_upsell():
+                    # Odoos Upsell rechnet selbst anteilig (Rabatt je Zeile).
                     continue
                 if so.wb_first_period_invoiced:
                     continue
@@ -476,6 +529,7 @@ class SaleOrder(models.Model):
                         })
                         for line in order.order_line
                         if line.product_id.wb_is_license_product
+                        and line.product_uom_qty > 0
                     ],
                 })
                 if move.invoice_line_ids:
@@ -493,3 +547,14 @@ class SaleOrder(models.Model):
                 f"📋 Dezember-Renewal: {created} Draft-Rechnungen für {target_year} "
                 f"erzeugt — bitte unter Buchhaltung prüfen und freigeben."
             )
+
+
+class SaleOrderLine(models.Model):
+    _inherit = 'sale.order.line'
+
+    wb_license_instance_id = fields.Many2one(
+        'wb.license.instance', string='Instanz (DEV-Lizenz)', copy=False,
+        ondelete='set null',
+        help="Fuer DEV-Zeilen: die neutralisierte Instanz, an die die "
+             "DEV-Lizenz nach Zahlungseingang gebunden wird.",
+    )

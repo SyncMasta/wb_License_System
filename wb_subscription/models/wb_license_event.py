@@ -59,6 +59,9 @@ EVENT_TYPES = [
     ('instance_eval_started', 'Eval für Test-DB gestartet'),
     ('instance_mismatch', 'Fremde, nicht neutralisierte Instanz'),
     ('dev_license_issued', 'DEV-Lizenz ausgestellt'),
+    ('dev_license_claimed', 'Freie DEV-Lizenz übernommen'),
+    ('dev_license_released', 'DEV-Lizenz freigegeben (Umzug)'),
+    ('dev_license_converted', 'DEV-Lizenz in Produktivlizenz umgewandelt'),
 ]
 
 

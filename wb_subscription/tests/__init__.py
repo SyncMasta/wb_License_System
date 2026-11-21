@@ -19,3 +19,4 @@ from . import test_nfr_license
 from . import test_hmac_signature
 from . import test_retention
 from . import test_instance_resolution
+from . import test_dev_license_sales
