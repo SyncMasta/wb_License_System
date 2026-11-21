@@ -6,13 +6,12 @@ import os
 from datetime import timedelta
 
 from cryptography.fernet import Fernet
-from dateutil.relativedelta import relativedelta
 from odoo import fields
 from odoo.exceptions import UserError
 from odoo.tests import HttpCase, TransactionCase, tagged
 
 from odoo.addons.wb_subscription.models.wb_license_instance import (
-    EVAL_DAYS, MAX_PARALLEL_EVALS, MISMATCH_GRACE_DAYS, DEV_LICENSE_MONTHS,
+    EVAL_DAYS, MAX_PARALLEL_EVALS, MISMATCH_GRACE_DAYS,
 )
 
 PROD_DOMAIN = 'https://kunde.example.com'
@@ -135,8 +134,7 @@ class TestInstanceResolution(_InstanceSetup, TransactionCase):
         test = inst.dev_license_id
         self.assertEqual(test.parent_license_id, self.license)
         self.assertEqual(test.bound_db_uuid, 'db-test')
-        self.assertEqual(
-            test.valid_to, fields.Date.today() + relativedelta(months=DEV_LICENSE_MONTHS))
+        self.assertEqual(test.valid_to, self.env['sale.order']._wb_compute_valid_to())
 
         res = self._resolve('https://test.example.com', 'db-test', True)
         self.assertEqual(res['status'], 'dev')

@@ -299,7 +299,7 @@ Lizenzmodell pro Datenbank. Erkennung einer Test-DB über zwei Signale, die Odoo
 | 85 | Eigenes Modell `wb.license.instance` statt `wb.license.install` | Install-Registry ist Lead-Liste mit Retention-Crons; gelöschte Einträge würden eine neue Eval ermöglichen |
 | 86 | `/check` antwortet für fremde Instanzen mit `state` im alten Vokabular (`active`/`grace`/`expired`) plus neuem Objekt `instance` | Ältere Clients sperren korrekt; ein unbekannter State würde dort als `unknown` 30 Tage weiterlaufen |
 | 87 | DEV-Lizenz = eigener Key mit `parent_license_id`, gebunden an die `db_uuid` der Test-DB, ausgestellt per Button an der fremden Instanz. Abrechnung über eigenes Produkt per Sale-Order | Kunde muss keinen zweiten Key eingeben; der Check mit dem Produktiv-Key findet die DEV-Lizenz |
-| 88 | DEV-Lizenz hat eine eigene Laufzeit von 12 Monaten ab Ausstellung, unabhängig von der Produktivlizenz. Verlängert wird sie über ihr eigenes Abo | Eigenes Produkt, eigene Rechnung: eine Kopplung an die Produktivlizenz wäre falsch |
+| 88 | DEV-Lizenz läuft wie jede Lizenz bis 31.12. (#4), anteilige Erstrechnung, Verlängerung über den Renewal-Cron (#30). Unabhängig von der Laufzeit der Produktivlizenz | Ein Abrechnungsmodell für alle Lizenzen; eigenes Produkt, eigene Rechnung |
 | 89 | Eval auf **14 Tage** verkürzt (statt 28). Eval (Kopie einer lizenzierten DB) und Trial (Neukunde, 7 Tage) bleiben getrennte Begriffe | Zwei Wochen reichen zum Testen; Trial und Eval haben verschiedene Zielgruppen |
 | 90 | „Testlizenz“ heißt **DEV-Lizenz**: für nicht-produktive, neutralisierte DBs (Entwicklung, Staging). Status im Contract `dev` / `dev_not_neutralized` | Name sagt, wofür sie ist; vor dem ersten Deploy umbenannt, daher ohne Kompatibilitätsaufwand |
 

@@ -21,15 +21,12 @@ Eintraege geloescht, bekaeme dieselbe Kopie eine neue Eval.
 
 from datetime import timedelta
 
-from dateutil.relativedelta import relativedelta
-
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 EVAL_DAYS = 14
 MAX_PARALLEL_EVALS = 2
 MISMATCH_GRACE_DAYS = 7
-DEV_LICENSE_MONTHS = 12
 
 INSTANCE_STATUS = [
     ('eval', 'Eval laeuft'),
@@ -177,8 +174,9 @@ class WbLicenseInstance(models.Model):
             'bound_domain': self.domain,
             'bound_db_uuid': self.db_uuid,
             'valid_from': today,
-            # Eigene Laufzeit, eigenes Abo: nicht an die Produktivlizenz gekoppelt.
-            'valid_to': today + relativedelta(months=DEV_LICENSE_MONTHS),
+            # Eigenes Abo, gleiches Modell wie jede Lizenz: Laufzeit bis 31.12.
+            # (DECISIONS.md #4), nicht an die Produktivlizenz gekoppelt.
+            'valid_to': self.env['sale.order']._wb_compute_valid_to(),
             'activated_at': fields.Datetime.now(),
             'activation_hash_method': 'dev',
         }])
