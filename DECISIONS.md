@@ -290,15 +290,16 @@ Lizenzmodell pro Datenbank. Erkennung einer Test-DB über zwei Signale, die Odoo
 
 | # | Entscheidung | Begründung |
 |---|---|---|
-| 80 | Meldet sich ein Key aus einer zweiten, **neutralisierten** DB (neue `db_uuid`), startet automatisch eine Eval von 28 Tagen. Banner „Testsystem, Eval bis …“ | Kunde muss Test-DBs nicht manuell melden |
-| 81 | Nach 28 Tagen ist eine **Testlizenz** (vergünstigt, eigenes Produkt) nötig. Sie gilt nur, solange `database.is_neutralized` gesetzt ist | Günstige Testlizenz lässt sich nicht produktiv missbrauchen |
+| 80 | Meldet sich ein Key aus einer zweiten, **neutralisierten** DB (neue `db_uuid`), startet automatisch eine Eval von 14 Tagen. Banner „Testsystem, Eval bis …“ | Kunde muss Test-DBs nicht manuell melden |
+| 81 | Nach 14 Tagen ist eine **Testlizenz** (vergünstigt, eigenes Produkt) nötig. Sie gilt nur, solange `database.is_neutralized` gesetzt ist | Günstige Testlizenz lässt sich nicht produktiv missbrauchen |
 | 82 | Zweite DB **nicht** neutralisiert → zählt als zweite Produktivinstanz (Volllizenz oder Umzug nach #22). Roher `pg_dump`/Restore mit gleicher `db_uuid` und neuer Domain fällt über den Fingerprint (#24) ebenfalls hierunter | Technisch nicht von einem Serverumzug unterscheidbar |
 
-| 83 | Eval höchstens **2 parallel** je Key, und je `db_uuid` nur **einmal** | Sonst ergäbe Neukopieren alle 28 Tage eine Dauer-Eval |
+| 83 | Eval höchstens **2 parallel** je Key, und je `db_uuid` nur **einmal** | Sonst ergäbe Neukopieren alle 14 Tage eine Dauer-Eval |
 | 84 | Nicht neutralisierte fremde Instanz: **7 Tage Kulanz** (`state=grace`), danach `expired` | Echter Serverumzug fällt nicht über Nacht aus; Zeit für Migration (#22) |
 | 85 | Eigenes Modell `wb.license.instance` statt `wb.license.install` | Install-Registry ist Lead-Liste mit Retention-Crons; gelöschte Einträge würden eine neue Eval ermöglichen |
 | 86 | `/check` antwortet für fremde Instanzen mit `state` im alten Vokabular (`active`/`grace`/`expired`) plus neuem Objekt `instance` | Ältere Clients sperren korrekt; ein unbekannter State würde dort als `unknown` 30 Tage weiterlaufen |
 | 87 | Testlizenz = eigener Key mit `parent_license_id`, gebunden an die `db_uuid` der Test-DB, ausgestellt per Button an der fremden Instanz. Abrechnung über eigenes Produkt per Sale-Order | Kunde muss keinen zweiten Key eingeben; der Check mit dem Produktiv-Key findet die Testlizenz |
 | 88 | Testlizenz hat eine eigene Laufzeit von 12 Monaten ab Ausstellung, unabhängig von der Produktivlizenz. Verlängert wird sie über ihr eigenes Abo | Eigenes Produkt, eigene Rechnung: eine Kopplung an die Produktivlizenz wäre falsch |
+| 89 | Eval auf **14 Tage** verkürzt (statt 28). Eval (Kopie einer lizenzierten DB) und Trial (Neukunde, 7 Tage) bleiben getrennte Begriffe | Zwei Wochen reichen zum Testen; Trial und Eval haben verschiedene Zielgruppen |
 
 Umgesetzt in `wb_subscription` 19.0.2.12.0 und `wb_license_client` 19.0.2.5.0 (Branch `feat/test-db-eval`). Ohne `db_uuid` im Request (z. B. PHP-Client UMAN) bleibt alles wie bisher. Restrisiko: `database.is_neutralized` ist ein einfacher Parameter; wer ihn auf einer Produktiv-DB setzt, bekommt dort nur Eval oder Testlizenz. Gehört als Klausel in die EULA.

@@ -26,7 +26,7 @@ from dateutil.relativedelta import relativedelta
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
-EVAL_DAYS = 28
+EVAL_DAYS = 14
 MAX_PARALLEL_EVALS = 2
 MISMATCH_GRACE_DAYS = 7
 TEST_LICENSE_MONTHS = 12

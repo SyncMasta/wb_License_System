@@ -244,7 +244,7 @@ Meldet sich ein Key aus einer anderen Datenbank als der gebundenen, bewertet der
 
 | `instance.status` | `state` | Bedeutung |
 |---|---|---|
-| `eval` | `active` (`valid_to` = `until`) | neutralisierte Kopie, Eval 28 Tage, einmal je `db_uuid`, max. 2 parallel je Key |
+| `eval` | `active` (`valid_to` = `until`) | neutralisierte Kopie, Eval 14 Tage, einmal je `db_uuid`, max. 2 parallel je Key |
 | `eval_expired` | `expired` | Eval vorbei, Testlizenz nötig |
 | `eval_limit` | `expired` | schon 2 Evals laufen |
 | `test` | `active` (`valid_to` = `until`) | Testlizenz für diese DB, gilt nur neutralisiert |
