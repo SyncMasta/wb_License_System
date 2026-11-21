@@ -58,7 +58,7 @@ EVENT_TYPES = [
     ('signature_failed', 'HMAC-Signatur ungültig oder abgelaufen'),
     ('instance_eval_started', 'Eval für Test-DB gestartet'),
     ('instance_mismatch', 'Fremde, nicht neutralisierte Instanz'),
-    ('test_license_issued', 'Testlizenz ausgestellt'),
+    ('dev_license_issued', 'DEV-Lizenz ausgestellt'),
 ]
 
 

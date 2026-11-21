@@ -206,8 +206,8 @@ class WbLicenseKey(models.Model):
     parent_license_id = fields.Many2one(
         'wb.license.key', string='Produktivlizenz', readonly=True,
         ondelete='restrict', index=True,
-        help="Gesetzt bei Testlizenzen: die Lizenz der Produktiv-Datenbank. "
-             "Eine Testlizenz gilt nur fuer eine neutralisierte Datenbank.",
+        help="Gesetzt bei DEV-Lizenzen: die Lizenz der Produktiv-Datenbank. "
+             "Eine DEV-Lizenz gilt nur fuer eine neutralisierte Datenbank.",
     )
 
     last_seen_at = fields.Datetime()
@@ -1261,10 +1261,10 @@ class WbLicenseKey(models.Model):
             return None
         if self._matches_binding(domain, db_uuid):
             if self.parent_license_id and not is_neutralized:
-                return {'status': 'test_not_neutralized', 'until': None}
+                return {'status': 'dev_not_neutralized', 'until': None}
             return None
         if self.parent_license_id:
-            # Testlizenz in einer anderen DB als ihrer eigenen: gesperrt.
+            # DEV-Lizenz in einer anderen DB als ihrer eigenen: gesperrt.
             return {'status': 'mismatch', 'until': None}
         return self.env['wb.license.instance']._resolve(
             self, domain, db_uuid, is_neutralized)

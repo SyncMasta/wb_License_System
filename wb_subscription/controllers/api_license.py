@@ -167,7 +167,7 @@ class ApiLicenseController(http.Controller):
             if status == 'mismatch_grace':
                 response['state'] = 'grace'
                 response['grace_until'] = response['instance']['until']
-            elif status in ('eval', 'test'):
+            elif status in ('eval', 'dev'):
                 response['state'] = 'active'
                 response['valid_to'] = response['instance']['until']
             else:

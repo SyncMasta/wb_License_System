@@ -47,8 +47,8 @@ INSTANCE_STATUS = [
     ('eval', 'Eval (Testsystem)'),
     ('eval_expired', 'Eval abgelaufen'),
     ('eval_limit', 'Eval-Limit erreicht'),
-    ('test', 'Testlizenz'),
-    ('test_not_neutralized', 'Testlizenz, DB nicht neutralisiert'),
+    ('dev', 'DEV-Lizenz'),
+    ('dev_not_neutralized', 'DEV-Lizenz, DB nicht neutralisiert'),
     ('mismatch_grace', 'Nicht lizenzierte Instanz (Kulanz)'),
     ('mismatch', 'Nicht lizenzierte Instanz'),
 ]
@@ -93,7 +93,7 @@ class WbLicenseInfo(models.Model):
         INSTANCE_STATUS,
         string='Instanz-Status',
         help="Leer, wenn diese Datenbank die lizenzierte Instanz ist. Sonst "
-             "meldet der Server hier Eval, Testlizenz oder Abweichung.",
+             "meldet der Server hier Eval, DEV-Lizenz oder Abweichung.",
     )
     instance_until = fields.Date(string='Instanz-Status gültig bis')
 
@@ -296,23 +296,23 @@ class WbLicenseInfo(models.Model):
         if status == 'eval':
             return _(
                 "Testsystem: %s läuft auf dieser Datenbank zur Probe bis %s. "
-                "Danach brauchen Sie für sie eine Testlizenz (%s)."
+                "Danach brauchen Sie für sie eine DEV-Lizenz (%s)."
             ) % (code, until, support)
         if status == 'eval_expired':
             return _(
                 "Die Probezeit für %s auf diesem Testsystem ist abgelaufen. "
-                "Für diese Datenbank brauchen Sie eine Testlizenz (%s)."
+                "Für diese Datenbank brauchen Sie eine DEV-Lizenz (%s)."
             ) % (code, support)
         if status == 'eval_limit':
             return _(
                 "Für %s laufen schon so viele Testsysteme zur Probe wie möglich. "
-                "Für diese Datenbank brauchen Sie eine Testlizenz (%s)."
+                "Für diese Datenbank brauchen Sie eine DEV-Lizenz (%s)."
             ) % (code, support)
-        if status == 'test':
-            return _("Testsystem: %s läuft mit Testlizenz bis %s.") % (code, until)
-        if status == 'test_not_neutralized':
+        if status == 'dev':
+            return _("Entwicklungs- oder Staging-System: %s läuft mit DEV-Lizenz bis %s.") % (code, until)
+        if status == 'dev_not_neutralized':
             return _(
-                "Die Testlizenz für %s gilt nur für neutralisierte Datenbanken. "
+                "Die DEV-Lizenz für %s gilt nur für neutralisierte Datenbanken. "
                 "Diese Datenbank ist nicht neutralisiert."
             ) % code
         message = _(

@@ -9,8 +9,8 @@ Regeln (DECISIONS.md #80-82):
 
 * Neutralisierte Kopie (``database.is_neutralized``) bekommt einmalig eine
   Eval ueber ``EVAL_DAYS`` Tage, hoechstens ``MAX_PARALLEL_EVALS`` gleichzeitig
-  pro Key. Danach braucht sie eine Testlizenz.
-* Eine Testlizenz gilt nur, solange die Datenbank neutralisiert ist.
+  pro Key. Danach braucht sie eine DEV-Lizenz.
+* Eine DEV-Lizenz gilt nur, solange die Datenbank neutralisiert ist.
 * Nicht neutralisierte Kopie oder gleiche DB unter neuer Domain: Kulanz ueber
   ``MISMATCH_GRACE_DAYS`` Tage, danach gesperrt (Umzug ueber Migration).
 
@@ -29,20 +29,20 @@ from odoo.exceptions import UserError
 EVAL_DAYS = 14
 MAX_PARALLEL_EVALS = 2
 MISMATCH_GRACE_DAYS = 7
-TEST_LICENSE_MONTHS = 12
+DEV_LICENSE_MONTHS = 12
 
 INSTANCE_STATUS = [
     ('eval', 'Eval laeuft'),
     ('eval_expired', 'Eval abgelaufen'),
     ('eval_limit', 'Eval-Limit erreicht'),
-    ('test', 'Testlizenz'),
-    ('test_not_neutralized', 'Testlizenz, DB nicht neutralisiert'),
+    ('dev', 'DEV-Lizenz'),
+    ('dev_not_neutralized', 'DEV-Lizenz, DB nicht neutralisiert'),
     ('mismatch_grace', 'Fremde Instanz (Kulanz)'),
     ('mismatch', 'Fremde Instanz (gesperrt)'),
 ]
 
 # Status, in denen die Instanz die Produkt-Funktionen nutzen darf.
-VALID_STATUS = ('eval', 'test', 'mismatch_grace')
+VALID_STATUS = ('eval', 'dev', 'mismatch_grace')
 
 
 class WbLicenseInstance(models.Model):
@@ -73,8 +73,8 @@ class WbLicenseInstance(models.Model):
         string='Kulanz bis', readonly=True,
         help="Ende der Kulanz fuer eine nicht neutralisierte fremde Instanz.",
     )
-    test_license_id = fields.Many2one(
-        'wb.license.key', string='Testlizenz', readonly=True, ondelete='set null',
+    dev_license_id = fields.Many2one(
+        'wb.license.key', string='DEV-Lizenz', readonly=True, ondelete='set null',
     )
 
     _sql_constraints = [
@@ -114,11 +114,11 @@ class WbLicenseInstance(models.Model):
 
     def _classify(self, license, same_db, is_neutralized, today):
         self.ensure_one()
-        test = self.test_license_id
+        test = self.dev_license_id
         if test and test.state in ('active', 'grace') and not same_db:
             if not is_neutralized:
-                return 'test_not_neutralized', None
-            return 'test', test.valid_to
+                return 'dev_not_neutralized', None
+            return 'dev', test.valid_to
 
         if is_neutralized and not same_db:
             if not self.eval_until:
@@ -148,21 +148,21 @@ class WbLicenseInstance(models.Model):
             return 'mismatch_grace', self.mismatch_until
         return 'mismatch', None
 
-    def action_issue_test_license(self):
-        """Stellt fuer diese (neutralisierte) Instanz eine Testlizenz aus.
+    def action_issue_dev_license(self):
+        """Stellt fuer diese (neutralisierte) Instanz eine DEV-Lizenz aus.
 
-        Die Testlizenz ist ein eigener Key mit Verweis auf die Produktivlizenz,
+        Die DEV-Lizenz ist ein eigener Key mit Verweis auf die Produktivlizenz,
         gebunden an die db_uuid dieser Instanz. Der Kunde muss nichts eingeben:
         der Check mit dem Produktiv-Key aus der Kopie findet sie hier.
         Abgerechnet wird ueber ein eigenes Produkt per Sale-Order.
         """
         self.ensure_one()
         parent = self.license_id
-        if self.test_license_id and self.test_license_id.state in ('active', 'grace'):
-            raise UserError(_("Fuer diese Instanz gibt es bereits eine aktive Testlizenz."))
+        if self.dev_license_id and self.dev_license_id.state in ('active', 'grace'):
+            raise UserError(_("Fuer diese Instanz gibt es bereits eine aktive DEV-Lizenz."))
         if not self.is_neutralized:
             raise UserError(_(
-                "Die Datenbank ist nicht neutralisiert. Eine Testlizenz gilt "
+                "Die Datenbank ist nicht neutralisiert. Eine DEV-Lizenz gilt "
                 "nur fuer neutralisierte Datenbanken."))
         if parent.state not in ('active', 'grace'):
             raise UserError(_("Die Produktivlizenz ist nicht aktiv."))
@@ -178,13 +178,13 @@ class WbLicenseInstance(models.Model):
             'bound_db_uuid': self.db_uuid,
             'valid_from': today,
             # Eigene Laufzeit, eigenes Abo: nicht an die Produktivlizenz gekoppelt.
-            'valid_to': today + relativedelta(months=TEST_LICENSE_MONTHS),
+            'valid_to': today + relativedelta(months=DEV_LICENSE_MONTHS),
             'activated_at': fields.Datetime.now(),
-            'activation_hash_method': 'test',
+            'activation_hash_method': 'dev',
         }])
-        self.write({'test_license_id': test.id, 'status': 'test'})
+        self.write({'dev_license_id': test.id, 'status': 'dev'})
         parent._log_instance_event(
-            'test_license_issued', self, details={'test_license': test.name})
+            'dev_license_issued', self, details={'dev_license': test.name})
         return {
             'type': 'ir.actions.act_window',
             'res_model': 'wb.license.key',

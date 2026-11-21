@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Tests fuer Test-DB-Eval, Testlizenz und fremde Instanzen (DECISIONS.md #80-82)."""
+"""Tests fuer Test-DB-Eval, DEV-Lizenz und fremde Instanzen (DECISIONS.md #80-82)."""
 
 import json
 import os
@@ -12,7 +12,7 @@ from odoo.exceptions import UserError
 from odoo.tests import HttpCase, TransactionCase, tagged
 
 from odoo.addons.wb_subscription.models.wb_license_instance import (
-    EVAL_DAYS, MAX_PARALLEL_EVALS, MISMATCH_GRACE_DAYS, TEST_LICENSE_MONTHS,
+    EVAL_DAYS, MAX_PARALLEL_EVALS, MISMATCH_GRACE_DAYS, DEV_LICENSE_MONTHS,
 )
 
 PROD_DOMAIN = 'https://kunde.example.com'
@@ -128,35 +128,35 @@ class TestInstanceResolution(_InstanceSetup, TransactionCase):
         self.license.state = 'revoked'
         self.assertIsNone(self._resolve('https://kopie.example.com', 'db-copy-4', True))
 
-    def test_test_license(self):
+    def test_dev_license(self):
         self._resolve('https://test.example.com', 'db-test', True)
         inst = self._instance('db-test')
-        inst.action_issue_test_license()
-        test = inst.test_license_id
+        inst.action_issue_dev_license()
+        test = inst.dev_license_id
         self.assertEqual(test.parent_license_id, self.license)
         self.assertEqual(test.bound_db_uuid, 'db-test')
         self.assertEqual(
-            test.valid_to, fields.Date.today() + relativedelta(months=TEST_LICENSE_MONTHS))
+            test.valid_to, fields.Date.today() + relativedelta(months=DEV_LICENSE_MONTHS))
 
         res = self._resolve('https://test.example.com', 'db-test', True)
-        self.assertEqual(res['status'], 'test')
+        self.assertEqual(res['status'], 'dev')
         res = self._resolve('https://test.example.com', 'db-test', False)
-        self.assertEqual(res['status'], 'test_not_neutralized')
+        self.assertEqual(res['status'], 'dev_not_neutralized')
 
-        # Mit dem eigenen Key der Testlizenz gelten dieselben Regeln.
+        # Mit dem eigenen Key der DEV-Lizenz gelten dieselben Regeln.
         self.assertIsNone(self._resolve('https://test.example.com', 'db-test', True, test))
         res = self._resolve('https://test.example.com', 'db-test', False, test)
-        self.assertEqual(res['status'], 'test_not_neutralized')
+        self.assertEqual(res['status'], 'dev_not_neutralized')
         res = self._resolve(PROD_DOMAIN, PROD_UUID, True, test)
         self.assertEqual(res['status'], 'mismatch')
 
         with self.assertRaises(UserError):
-            inst.action_issue_test_license()
+            inst.action_issue_dev_license()
 
-    def test_test_license_requires_neutralized_db(self):
+    def test_dev_license_requires_neutralized_db(self):
         self._resolve('https://kopie.example.com', 'db-copy-5', False)
         with self.assertRaises(UserError):
-            self._instance('db-copy-5').action_issue_test_license()
+            self._instance('db-copy-5').action_issue_dev_license()
 
 
 @tagged('wb_subscription', 'wb_instance', 'post_install', '-at_install')

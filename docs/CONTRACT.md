@@ -245,10 +245,10 @@ Meldet sich ein Key aus einer anderen Datenbank als der gebundenen, bewertet der
 | `instance.status` | `state` | Bedeutung |
 |---|---|---|
 | `eval` | `active` (`valid_to` = `until`) | neutralisierte Kopie, Eval 14 Tage, einmal je `db_uuid`, max. 2 parallel je Key |
-| `eval_expired` | `expired` | Eval vorbei, Testlizenz nötig |
+| `eval_expired` | `expired` | Eval vorbei, DEV-Lizenz nötig |
 | `eval_limit` | `expired` | schon 2 Evals laufen |
-| `test` | `active` (`valid_to` = `until`) | Testlizenz für diese DB, gilt nur neutralisiert |
-| `test_not_neutralized` | `expired` | Testlizenz, DB aber nicht neutralisiert |
+| `dev` | `active` (`valid_to` = `until`) | DEV-Lizenz für diese DB, gilt nur neutralisiert |
+| `dev_not_neutralized` | `expired` | DEV-Lizenz, DB aber nicht neutralisiert |
 | `mismatch_grace` | `grace` (`grace_until` = `until`) | nicht neutralisierte Kopie oder gleiche DB unter neuer Domain, 7 Tage Kulanz |
 | `mismatch` | `expired` | Kulanz vorbei; Umzug über `/api/license/migrate` |
 

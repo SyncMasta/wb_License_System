@@ -23,7 +23,7 @@ function severityFor(info) {
     if (state === "expired") return "danger";
     if (state === "grace") return "warning";
     if (state === "unknown") return "info";
-    // Eval oder Testlizenz: gültig, aber als Testsystem kenntlich machen.
+    // Eval oder DEV-Lizenz: gültig, aber als Testsystem kenntlich machen.
     if (info.instance_status) return "info";
     return null;
 }

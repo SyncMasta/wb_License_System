@@ -181,20 +181,20 @@
                               invisible="parent_license_id">
                             <field name="instance_ids">
                                 <list create="false" delete="false"
-                                      decoration-success="status in ('eval', 'test')"
+                                      decoration-success="status in ('eval', 'dev')"
                                       decoration-warning="status == 'mismatch_grace'"
-                                      decoration-danger="status in ('mismatch', 'eval_expired', 'eval_limit', 'test_not_neutralized')">
+                                      decoration-danger="status in ('mismatch', 'eval_expired', 'eval_limit', 'dev_not_neutralized')">
                                     <field name="domain"/>
                                     <field name="db_uuid" optional="hide"/>
                                     <field name="is_neutralized"/>
                                     <field name="status" widget="badge"/>
                                     <field name="eval_until"/>
                                     <field name="mismatch_until"/>
-                                    <field name="test_license_id"/>
+                                    <field name="dev_license_id"/>
                                     <field name="last_seen_at"/>
-                                    <button name="action_issue_test_license" type="object"
-                                            string="Testlizenz ausstellen" icon="fa-flask"
-                                            invisible="not is_neutralized or status == 'test'"
+                                    <button name="action_issue_dev_license" type="object"
+                                            string="DEV-Lizenz ausstellen" icon="fa-flask"
+                                            invisible="not is_neutralized or status == 'dev'"
                                             groups="wb_subscription.group_wb_subscription_manager"/>
                                 </list>
                             </field>

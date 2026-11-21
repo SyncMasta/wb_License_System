@@ -652,7 +652,7 @@ class WbLicenseClient(models.AbstractModel):
 
         Gleiche Auswertung wie Odoo selbst in ir_cron: der Wahrheitswert von
         ``database.is_neutralized``. Der Server vergibt daraufhin Eval oder
-        Testlizenz statt einer zweiten Produktivinstanz.
+        DEV-Lizenz statt einer zweiten Produktivinstanz.
         """
         return bool(self.env['ir.config_parameter'].sudo().get_param(
             'database.is_neutralized'))
