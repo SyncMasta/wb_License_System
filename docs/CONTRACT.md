@@ -219,6 +219,7 @@ Der einzige Endpunkt, den der PHP-Client benötigt.
 | `domain` | string | nein | nur Event-Log; zusammen mit `db_uuid` + `module_version` Update der Install-Version |
 | `db_uuid` | string | nein | dito — hier die synthetische Instanzkennung |
 | `module_version` | string | nein | Version des Konsumenten; nur wirksam wenn `domain` **und** `db_uuid` mitkommen |
+| `is_neutralized` | bool | nein | Nur Odoo-Client: `database.is_neutralized` der Datenbank. Muss echtes JSON-`true` sein, alles andere zählt als `false`. Für PHP gegenstandslos (weglassen). |
 
 Weitere Felder werden ignoriert (`**kw`).
 
@@ -233,8 +234,28 @@ Weitere Felder werden ignoriert (`**kw`).
 | `product_code` | string | 4 Zeichen |
 | `latest_module_version` | string \| null | gepflegte Soll-Version des Produkts |
 | `download_url` | string \| null | Portal-Link, nur gesetzt wenn `latest_module_version` ≠ `module_version` |
+| `instance` | object | **Nur vorhanden**, wenn `db_uuid` mitkommt und nicht zur Bindung (`bound_db_uuid` + `bound_domain`) passt. Siehe unten. |
 
-Die letzten beiden Felder sind für PHP-Dienste gegenstandslos (kein Update-Mechanismus, §1 der
+#### Fremde Instanz (`instance`, DECISIONS.md #80-82)
+
+Meldet sich ein Key aus einer anderen Datenbank als der gebundenen, bewertet der Server sie
+(gespeichert in `wb.license.instance`). `instance = {"status": ..., "until": "YYYY-MM-DD" | null}`.
+`state` bleibt im alten Vokabular, damit auch ältere Clients richtig sperren:
+
+| `instance.status` | `state` | Bedeutung |
+|---|---|---|
+| `eval` | `active` (`valid_to` = `until`) | neutralisierte Kopie, Eval 14 Tage, einmal je `db_uuid`, max. 2 parallel je Key |
+| `eval_expired` | `expired` | Eval vorbei, DEV-Lizenz nötig |
+| `eval_limit` | `expired` | schon 2 Evals laufen |
+| `dev` | `active` (`valid_to` = `until`) | DEV-Lizenz für diese DB, gilt nur neutralisiert |
+| `dev_not_neutralized` | `expired` | DEV-Lizenz, DB aber nicht neutralisiert |
+| `mismatch_grace` | `grace` (`grace_until` = `until`) | nicht neutralisierte Kopie oder gleiche DB unter neuer Domain, 7 Tage Kulanz |
+| `mismatch` | `expired` | Kulanz vorbei; Umzug über `/api/license/migrate` |
+
+Ohne `db_uuid` im Request oder ohne `bound_db_uuid` an der Lizenz findet keine Prüfung statt
+(Verhalten wie bisher). Fehlende `domain` auf einer Seite zählt nicht als Abweichung.
+
+Die Felder `latest_module_version` und `download_url` sind für PHP-Dienste gegenstandslos (kein Update-Mechanismus, §1 der
 Übergabe) — in `raw` mitführen, sonst ignorieren.
 
 ### Fehler (`result.error`, HTTP weiterhin 200)
@@ -356,9 +377,10 @@ Meldepflichtig gemäß §0 der Übergabe:
    Nichttreffer einen neuen Partner an — genau der E-Mail-basierte Identitätsabgleich, vor dem die
    Übergabe warnt. Immerhin hinter `X-API-Key`. Kein Client-Thema, aber ein offener Punkt für das
    Serverrepo.
-3. **`/api/license/check` prüft keine Bindung.** Wer den Key kennt, bekommt den Status und
-   überschreibt dabei `last_seen_ip`/`last_seen_user_agent` der Lizenz. `domain`/`db_uuid` im Body
-   werden **nicht** gegen `bound_domain`/`bound_db_uuid` validiert. Der Key ist alles.
+3. **`/api/license/check` prüft die Bindung nur, wenn `db_uuid` mitkommt** (seit
+   `wb_subscription` 19.0.2.12.0, siehe §4 „Fremde Instanz“). Ohne `db_uuid` gilt weiter: wer den
+   Key kennt, bekommt den Status und überschreibt dabei `last_seen_ip`/`last_seen_user_agent`
+   der Lizenz. Der Key ist alles.
    → Für den PHP-Client: Keys gehören in den Secret Store, in Logs ausschließlich maskiert
    (`WB-UMAN-****QF`), und nie in Exception-Messages oder Event-Payloads.
 4. **Kein Response-Signing.** Ein kompromittierter Zwischenweg kann `state` frei setzen. Bei

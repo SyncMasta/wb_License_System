@@ -56,6 +56,9 @@ EVENT_TYPES = [
     ('api_secret_issued', 'API-Secret erzeugt/rotiert'),
     ('api_secret_revoked', 'API-Secret entzogen'),
     ('signature_failed', 'HMAC-Signatur ungültig oder abgelaufen'),
+    ('instance_eval_started', 'Eval für Test-DB gestartet'),
+    ('instance_mismatch', 'Fremde, nicht neutralisierte Instanz'),
+    ('dev_license_issued', 'DEV-Lizenz ausgestellt'),
 ]
 
 

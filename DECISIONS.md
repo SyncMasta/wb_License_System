@@ -278,3 +278,29 @@ Snapshot: `docs/snapshots/production-snapshot-2026-04-28.md`.
 | Production `ir_config_parameter` | Verwaiste `wb_bitwarden.cred.4.*` von gelöschtem Account | Manueller `DELETE` auf Production + Migration für andere Tenants (Sprint 2 / B-N1) |
 
 **Test-Coverage:** 77 `security_regression`-getaggte Tests gegen alle 22+ Bypass-Vektoren, Smoke + Test-Run jeweils auf isolierter Test-DB validiert.
+
+---
+
+## Test-Datenbanken: Eval und DEV-Lizenz (2026-11-20, erstmals für Home Canvas Pro)
+
+Lizenzmodell pro Datenbank. Erkennung einer Test-DB über zwei Signale, die Odoo selbst setzt (geprüft im Odoo-19-Quellcode):
+
+- Neue `database.uuid`: Odoo vergibt sie beim Duplizieren und beim Restore mit „Dies ist eine Kopie“ (`odoo/service/db.py`, `ir.config_parameter.init(force=True)`).
+- `database.is_neutralized = True`: gesetzt beim Neutralisieren (Duplizieren mit Haken, `odoo-bin neutralize`, odoo.sh-Staging). Mails, Crons und Zahlungsanbieter sind dann aus, die DB ist produktiv kaum nutzbar.
+
+| # | Entscheidung | Begründung |
+|---|---|---|
+| 80 | Meldet sich ein Key aus einer zweiten, **neutralisierten** DB (neue `db_uuid`), startet automatisch eine Eval von 14 Tagen. Banner „Testsystem, Eval bis …“ | Kunde muss Test-DBs nicht manuell melden |
+| 81 | Nach 14 Tagen ist eine **DEV-Lizenz** (vergünstigt, eigenes Produkt) nötig. Sie gilt nur, solange `database.is_neutralized` gesetzt ist | Günstige DEV-Lizenz lässt sich nicht produktiv missbrauchen |
+| 82 | Zweite DB **nicht** neutralisiert → zählt als zweite Produktivinstanz (Volllizenz oder Umzug nach #22). Roher `pg_dump`/Restore mit gleicher `db_uuid` und neuer Domain fällt über den Fingerprint (#24) ebenfalls hierunter | Technisch nicht von einem Serverumzug unterscheidbar |
+
+| 83 | Eval höchstens **2 parallel** je Key, und je `db_uuid` nur **einmal** | Sonst ergäbe Neukopieren alle 14 Tage eine Dauer-Eval |
+| 84 | Nicht neutralisierte fremde Instanz: **7 Tage Kulanz** (`state=grace`), danach `expired` | Echter Serverumzug fällt nicht über Nacht aus; Zeit für Migration (#22) |
+| 85 | Eigenes Modell `wb.license.instance` statt `wb.license.install` | Install-Registry ist Lead-Liste mit Retention-Crons; gelöschte Einträge würden eine neue Eval ermöglichen |
+| 86 | `/check` antwortet für fremde Instanzen mit `state` im alten Vokabular (`active`/`grace`/`expired`) plus neuem Objekt `instance` | Ältere Clients sperren korrekt; ein unbekannter State würde dort als `unknown` 30 Tage weiterlaufen |
+| 87 | DEV-Lizenz = eigener Key mit `parent_license_id`, gebunden an die `db_uuid` der Test-DB, ausgestellt per Button an der fremden Instanz. Abrechnung über eigenes Produkt per Sale-Order | Kunde muss keinen zweiten Key eingeben; der Check mit dem Produktiv-Key findet die DEV-Lizenz |
+| 88 | DEV-Lizenz läuft wie jede Lizenz bis 31.12. (#4), anteilige Erstrechnung, Verlängerung über den Renewal-Cron (#30). Unabhängig von der Laufzeit der Produktivlizenz | Ein Abrechnungsmodell für alle Lizenzen; eigenes Produkt, eigene Rechnung |
+| 89 | Eval auf **14 Tage** verkürzt (statt 28). Eval (Kopie einer lizenzierten DB) und Trial (Neukunde, 7 Tage) bleiben getrennte Begriffe | Zwei Wochen reichen zum Testen; Trial und Eval haben verschiedene Zielgruppen |
+| 90 | „Testlizenz“ heißt **DEV-Lizenz**: für nicht-produktive, neutralisierte DBs (Entwicklung, Staging). Status im Contract `dev` / `dev_not_neutralized` | Name sagt, wofür sie ist; vor dem ersten Deploy umbenannt, daher ohne Kompatibilitätsaufwand |
+
+Umgesetzt in `wb_subscription` 19.0.2.12.0 und `wb_license_client` 19.0.2.5.0 (Branch `feat/test-db-eval`). Ohne `db_uuid` im Request (z. B. PHP-Client UMAN) bleibt alles wie bisher. Restrisiko: `database.is_neutralized` ist ein einfacher Parameter; wer ihn auf einer Produktiv-DB setzt, bekommt dort nur Eval oder DEV-Lizenz. Gehört als Klausel in die EULA.

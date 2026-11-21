@@ -18,10 +18,13 @@ function setCookie(name, value, hours) {
     document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Strict`;
 }
 
-function severityFor(state) {
+function severityFor(info) {
+    const state = info.state;
     if (state === "expired") return "danger";
     if (state === "grace") return "warning";
     if (state === "unknown") return "info";
+    // Eval oder DEV-Lizenz: gültig, aber als Testsystem kenntlich machen.
+    if (info.instance_status) return "info";
     return null;
 }
 
@@ -66,7 +69,7 @@ const licenseBannerService = {
             || document.body;
 
         for (const info of infos) {
-            const severity = severityFor(info.state);
+            const severity = severityFor(info);
             if (!severity) continue;
             if (getCookie(COOKIE_PREFIX + info.product_code)) continue;
             const banner = buildBanner(info, severity);

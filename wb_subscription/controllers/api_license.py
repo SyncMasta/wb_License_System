@@ -142,7 +142,7 @@ class ApiLicenseController(http.Controller):
                 download_url = request.env['ir.config_parameter'].sudo().get_param(
                     'wb_subscription.download_portal_url') or None
 
-        return {
+        response = {
             'state': license.state,
             'valid_from': license.valid_from.isoformat() if license.valid_from else None,
             'valid_to': license.valid_to.isoformat() if license.valid_to else None,
@@ -151,6 +151,28 @@ class ApiLicenseController(http.Controller):
             'latest_module_version': latest_module_version,
             'download_url': download_url,
         }
+
+        # Fremde Instanz (Test-DB, Kopie, Umzug)? DECISIONS.md #80-82.
+        # ``state`` bleibt im alten Vokabular, damit auch aeltere Clients
+        # richtig sperren; ``instance`` traegt die Details fuer neue Clients.
+        instance = license.resolve_instance(
+            domain, db_uuid, kw.get('is_neutralized') is True)
+        if instance:
+            until = instance['until']
+            status = instance['status']
+            response['instance'] = {
+                'status': status,
+                'until': until.isoformat() if until else None,
+            }
+            if status == 'mismatch_grace':
+                response['state'] = 'grace'
+                response['grace_until'] = response['instance']['until']
+            elif status in ('eval', 'dev'):
+                response['state'] = 'active'
+                response['valid_to'] = response['instance']['until']
+            else:
+                response['state'] = 'expired'
+        return response
 
     @http.route('/api/license/activate',
                 type='json', auth='public', methods=['POST'],

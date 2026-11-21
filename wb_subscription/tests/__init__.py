@@ -18,3 +18,4 @@ from . import test_auto_bind_lookup
 from . import test_nfr_license
 from . import test_hmac_signature
 from . import test_retention
+from . import test_instance_resolution
