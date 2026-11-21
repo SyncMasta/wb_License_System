@@ -21,12 +21,15 @@ Eintraege geloescht, bekaeme dieselbe Kopie eine neue Eval.
 
 from datetime import timedelta
 
+from dateutil.relativedelta import relativedelta
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 EVAL_DAYS = 28
 MAX_PARALLEL_EVALS = 2
 MISMATCH_GRACE_DAYS = 7
+TEST_LICENSE_MONTHS = 12
 
 INSTANCE_STATUS = [
     ('eval', 'Eval laeuft'),
@@ -163,6 +166,7 @@ class WbLicenseInstance(models.Model):
                 "nur fuer neutralisierte Datenbanken."))
         if parent.state not in ('active', 'grace'):
             raise UserError(_("Die Produktivlizenz ist nicht aktiv."))
+        today = fields.Date.context_today(self)
         test = self.env['wb.license.key'].create([{
             'product_id': parent.product_id.id,
             'partner_id': parent.partner_id.id,
@@ -172,8 +176,9 @@ class WbLicenseInstance(models.Model):
             'state': 'active',
             'bound_domain': self.domain,
             'bound_db_uuid': self.db_uuid,
-            'valid_from': fields.Date.context_today(self),
-            'valid_to': parent.valid_to,
+            'valid_from': today,
+            # Eigene Laufzeit, eigenes Abo: nicht an die Produktivlizenz gekoppelt.
+            'valid_to': today + relativedelta(months=TEST_LICENSE_MONTHS),
             'activated_at': fields.Datetime.now(),
             'activation_hash_method': 'test',
         }])
