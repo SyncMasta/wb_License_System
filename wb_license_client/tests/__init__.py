@@ -3,3 +3,4 @@ from . import test_activate_wizard
 from . import test_auto_lookup
 from . import test_signature
 from . import test_ping_backoff
+from . import test_server_url_db_header

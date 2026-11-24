@@ -4,7 +4,7 @@
 
         <record id="config_server_url" model="ir.config_parameter">
             <field name="key">wb_license_client.server_url</field>
-            <field name="value">https://wissen-beratung.de</field>
+            <field name="value">https://my.wissen-beratung.de</field>
         </record>
 
         <record id="config_debug_mode" model="ir.config_parameter">

@@ -1114,7 +1114,7 @@ class WbLicenseKey(models.Model):
         """
         self.ensure_one()
         base = self.env['ir.config_parameter'].sudo().get_param(
-            'web.base.url') or 'https://wissen-beratung.de'
+            'web.base.url') or 'https://my.wissen-beratung.de'
         return f"{base.rstrip('/')}/license/verify/{self.name}"
 
     def action_generate_certificate_pdf(self):

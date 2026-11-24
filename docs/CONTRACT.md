@@ -46,7 +46,7 @@ Alle `/api/...`-Routen sind Odoo-Routen mit `type='json'`. Das ist **kein REST**
 | Auth | `auth='public'` — kein Login, kein Token, kein HMAC (siehe §3) |
 | CSRF | aus (`csrf=False`) |
 | CORS | `*` für alle `/api/license/*`; `*.wissen-beratung.de` für `/api/license/trial` und `/api/wb_subscription/order` |
-| Base-URL Produktion | `https://my.wissen-beratung.de` (das Client-Odoo-Modul nutzt als Default noch `https://wissen-beratung.de` — für PHP `my.` konfigurieren) |
+| Base-URL Produktion | `https://my.wissen-beratung.de` (auch Default des Client-Odoo-Moduls) |
 
 ### Header, die der bestehende Odoo-Client sendet
 
@@ -58,7 +58,7 @@ Content-Type: application/json
 User-Agent: wb_license_client/<version>        → PHP: wb-license-client-php/<version> (<service-name>)
 X-WB-DB-UUID: <db_uuid>
 X-WB-Domain: <domain>
-X-Odoo-Database: <dbname>                      → Multi-DB-Routing-Hint, für PHP irrelevant (weglassen)
+X-Odoo-Database: <dbname>                      → nur senden, wenn `wb_license_client.server_database` gesetzt ist (DB-Name des Lizenzservers, nie die Kunden-DB); für PHP weglassen
 ```
 
 `User-Agent` wird vom `/check`-Endpunkt in `wb.license.key.last_seen_user_agent` (max. 255 Zeichen)
