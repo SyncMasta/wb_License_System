@@ -1,6 +1,6 @@
 {
     'name': 'WB License Client',
-    'version': '19.0.2.5.1',
+    'version': '19.0.2.5.2',
     'category': 'Technical',
     'summary': 'Lizenz-Client für WISSEN BERATUNG Produkt-Module',
     'description': """
