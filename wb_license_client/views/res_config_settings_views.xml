@@ -12,7 +12,7 @@
                     <block title="Server-Verbindung" name="wb_license_server">
                         <setting string="Lizenz-Server"
                                  help="URL des WB-Lizenz-Servers. Default nicht ändern.">
-                            <field name="wb_license_server_url" placeholder="https://wissen-beratung.de"/>
+                            <field name="wb_license_server_url" placeholder="https://my.wissen-beratung.de"/>
                         </setting>
                         <setting string="Debug-Modus"
                                  help="Server-Responses als Notification anzeigen. Nur für Support/Diagnose.">
@@ -21,7 +21,7 @@
                     </block>
                     <block title="Datenschutz" name="wb_license_privacy">
                         <setting string="Install-Registry deaktivieren"
-                                 help="Sendet beim Install eines unlizenzierten Addons KEIN Announce-Signal an wissen-beratung.de. Default: aus.">
+                                 help="Sendet beim Install eines unlizenzierten Addons KEIN Announce-Signal an my.wissen-beratung.de. Default: aus.">
                             <field name="wb_license_disable_install_registry"/>
                         </setting>
                     </block>

@@ -585,11 +585,11 @@ In Odoo: **WB Lizenzen → Lizenz-Produkte → Erstellen**
    ```
 
 3. **Portal-Flow durchspielen:**
-   `https://wissen-beratung.de/activate/<ticket>` aufrufen,
+   `https://my.wissen-beratung.de/activate/<ticket>` aufrufen,
    OTP anfordern, OTP eingeben, Code wird angezeigt.
 
 4. **Public-Verify testen:**
-   `https://wissen-beratung.de/license/verify/<key>` —
+   `https://my.wissen-beratung.de/license/verify/<key>` —
    sollte mit reCAPTCHA-Challenge laden, dann Lizenz-Daten zeigen.
 
 5. **Tests laufen lassen:**

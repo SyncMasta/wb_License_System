@@ -40,11 +40,12 @@ from odoo.exceptions import UserError
 _logger = logging.getLogger(__name__)
 
 
-DEFAULT_SERVER_URL = 'https://wissen-beratung.de'
+DEFAULT_SERVER_URL = 'https://my.wissen-beratung.de'
 KEY_PARAM_PREFIX = 'wb_license_client.key_'
 SECRET_PARAM_PREFIX = 'wb_license_client.secret_'
 SIGNATURE_SCHEME = 'WB-HMAC-V1'
 SERVER_URL_PARAM = 'wb_license_client.server_url'
+SERVER_DATABASE_PARAM = 'wb_license_client.server_database'
 DEBUG_PARAM = 'wb_license_client.debug_mode'
 INSTALL_REGISTRY_OPT_OUT_PARAM = 'wb_license_client.disable_install_registry'
 DEFAULT_CHECK_TIMEOUT = 10
@@ -207,7 +208,7 @@ class WbLicenseClient(models.AbstractModel):
 
     @api.model
     def submit_lead_request(self, product_code, payload):
-        """Sendet einen Lead-/Verkaufschancen-Request an wissen-beratung.de.
+        """Sendet einen Lead-/Verkaufschancen-Request an den Lizenzserver (my.wissen-beratung.de).
 
         Wird aus Onboarding- bzw. Lizenz-Anfrage-Wizards der Produkt-Module
         aufgerufen. Der Server-Endpoint ``/api/license/lead`` legt einen
@@ -279,7 +280,7 @@ class WbLicenseClient(models.AbstractModel):
     @api.model
     def register_install(self, product_code, module_name=None,
                          try_auto_lookup=True):
-        """Meldet diese Odoo-Instanz als Install bei wissen-beratung.de an.
+        """Meldet diese Odoo-Instanz als Install beim Lizenzserver (my.wissen-beratung.de) an.
 
         Wird aus zwei Pfaden gerufen:
         1. ``_post_init_hook`` von Produkt-Modulen — explizit beim Install,
@@ -525,21 +526,23 @@ class WbLicenseClient(models.AbstractModel):
             status=0 signalisiert Netzwerk-Fehler (Timeout/ConnectionError).
         """
         url = self._get_server_url() + endpoint
-        # X-Odoo-Database (M-109): bei Self-Hosting (License-Server + Client
-        # in derselben Odoo-Instanz mit Multi-DB) kann der License-Server-
-        # Endpoint ohne expliziten DB-Selektor 404 zurueckgeben, was den
-        # Client-Cache auf `unlicensed` zuruecksetzt. Wir senden den Namen
-        # der eigenen DB als Hint mit — die License-Server-Box (oder
-        # nginx davor) kann ihn ignorieren oder zur Routing-Entscheidung
-        # nutzen. Fuer Standard-Setups (License-Server auf separater Box)
-        # ist der Header eine harmlose Zusatzinfo.
+        # X-Odoo-Database (M-109): Der Header waehlt auf einem Multi-DB-
+        # Lizenzserver die Datenbank des SERVERS. Den Namen der Kunden-DB
+        # senden wir nie: Existiert sie dort nicht, antwortet der Server mit
+        # 404 ("No database is selected"). Gesetzt wird der Header nur, wenn
+        # der Parameter ``wb_license_client.server_database`` den DB-Namen
+        # des Lizenzservers nennt (z.B. WB selbst bei Self-Hosting mit
+        # Client und Server in einer Multi-DB-Instanz).
         headers = {
             'Content-Type': 'application/json',
             'User-Agent': f'wb_license_client/{self._get_module_version()}',
             'X-WB-DB-UUID': self._get_db_uuid() or '',
             'X-WB-Domain': self._get_domain() or '',
-            'X-Odoo-Database': self.env.cr.dbname or '',
         }
+        server_db = (self.env['ir.config_parameter'].sudo().get_param(
+            SERVER_DATABASE_PARAM) or '').strip()
+        if server_db:
+            headers['X-Odoo-Database'] = server_db
         # HMAC-Signatur, wenn fuer dieses Produkt ein Secret hinterlegt ist.
         # Signiert wird der rohe Body — deshalb wird hier selbst serialisiert
         # und ``data=`` statt ``json=`` verwendet: requests wuerde sonst neu

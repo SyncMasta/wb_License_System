@@ -741,7 +741,7 @@ folgen Sie bitte diesem Link:
 
   ┌──────────────────────────────────────────────┐
   │  Aktivierungs-Code abrufen:                  │
-  │  https://wissen-beratung.de/activate/        │
+  │  https://my.wissen-beratung.de/activate/     │
   │  TCKT-x9f2k8m4p7n3q5w1r6t8y0                 │
   └──────────────────────────────────────────────┘
 

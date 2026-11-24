@@ -12,7 +12,7 @@ class ResConfigSettings(models.TransientModel):
     wb_license_server_url = fields.Char(
         string='WB-Lizenz-Server-URL',
         config_parameter=SERVER_URL_PARAM,
-        default='https://wissen-beratung.de',
+        default='https://my.wissen-beratung.de',
         help="URL des WB-Lizenz-Servers. Normalerweise nicht ändern. "
              "Nur für Test-/Staging-Umgebungen anpassen.",
     )
@@ -26,7 +26,7 @@ class ResConfigSettings(models.TransientModel):
         string='Install-Registry deaktivieren',
         config_parameter=INSTALL_REGISTRY_OPT_OUT_PARAM,
         help="Wenn aktiv, wird beim Install eines unlizenzierten WB-Produkt-"
-             "Addons KEIN Announce-Signal an wissen-beratung.de gesendet. "
+             "Addons KEIN Announce-Signal an my.wissen-beratung.de gesendet. "
              "Standardmäßig aus — der Announce enthält nur Domain, DB-UUID, "
              "Produkt-Code und Admin-Email zur Lead-Verwaltung.",
     )
