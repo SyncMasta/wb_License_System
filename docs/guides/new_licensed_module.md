@@ -41,6 +41,7 @@ Eindeutige 4 Großbuchstaben. Vor Implementierungsstart in
 | DATV | DATEV Export (Konzept) |
 | DSGV | DSGVO Auskunft (Konzept) |
 | ELST | (verworfen) |
+| VOIP | WB VoIP – Softphone, Anrufprotokoll, Telefonanlagen-Anbindung |
 
 Constraint im Code: `^[A-Z]{4}$`, UNIQUE auf `product.template.wb_technical_code`.
 
