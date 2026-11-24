@@ -10,6 +10,7 @@ from unittest.mock import patch
 from odoo import fields
 from odoo.tests import TransactionCase, tagged
 
+from odoo.addons.wb_license_client.models import wb_license_client as modul
 from odoo.addons.wb_license_client.models.wb_license_client import PING_RETRY_MINUTES
 
 
@@ -18,6 +19,9 @@ class TestPingBackoff(TransactionCase):
 
     def setUp(self):
         super().setUp()
+        # Speicher-Sperre je Worker ist Modulzustand: vor und nach jedem Test leeren
+        modul._PING_SPERRE.clear()
+        self.addCleanup(modul._PING_SPERRE.clear)
         self.client = self.env['wb.license.client']
         self.env['ir.config_parameter'].sudo().set_param(
             'wb_license_client.key_BKOF', 'WB-BKOF-abc12345AB')
@@ -69,3 +73,28 @@ class TestPingBackoff(TransactionCase):
             info = self.client.check_license('BKOF')
         self.assertEqual(request.call_count, 0)
         self.assertFalse(info.is_valid)
+
+    def test_sperre_ueberlebt_rollback(self):
+        """Der DB-Merker geht bei Rollback verloren, die Speicher-Sperre nicht."""
+        with self._request((None, 0)) as request:
+            self.client.check_license('BKOF')
+            # Rollback: DB-Merker weg, Cache wieder "Ping fällig"
+            self.info.last_failed_check_at = False
+            self.client.check_license('BKOF')
+        self.assertEqual(request.call_count, 1, "Speicher-Sperre muss den zweiten Ping verhindern.")
+
+    def test_sperre_endet_nach_15_minuten(self):
+        key = (self.env.cr.dbname, 'BKOF')
+        with self._request((None, 0)) as request:
+            self.client.check_license('BKOF')
+            self.info.last_failed_check_at = False
+            modul._PING_SPERRE[key] -= PING_RETRY_MINUTES * 60 + 1
+            self.client.check_license('BKOF')
+        self.assertEqual(request.call_count, 2)
+
+    def test_erfolg_loescht_speicher_sperre(self):
+        key = (self.env.cr.dbname, 'BKOF')
+        modul._PING_SPERRE[key] = modul.time.monotonic() - PING_RETRY_MINUTES * 60 - 1
+        with self._request(({'state': 'active', 'valid_to': '2030-12-31'}, 200)):
+            self.client.check_license('BKOF')
+        self.assertNotIn(key, modul._PING_SPERRE)

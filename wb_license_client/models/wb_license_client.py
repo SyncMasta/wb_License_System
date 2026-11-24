@@ -56,6 +56,13 @@ INSTALL_ANNOUNCE_THROTTLE_HOURS = 24
 # bis dahin gilt der gespeicherte Zustand (min_cache_age_days unverändert).
 PING_RETRY_MINUTES = 15
 
+# Zusätzliche Ping-Pause im Arbeitsspeicher je Worker: {(dbname, product_code):
+# time.monotonic() des letzten Fehlschlags}. Der DB-Merker ``last_failed_check_at``
+# geht verloren, wenn die Transaktion der gegateten Methode zurückgerollt wird;
+# dieser Eintrag bleibt. Bewusst ohne Lock und ohne zweiten Cursor (der würde
+# sich an derselben Zeile selbst blockieren). Ein Dict-Zugriff genügt je Worker.
+_PING_SPERRE = {}
+
 
 class WbLicenseClient(models.AbstractModel):
     _name = 'wb.license.client'
@@ -104,6 +111,9 @@ class WbLicenseClient(models.AbstractModel):
             info.last_failed_check_at
             and now - timedelta(minutes=PING_RETRY_MINUTES) < info.last_failed_check_at <= now
         )
+        sperre = _PING_SPERRE.get((self.env.cr.dbname, product_code))
+        if sperre is not None and time.monotonic() - sperre < PING_RETRY_MINUTES * 60:
+            recently_failed = True
         if needs_refresh and not recently_failed:
             self._do_ping(info, product_code, key)
 
@@ -491,9 +501,12 @@ class WbLicenseClient(models.AbstractModel):
             '/api/license/check', payload,
             key=key, secret=self._get_stored_secret(product_code),
         )
+        sperre_key = (self.env.cr.dbname, product_code)
         if status == 200 and data:
+            _PING_SPERRE.pop(sperre_key, None)
             info.apply_server_response(data)
         else:
+            _PING_SPERRE[sperre_key] = time.monotonic()
             info.record_check_failure(status, data)
 
     @api.model
