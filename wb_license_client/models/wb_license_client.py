@@ -52,6 +52,9 @@ DEFAULT_ACTIVATE_TIMEOUT = 15
 DEFAULT_ANNOUNCE_TIMEOUT = 5
 DEFAULT_MIN_CACHE_AGE_DAYS = 30
 INSTALL_ANNOUNCE_THROTTLE_HOURS = 24
+# Nach einem fehlgeschlagenen Ping frühestens nach dieser Zeit erneut pingen;
+# bis dahin gilt der gespeicherte Zustand (min_cache_age_days unverändert).
+PING_RETRY_MINUTES = 15
 
 
 class WbLicenseClient(models.AbstractModel):
@@ -68,7 +71,8 @@ class WbLicenseClient(models.AbstractModel):
           2. Cache-Eintrag (wb.license.info) prüfen
           3. Wenn Cache < 24h alt: Cache zurückgeben (kein HTTP-Call)
           4. Sonst: Ping an Server, Cache aktualisieren
-          5. Bei Server-Fehler: alten Cache behalten, state bleibt wie es war
+          5. Bei Server-Fehler: alten Cache behalten, state bleibt wie es war;
+             der nächste Ping frühestens nach PING_RETRY_MINUTES
           6. is_valid berücksichtigt min_cache_age_days für 'unknown'-State
 
         :param product_code: 4-stelliger Produkt-Code (z.B. 'TELE')
@@ -89,11 +93,18 @@ class WbLicenseClient(models.AbstractModel):
             self._maybe_announce_install(info, product_code)
             return info
 
+        now = fields.Datetime.now()
         needs_refresh = (
             not info.last_server_check
-            or info.last_server_check < fields.Datetime.now() - timedelta(hours=24)
+            or info.last_server_check < now - timedelta(hours=24)
         )
-        if needs_refresh:
+        # Server war gerade nicht erreichbar: nicht bei jedem Aufruf erneut bis
+        # zum Timeout warten, sondern höchstens alle PING_RETRY_MINUTES.
+        recently_failed = (
+            info.last_failed_check_at
+            and now - timedelta(minutes=PING_RETRY_MINUTES) < info.last_failed_check_at <= now
+        )
+        if needs_refresh and not recently_failed:
             self._do_ping(info, product_code, key)
 
         info.apply_cache_age_policy(min_cache_age_days)
