@@ -102,6 +102,13 @@ class WbLicenseInfo(models.Model):
         help="Zeitpunkt der letzten Antwort vom WB-Server.",
     )
     last_check_success = fields.Boolean(default=False)
+    last_failed_check_at = fields.Datetime(
+        string='Letzter fehlgeschlagener Check',
+        readonly=True,
+        help="Zeitpunkt des letzten fehlgeschlagenen Pings. check_license "
+             "pingt danach frühestens nach 15 Minuten erneut; bis dahin gilt "
+             "der gespeicherte Zustand.",
+    )
     last_error_message = fields.Char()
     last_clock_anomaly_at = fields.Datetime(
         string='Letzte Clock-Anomalie',
@@ -356,6 +363,7 @@ class WbLicenseInfo(models.Model):
             'last_server_check': now,
             'last_check_success': True,
             'last_error_message': False,
+            'last_failed_check_at': False,
             'server_response_raw': json.dumps(data, ensure_ascii=False),
             'latest_module_version': (data.get('latest_module_version') or '').strip() or False,
             'download_url': (data.get('download_url') or '').strip() or False,
@@ -391,6 +399,7 @@ class WbLicenseInfo(models.Model):
         self.write({
             'last_check_success': False,
             'last_error_message': msg,
+            'last_failed_check_at': fields.Datetime.now(),
         })
         if self.state == 'active':
             self.state = 'unknown'
