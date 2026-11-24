@@ -6,6 +6,8 @@ from unittest.mock import patch
 from odoo import fields
 from odoo.tests import TransactionCase, tagged
 
+from odoo.addons.wb_license_client.models.wb_license_client import _PING_SPERRE
+
 
 @tagged('wb_license_client', 'wb_license_info')
 class TestLicenseInfo(TransactionCase):
@@ -153,6 +155,9 @@ class TestLicenseInfo(TransactionCase):
         ICP = self.env['ir.config_parameter'].sudo()
         info = self._create_info(state='active')
         sent = []
+        # _do_ping schreibt in die Speicher-Sperre je Worker (Modulzustand): danach leeren,
+        # sonst sehen spätere Tests im selben Prozess eine Sperre aus diesem Test
+        self.addCleanup(_PING_SPERRE.clear)
 
         def fake_request(endpoint, payload, **kwargs):
             sent.append(payload)
