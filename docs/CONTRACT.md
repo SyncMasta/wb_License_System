@@ -219,6 +219,7 @@ Der einzige Endpunkt, den der PHP-Client benötigt.
 | `domain` | string | nein | nur Event-Log; zusammen mit `db_uuid` + `module_version` Update der Install-Version |
 | `db_uuid` | string | nein | dito — hier die synthetische Instanzkennung |
 | `module_version` | string | nein | Version des Konsumenten; nur wirksam wenn `domain` **und** `db_uuid` mitkommen |
+| `product_code` | string | nein | Produkt, für das der Client prüft. Gehört der Key zu einem anderen Produkt: `PRODUCT_MISMATCH` (DECISIONS.md #97). Weglassen = keine Prüfung (ältere Clients, PHP) |
 | `is_neutralized` | bool | nein | Nur Odoo-Client: `database.is_neutralized` der Datenbank. Muss echtes JSON-`true` sein, alles andere zählt als `false`. Für PHP gegenstandslos (weglassen). |
 
 Weitere Felder werden ignoriert (`**kw`).
@@ -273,6 +274,7 @@ Die Felder `latest_module_version` und `download_url` sind für PHP-Dienste gege
 | `TOO_MANY_REQUESTS` | IP- oder Key-Limit überschritten | kein Retry, Circuit Breaker öffnen, `LicenseServerUnreachable`, aus Cache/LocalGrace bedienen |
 | `INVALID_KEY_FORMAT` | Formatprüfung gescheitert | kein Retry — Konfigurationsfehler, deutlich loggen (maskiert!), `unknown` |
 | `KEY_NOT_FOUND` | Key existiert nicht in `wb.license.key` | kein Retry, deutlicher Log-Eintrag, `unknown` |
+| `PRODUCT_MISMATCH` | `product_code` im Request ≠ Produkt des Keys (#97) | wie `expired` behandeln, Key gilt für dieses Produkt nicht |
 
 **Es gibt kein HTTP 429 und keinen `Retry-After`-Header.** Der Backoff muss vollständig
 clientseitig erfolgen; sinnvoll ist eine feste Sperre (z. B. 15 Minuten) nach `TOO_MANY_REQUESTS`,
@@ -333,7 +335,7 @@ normalisierte `pre_assigned_domain` == Domain **oder** `pre_assigned_email` == E
 ## 6. Übrige Endpunkte (Vollständigkeit)
 
 - **`/api/license/activate`** — `key`, `activation_code` (`^[A-HJ-NP-Z2-9]{5}(-[A-HJ-NP-Z2-9]{5}){4}$`),
-  `domain`, `db_uuid`, vier Pflicht-Consents (`confirm_eula`, `confirm_terms`, `confirm_privacy`,
+  `domain`, `db_uuid`, optional `product_code` (sonst `PRODUCT_MISMATCH` bei fremdem Key, #97), vier Pflicht-Consents (`confirm_eula`, `confirm_terms`, `confirm_privacy`,
   `confirm_no_refund`), optional `subscribe_newsletter`, `contact_email`, `request_id` (UUID4,
   Replay-Dedup). Erfolg: `{"status":"ok","state":...,"bound_domain":...,"valid_to":...}`.
   Fehler: `TOO_MANY_ATTEMPTS`, `INVALID_KEY_FORMAT`, `INVALID_CODE_FORMAT`, `MISSING_BINDING_DATA`,
@@ -344,23 +346,31 @@ normalisierte `pre_assigned_domain` == Domain **oder** `pre_assigned_email` == E
   Infrastruktur sinnlos.
 - **`/api/license/migrate`** — `key` + `new_domain`/`new_db_uuid`/`reason`/`contact_email`.
   Legt einen Migrationsantrag an; die Umbindung macht WB manuell im Odoo.
-- **`/api/license/trial`** (DECISIONS.md #94) — `product_code`, `contact_name`, `contact_email`,
-  `company_name`, `domain`, `db_uuid` (UUID, empfohlen), optional `contact_phone`, `company_size`,
-  `industry`, `expected_use_case`. Aufgerufen vom Kunden-Odoo („Start 7-day free trial“, nur nach
-  Zustimmung im Formular) und von der Website; CORS `*.wissen-beratung.de` betrifft nur Browser.
+- **`/api/license/trial`** (DECISIONS.md #94, #97) — `product_code`, `contact_name`, `contact_email`,
+  `company_name`, `domain`, `db_uuid` (UUID, empfohlen), **`consent: true`** (echtes JSON-true) und
+  **`privacy_version`** (Fassung der Datenschutzhinweise, ≤ 32 Zeichen; ohne beides
+  `MISSING_CONSENT`), optional `contact_phone`, `company_size`, `industry`, `expected_use_case`.
+  Header `X-WB-DB-UUID` (der Odoo-Client sendet ihn immer). Aufgerufen vom Kunden-Odoo („Start 7-day
+  free trial“, nur nach Zustimmung im Formular) und von der Website; CORS `*.wissen-beratung.de`
+  betrifft nur Browser.
   Erfolg: `{"status":"ok","trial_id":...,"key":"WB-XXXX-…","state":"trial","product_code":...,
   "valid_from":...,"valid_to":...,"max_users":0}` — Laufzeit `wb_trial_days` des Produkts, Schlüssel
   an `domain` + `db_uuid` gebunden, kein Aktivierungscode, kein API-Secret. Variante: das größte
-  Paket (unbegrenzt vor höchster Grenze). Missbrauchsverdacht: `{"status":"pending","trial_id":...}`
-  ohne Schlüssel, Freigabe von Hand. Derselbe Antrag (gleiche E-Mail, Domain und DB-UUID) erneut:
-  vorhandener Stand (Schlüssel bzw. `pending`). Fehler: `TOO_MANY_REQUESTS`, `INVALID_EMAIL`,
-  `MISSING_COMPANY`, `MISSING_DOMAIN`, `INVALID_PRODUCT_CODE`, `INVALID_DB_UUID`,
-  `PRODUCT_NOT_FOUND`, `TRIAL_NOT_AVAILABLE` (`wb_trial_days` = 0), `EMAIL_LIMIT_REACHED`,
-  `DOMAIN_LIMIT_REACHED`, `DATABASE_LIMIT_REACHED`, `TRIAL_ALREADY_USED` (abgelaufen, umgewandelt
-  oder abgelehnt), `TRIAL_PROCESSING_FAILED`.
+  Paket (unbegrenzt vor höchster Grenze). `{"status":"pending","trial_id":...}` ohne Schlüssel bei
+  Missbrauchsverdacht oder wenn E-Mail bzw. öffentliche Domain schon einen Test aus einer anderen DB
+  hatten; Freigabe von Hand. Derselbe Antrag (exakt gleiche E-Mail, Domain und DB-UUID, Header
+  `X-WB-DB-UUID` = `db_uuid`) erneut: vorhandener Stand (Schlüssel bzw. `pending`). Fehler:
+  `TOO_MANY_REQUESTS`, `INVALID_EMAIL`, `MISSING_COMPANY`, `MISSING_DOMAIN`, `INVALID_PRODUCT_CODE`,
+  `INVALID_DB_UUID`, `MISSING_CONSENT`, `PRODUCT_NOT_FOUND`, **`TRIAL_NOT_AVAILABLE`** (ein Code
+  für: kein Test vorgesehen, diese DB hatte schon einen Test, abgelaufen, umgewandelt, abgelehnt),
+  `TRIAL_PROCESSING_FAILED`. Die Codes `EMAIL_/DOMAIN_/DATABASE_LIMIT_REACHED` und
+  `TRIAL_ALREADY_USED` gibt es seit #97 nicht mehr.
 - **`/api/wb_subscription/order`** — CORS auf `*.wissen-beratung.de`, gehört zur Website. Der
   Order-Endpunkt ist der einzige mit echter Auth (`X-API-Key` gegen
-  `ir.config_parameter wb_subscription.webshop_api_key`).
+  `ir.config_parameter wb_subscription.webshop_api_key`, konstantzeitig verglichen). Variante per
+  `product_id` oder `default_code`; ohne beides bei mehreren Varianten `AMBIGUOUS_PRODUCT`, eine
+  Angabe, die nicht zum `product_code` passt, `PRODUCT_NOT_FOUND`. Kontakt wird nur bei exakt
+  gleicher (normalisierter) E-Mail wiederverwendet (#97).
 
 ---
 
