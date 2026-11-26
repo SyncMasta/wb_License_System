@@ -26,6 +26,7 @@ import hmac
 import json
 import logging
 import random
+import re
 import secrets
 import time
 import uuid
@@ -35,7 +36,9 @@ from functools import wraps
 import requests
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
+
+from .wb_license_info import parse_max_users
 
 _logger = logging.getLogger(__name__)
 
@@ -50,6 +53,9 @@ DEBUG_PARAM = 'wb_license_client.debug_mode'
 INSTALL_REGISTRY_OPT_OUT_PARAM = 'wb_license_client.disable_install_registry'
 DEFAULT_CHECK_TIMEOUT = 10
 DEFAULT_ACTIVATE_TIMEOUT = 15
+DEFAULT_TRIAL_TIMEOUT = 20
+# Format eines Public Keys (wie wb.key.generator auf dem Server, ohne Prüfsumme).
+KEY_FORMAT_RE = re.compile(r'^WB-([A-Z0-9]{4})-([a-f0-9]{8})([A-Z2-7]{2})$')
 DEFAULT_ANNOUNCE_TIMEOUT = 5
 DEFAULT_MIN_CACHE_AGE_DAYS = 30
 INSTALL_ANNOUNCE_THROTTLE_HOURS = 24
@@ -169,17 +175,149 @@ class WbLicenseClient(models.AbstractModel):
         if status == 200 and data and data.get('status') == 'ok':
             self._store_key(product_code, key)
             info = self._get_or_create_info(product_code)
-            info.write({
+            vals = {
                 'key': key,
                 'state': 'active',
                 'valid_to': data.get('valid_to'),
                 'last_server_check': fields.Datetime.now(),
                 'last_check_success': True,
                 'last_error_message': False,
-            })
+            }
+            if 'max_users' in data:
+                vals['max_users'] = parse_max_users(data.get('max_users'))
+            info.write(vals)
             return info
 
         self._raise_activation_error(status, data)
+
+    @api.model
+    def start_trial(self, product_code, contact_name, contact_email, company_name):
+        """Request a free trial from /api/license/trial and store its key (DECISIONS.md #94).
+
+        Called by the wizard only after the user agreed to send the data. Sends
+        name, email and company of the form plus domain and database UUID of
+        this instance (the trial key is bound to them). Stores nothing unless
+        the server answers with a valid trial key.
+
+        :return: ``('ok', info)`` or ``('pending', None)`` (request is reviewed
+            manually by WISSEN BERATUNG; repeating it later fetches the key).
+        :raises UserError: on any error; then no key is stored.
+        """
+        # Öffentliche Methode (per RPC aufrufbar): nur Administratoren dürfen
+        # Daten an WB senden und einen Schlüssel eintragen.
+        if not self.env.is_superuser() and not self.env.user.has_group('base.group_system'):
+            raise AccessError(_("Only administrators can start a trial."))
+        product_code = (product_code or '').strip().upper()
+        if self._get_stored_key(product_code):
+            raise UserError(_(
+                "A license key for %s is already configured. A trial is only "
+                "available for new installations.") % product_code)
+        domain = self._get_domain() or ''
+        db_uuid = self._get_db_uuid() or ''
+        if not domain or not db_uuid:
+            raise UserError(_(
+                "The domain or database ID of this Odoo instance could not be "
+                "determined. Please inform your system administrator."))
+        payload = {
+            'product_code': product_code,
+            'contact_name': (contact_name or '').strip(),
+            'contact_email': (contact_email or '').strip(),
+            'company_name': (company_name or '').strip(),
+            'domain': domain,
+            'db_uuid': db_uuid,
+            'client_version': self._get_module_version(),
+        }
+        data, status = self._do_request(
+            '/api/license/trial', payload, timeout=DEFAULT_TRIAL_TIMEOUT)
+        data = data if isinstance(data, dict) else {}
+
+        if status == 200 and data.get('status') == 'pending':
+            return 'pending', None
+        key = (data.get('key') or '').strip() if status == 200 and data.get('status') == 'ok' else ''
+        match = KEY_FORMAT_RE.match(key)
+        if match and match.group(1) == product_code:
+            self._store_key(product_code, key)
+            info = self._get_or_create_info(product_code)
+            state = data.get('state') if data.get('state') in ('trial', 'active') else 'trial'
+            info.write({
+                'key': key,
+                'state': state,
+                'valid_from': data.get('valid_from') or False,
+                'valid_to': data.get('valid_to') or False,
+                'max_users': parse_max_users(data.get('max_users')),
+                'last_server_check': fields.Datetime.now(),
+                'last_check_success': True,
+                'last_error_message': False,
+                'last_failed_check_at': False,
+                'instance_status': False,
+                'instance_until': False,
+            })
+            return 'ok', info
+        self._raise_trial_error(status, data)
+
+    @api.model
+    def _raise_trial_error(self, status, data):
+        """Translate an error answer of /api/license/trial into a UserError."""
+        error_code = (data or {}).get('error')
+        messages = {
+            'EMAIL_LIMIT_REACHED': _(
+                "A free trial was already requested with this email address. "
+                "Only one trial per email address, domain and database is possible. "
+                "Please contact vertrieb@wissen-beratung.de."),
+            'DOMAIN_LIMIT_REACHED': _(
+                "A free trial was already requested for this Odoo domain. Only one "
+                "trial per email address, domain and database is possible. Please "
+                "contact vertrieb@wissen-beratung.de."),
+            'DATABASE_LIMIT_REACHED': _(
+                "A free trial was already requested for this database. Only one "
+                "trial per email address, domain and database is possible. Please "
+                "contact vertrieb@wissen-beratung.de."),
+            'TRIAL_ALREADY_USED': _(
+                "The free trial for this installation has already been used or has "
+                "ended. To keep using the product, please order a license from "
+                "vertrieb@wissen-beratung.de."),
+            'TRIAL_NOT_AVAILABLE': _(
+                "No free trial is offered for this product. Please contact "
+                "vertrieb@wissen-beratung.de."),
+            'PRODUCT_NOT_FOUND': _(
+                "The license server does not know this product. Please contact "
+                "support@wissen-beratung.de."),
+            'INVALID_EMAIL': _("Please enter a valid email address."),
+            'MISSING_COMPANY': _("Please enter your company."),
+            'MISSING_DOMAIN': _(
+                "The address of this Odoo instance could not be determined. Please "
+                "inform your system administrator."),
+            'INVALID_DB_UUID': _(
+                "The database ID of this Odoo instance is invalid. Please inform "
+                "your system administrator."),
+            'INVALID_PRODUCT_CODE': _(
+                "Invalid product code. Please contact support@wissen-beratung.de."),
+            'TOO_MANY_REQUESTS': _("Too many requests. Please try again in an hour."),
+        }
+        message = messages.get(error_code)
+        if not message:
+            if status == 0:
+                message = _(
+                    "The license server cannot be reached. Please check the internet "
+                    "connection and try again. No trial was started.")
+            else:
+                message = _(
+                    "The trial could not be started (HTTP %s). Please try again later "
+                    "or contact support@wissen-beratung.de.") % status
+        raise UserError(message)
+
+    @api.model
+    def _wb_license_max_users(self, product_code):
+        """Public helper for product modules: user limit of the current license.
+
+        :return: ``None`` if there is no valid license for ``product_code``,
+            ``0`` for unlimited, otherwise the maximum number of users reported
+            by the license server.
+        """
+        info = self.check_license(product_code)
+        if not info.is_valid:
+            return None
+        return info.max_users or 0
 
     @api.model
     def request_migration(self, product_code, new_domain, new_db_uuid, reason, contact_email):
@@ -187,7 +325,7 @@ class WbLicenseClient(models.AbstractModel):
         key = self._get_stored_key(product_code)
         if not key:
             raise UserError(_(
-                "Keine Lizenz für Produkt '%s' konfiguriert — Migration nicht möglich."
+                "No license configured for product '%s', migration not possible."
             ) % product_code)
         payload = {
             'key': key,
@@ -201,8 +339,8 @@ class WbLicenseClient(models.AbstractModel):
         data, status = self._do_request('/api/license/migrate', payload)
         if status != 200:
             raise UserError(_(
-                "Migration konnte nicht beantragt werden (HTTP %s). Bitte später erneut versuchen "
-                "oder support@wissen-beratung.de kontaktieren."
+                "The migration could not be requested (HTTP %s). Please try again later "
+                "or contact support@wissen-beratung.de."
             ) % status)
         return data
 
@@ -237,9 +375,8 @@ class WbLicenseClient(models.AbstractModel):
 
         if not body['domain'] or not body['db_uuid']:
             raise UserError(_(
-                "Konnte Domain bzw. DB-UUID dieser Odoo-Instanz nicht "
-                "ermitteln — bitte System-Administrator informieren."
-            ))
+                "The domain or database ID of this Odoo instance could not be "
+                "determined. Please inform your system administrator."))
 
         # Signatur ist hier optional: ein Interessent hat noch keinen Key.
         # Ein Bestandskunde, der ein zweites Produkt anfragt, signiert mit
@@ -257,23 +394,21 @@ class WbLicenseClient(models.AbstractModel):
 
         error_code = (data or {}).get('error') if data else None
         messages = {
-            'TOO_MANY_REQUESTS': _(
-                "Zu viele Anfragen. Bitte in einer Stunde erneut versuchen."),
+            'TOO_MANY_REQUESTS': _("Too many requests. Please try again in an hour."),
             'INVALID_PRODUCT_CODE': _(
-                "Ungültiger Produkt-Code — bitte support@wissen-beratung.de "
-                "kontaktieren."),
+                "Invalid product code. Please contact support@wissen-beratung.de."),
             'MISSING_BINDING_DATA': _(
-                "Domain oder DB-UUID dieser Odoo-Instanz konnte nicht ermittelt "
-                "werden — bitte System-Administrator informieren."),
+                "The domain or database ID of this Odoo instance could not be "
+                "determined. Please inform your system administrator."),
             'MISSING_REQUIRED_FIELDS': _(
-                "Bitte Firma, Ansprechpartner und Email ausfüllen."),
+                "Please fill in company, contact person and email."),
         }
         message = messages.get(error_code) or (
-            _("Lizenz-Server nicht erreichbar (HTTP %s). Bitte später erneut "
-              "versuchen oder vertrieb@wissen-beratung.de kontaktieren.") % status
+            _("The license server cannot be reached (HTTP %s). Please try again "
+              "later or contact vertrieb@wissen-beratung.de.") % status
             if status == 0 or status >= 500
-            else _("Anfrage konnte nicht übermittelt werden (HTTP %s). Bitte "
-                   "Eingaben prüfen und erneut versuchen.") % status
+            else _("The request could not be sent (HTTP %s). Please check your "
+                   "input and try again.") % status
         )
         raise UserError(message)
 
@@ -354,14 +489,17 @@ class WbLicenseClient(models.AbstractModel):
         if not key:
             return False
         self._store_key(product_code, key)
-        info.sudo().write({
+        vals = {
             'key': key,
             'state': data.get('state') or 'active',
             'valid_to': data.get('valid_to'),
             'last_server_check': fields.Datetime.now(),
             'last_check_success': True,
             'last_error_message': False,
-        })
+        }
+        if 'max_users' in data:
+            vals['max_users'] = parse_max_users(data.get('max_users'))
+        info.sudo().write(vals)
         _logger.info(
             "[wb_license_client] Auto-Lookup %s: Match — Lizenz '%s' "
             "automatisch gebunden.", product_code, key)
@@ -578,39 +716,39 @@ class WbLicenseClient(models.AbstractModel):
         error_code = (data or {}).get('error') if data else None
         messages = {
             'INVALID_KEY_FORMAT': _(
-                "Der Lizenzschlüssel hat ein ungültiges Format. Bitte genau so eingeben "
-                "wie er auf dem Zertifikat steht."),
+                "The license key has an invalid format. Please enter it exactly as "
+                "shown on the certificate."),
             'INVALID_CODE_FORMAT': _(
-                "Der Aktivierungs-Code hat ein ungültiges Format. 5 Gruppen à 5 Zeichen, "
-                "mit Bindestrichen getrennt."),
+                "The activation code has an invalid format: 5 groups of 5 characters, "
+                "separated by hyphens."),
             'KEY_NOT_FOUND': _(
-                "Dieser Lizenzschlüssel ist nicht bekannt. Bitte Eingabe prüfen oder "
-                "support@wissen-beratung.de kontaktieren."),
+                "This license key is unknown. Please check your input or contact "
+                "support@wissen-beratung.de."),
             'WRONG_CODE': _(
-                "Der Aktivierungs-Code ist falsch. Bitte prüfen Sie den Code im Portal "
-                "und versuchen Sie es erneut."),
+                "The activation code is wrong. Please check the code in the portal "
+                "and try again."),
             'ALREADY_ACTIVATED': _(
-                "Dieser Lizenzschlüssel wurde bereits an einer anderen Instanz aktiviert. "
-                "Möchten Sie eine Migration beantragen?"),
+                "This license key has already been activated on another instance. "
+                "Do you want to request a migration?"),
             'ACTIVATION_EXPIRED': _(
-                "Der Aktivierungs-Zeitraum ist abgelaufen. Bitte kontaktieren Sie "
-                "support@wissen-beratung.de für eine Reaktivierung."),
+                "The activation period has expired. Please contact "
+                "support@wissen-beratung.de to reactivate it."),
             'TOO_MANY_ATTEMPTS': _(
-                "Zu viele Fehlversuche. Bitte warten Sie 1 Stunde und versuchen Sie es erneut."),
+                "Too many failed attempts. Please wait one hour and try again."),
             'MISSING_CONSENTS': _(
-                "Aktivierung nicht möglich — Sie müssen EULA, AGB, Datenschutzhinweis "
-                "und den Verzicht auf Gutschrift bestätigen."),
+                "Activation not possible: you have to confirm the EULA, the terms and "
+                "conditions, the privacy notice and the waiver of a refund."),
         }
         message = messages.get(error_code)
         if not message:
             if status == 0:
                 message = _(
-                    "Der Lizenz-Server ist nicht erreichbar. Bitte prüfen Sie Ihre "
-                    "Internetverbindung und versuchen Sie es erneut.")
+                    "The license server cannot be reached. Please check your internet "
+                    "connection and try again.")
             else:
                 message = _(
-                    "Aktivierung fehlgeschlagen (HTTP %s). Bitte support@wissen-beratung.de "
-                    "kontaktieren.") % status
+                    "Activation failed (HTTP %s). Please contact "
+                    "support@wissen-beratung.de.") % status
         raise UserError(message)
 
     @api.model
@@ -769,8 +907,8 @@ def license_required(product_code, min_cache_age_days=DEFAULT_MIN_CACHE_AGE_DAYS
             )
             if not info.is_valid:
                 raise UserError(info.user_message or _(
-                    "Keine gültige Lizenz für '%s'. Bitte unter Einstellungen "
-                    "→ WB Lizenzen aktivieren."
+                    "No valid license for '%s'. Please activate one under "
+                    "Settings → WB Licenses."
                 ) % product_code)
             return func(self, *args, **kwargs)
         return wrapper

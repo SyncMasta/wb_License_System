@@ -7,21 +7,21 @@
         <field name="inherit_id" ref="base.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
-                <app data-string="WB Lizenzen" string="WB Lizenzen" name="wb_license_client"
+                <app data-string="WB Licenses" string="WB Licenses" name="wb_license_client"
                      groups="base.group_system">
-                    <block title="Server-Verbindung" name="wb_license_server">
-                        <setting string="Lizenz-Server"
-                                 help="URL des WB-Lizenz-Servers. Default nicht ändern.">
+                    <block title="Server Connection" name="wb_license_server">
+                        <setting string="License Server"
+                                 help="URL of the WB license server. Do not change the default.">
                             <field name="wb_license_server_url" placeholder="https://my.wissen-beratung.de"/>
                         </setting>
-                        <setting string="Debug-Modus"
-                                 help="Server-Responses als Notification anzeigen. Nur für Support/Diagnose.">
+                        <setting string="Debug Mode"
+                                 help="Show server answers as notifications. Only for support and diagnosis.">
                             <field name="wb_license_debug_mode"/>
                         </setting>
                     </block>
-                    <block title="Datenschutz" name="wb_license_privacy">
-                        <setting string="Install-Registry deaktivieren"
-                                 help="Sendet beim Install eines unlizenzierten Addons KEIN Announce-Signal an my.wissen-beratung.de. Default: aus.">
+                    <block title="Privacy" name="wb_license_privacy">
+                        <setting string="Disable Install Registry"
+                                 help="Installing an unlicensed add-on sends NO announcement to my.wissen-beratung.de. Default: off.">
                             <field name="wb_license_disable_install_registry"/>
                         </setting>
                     </block>

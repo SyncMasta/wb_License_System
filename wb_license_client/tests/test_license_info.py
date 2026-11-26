@@ -135,7 +135,7 @@ class TestLicenseInfo(TransactionCase):
         })
         self.assertFalse(info.is_valid)
         self.assertEqual(info.instance_status, 'mismatch')
-        self.assertIn('Migration', info.user_message)
+        self.assertIn('migration', info.user_message.lower())
 
     def test_instance_status_cleared_without_instance_block(self):
         info = self._create_info(instance_status='eval',

@@ -11,24 +11,24 @@ from odoo.exceptions import UserError
 
 class WbLicenseMigrateWizard(models.TransientModel):
     _name = 'wb.license.migrate.wizard'
-    _description = 'Wizard für Lizenz-Migration'
+    _description = 'License Migration Wizard'
 
     product_code = fields.Char(size=4, required=True)
-    current_domain = fields.Char(string='Aktuelle Domain (alt)', readonly=True)
-    current_db_uuid = fields.Char(string='Aktuelle DB-UUID (alt)', readonly=True)
+    current_domain = fields.Char(string='Current Domain (old)', readonly=True)
+    current_db_uuid = fields.Char(string='Current Database ID (old)', readonly=True)
     new_domain = fields.Char(
-        string='Neue Domain',
+        string='New Domain',
         required=True,
         default=lambda self: self.env['wb.license.client']._get_domain() or '',
     )
     new_db_uuid = fields.Char(
-        string='Neue DB-UUID',
+        string='New Database ID',
         readonly=True,
         default=lambda self: self.env['wb.license.client']._get_db_uuid() or '',
     )
-    reason = fields.Text(string='Begründung', required=True)
+    reason = fields.Text(string='Reason', required=True)
     contact_email = fields.Char(
-        string='Kontakt-Email',
+        string='Contact Email',
         required=True,
         default=lambda self: self.env.user.email or '',
     )
@@ -63,11 +63,10 @@ class WbLicenseMigrateWizard(models.TransientModel):
             'tag': 'display_notification',
             'params': {
                 'type': 'success',
-                'title': _("Migration beantragt"),
+                'title': _("Migration requested"),
                 'message': _(
-                    "Ihr Migrations-Antrag wurde übermittelt. Sie erhalten "
-                    "eine Benachrichtigung sobald er bearbeitet wurde "
-                    "(normalerweise 1-2 Werktage)."
+                    "Your migration request has been sent. You will be notified "
+                    "as soon as it has been processed (usually 1-2 working days)."
                 ),
                 'sticky': False,
                 'next': {'type': 'ir.actions.act_window_close'},
