@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 19.0-20261112\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-26 12:04+0000\n"
-"PO-Revision-Date: 2026-11-26 12:04+0000\n"
+"POT-Creation-Date: 2026-11-26 12:25+0000\n"
+"PO-Revision-Date: 2026-11-26 12:25+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
@@ -117,27 +117,8 @@ msgstr ""
 #. odoo-python
 #: code:addons/wb_license_client/models/wb_license_client.py:0
 msgid ""
-"A free trial was already requested for this Odoo domain. Only one trial per "
-"email address, domain and database is possible. Please contact "
-"vertrieb@wissen-beratung.de."
-msgstr ""
-
-#. module: wb_license_client
-#. odoo-python
-#: code:addons/wb_license_client/models/wb_license_client.py:0
-msgid ""
-"A free trial was already requested for this database. Only one trial per "
-"email address, domain and database is possible. Please contact "
-"vertrieb@wissen-beratung.de."
-msgstr ""
-
-#. module: wb_license_client
-#. odoo-python
-#: code:addons/wb_license_client/models/wb_license_client.py:0
-msgid ""
-"A free trial was already requested with this email address. Only one trial "
-"per email address, domain and database is possible. Please contact "
-"vertrieb@wissen-beratung.de."
+"A free trial is not available for this installation. To test or buy the "
+"product, please contact vertrieb@wissen-beratung.de."
 msgstr ""
 
 #. module: wb_license_client
@@ -671,14 +652,6 @@ msgid "No WB licenses configured."
 msgstr ""
 
 #. module: wb_license_client
-#. odoo-python
-#: code:addons/wb_license_client/models/wb_license_client.py:0
-msgid ""
-"No free trial is offered for this product. Please contact vertrieb@wissen-"
-"beratung.de."
-msgstr ""
-
-#. module: wb_license_client
 #: model:ir.model.fields.selection,name:wb_license_client.selection__wb_license_info__state__unlicensed
 msgid "No key configured"
 msgstr ""
@@ -727,7 +700,7 @@ msgstr ""
 #. module: wb_license_client
 #. odoo-python
 #: code:addons/wb_license_client/models/wb_license_client.py:0
-msgid "Only administrators can start a trial."
+msgid "Only administrators can manage WB licenses."
 msgstr ""
 
 #. module: wb_license_client
@@ -754,6 +727,7 @@ msgstr ""
 
 #. module: wb_license_client
 #. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
 #: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
 msgid ""
 "Please agree to the transfer of your data to WISSEN BERATUNG; without it no "
@@ -1065,15 +1039,6 @@ msgstr ""
 
 #. module: wb_license_client
 #. odoo-python
-#: code:addons/wb_license_client/models/wb_license_client.py:0
-msgid ""
-"The free trial for this installation has already been used or has ended. To "
-"keep using the product, please order a license from vertrieb@wissen-"
-"beratung.de."
-msgstr ""
-
-#. module: wb_license_client
-#. odoo-python
 #: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
 msgid "The free trial of %(code)s is active until %(until)s."
 msgstr ""
@@ -1154,6 +1119,14 @@ msgstr ""
 #. odoo-python
 #: code:addons/wb_license_client/models/wb_license_client.py:0
 msgid ""
+"The license server sent an invalid answer. No trial was started. Please "
+"contact support@wissen-beratung.de."
+msgstr ""
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid ""
 "The migration could not be requested (HTTP %s). Please try again later or "
 "contact support@wissen-beratung.de."
 msgstr ""
@@ -1195,6 +1168,14 @@ msgid ""
 "This database is not the licensed instance for %(code)s. If it is a test "
 "system, neutralize it. After a move, please request the migration "
 "(%(support)s)."
+msgstr ""
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid ""
+"This license key does not belong to product %s. Please check the product "
+"code and the key."
 msgstr ""
 
 #. module: wb_license_client

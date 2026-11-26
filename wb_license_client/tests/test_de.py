@@ -29,8 +29,8 @@ class TestDeutsch(TransactionCase):
     def test_fehler_testantrag(self):
         client = self.de['wb.license.client']
         with self.assertRaises(UserError) as fehler:
-            client._raise_trial_error(200, {'error': 'EMAIL_LIMIT_REACHED'})
-        self.assertIn('E-Mail-Adresse', str(fehler.exception))
+            client._raise_trial_error(200, {'error': 'TRIAL_NOT_AVAILABLE'})
+        self.assertIn('nicht möglich', str(fehler.exception))
 
     def test_ansicht_und_menue(self):
         ansicht = self.env.ref('wb_license_client.wb_license_activate_wizard_view_form')

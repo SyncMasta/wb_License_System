@@ -113,16 +113,41 @@ class TestTrialWizard(TransactionCase):
         self.assertFalse(self.ICP.get_param(KEY_PARAM_PREFIX + 'TRIA'))
         self.assertFalse(self._info().key)
 
-    def test_second_trial_rejected_with_clear_message(self):
-        for code, text in (('EMAIL_LIMIT_REACHED', 'email address'),
-                           ('DOMAIN_LIMIT_REACHED', 'domain'),
-                           ('DATABASE_LIMIT_REACHED', 'database'),
-                           ('TRIAL_ALREADY_USED', 'already been used')):
+    def test_second_trial_rejected_with_one_message(self):
+        # Ein Text für alle „schon genutzt“-Fälle (kein Rückschluss auf E-Mail/Domain/DB);
+        # alte Server senden noch die einzelnen Codes.
+        texte = set()
+        for code in ('TRIAL_NOT_AVAILABLE', 'EMAIL_LIMIT_REACHED', 'DOMAIN_LIMIT_REACHED',
+                     'DATABASE_LIMIT_REACHED', 'TRIAL_ALREADY_USED'):
             with self.subTest(code=code), self._fake({'error': code}):
                 with self.assertRaises(UserError) as err:
                     self._wizard().action_start_trial()
-                self.assertIn(text, str(err.exception))
+                texte.add(str(err.exception))
+        self.assertEqual(len(texte), 1)
+        self.assertIn('vertrieb@wissen-beratung.de', texte.pop())
         self.assertFalse(self.ICP.get_param(KEY_PARAM_PREFIX + 'TRIA'))
+
+    def test_consent_is_sent(self):
+        with self._fake(self._ok()):
+            self._wizard().action_start_trial()
+        payload = self.sent[0][1]
+        self.assertIs(payload['consent'], True)
+        self.assertTrue(payload['privacy_version'])
+
+    def test_invalid_answer_values_store_nothing(self):
+        for extra in ({'max_users': 'viele'}, {'max_users': -1}, {'max_users': True},
+                      {'valid_to': None}, {'valid_to': ''}):
+            with self.subTest(extra=extra), self._fake(self._ok(**extra)):
+                with self.assertRaises(UserError):
+                    self._wizard().action_start_trial()
+        self.assertFalse(self.ICP.get_param(KEY_PARAM_PREFIX + 'TRIA'))
+
+    def test_missing_max_users_means_unlimited(self):
+        answer = self._ok()
+        del answer['max_users']
+        with self._fake(answer):
+            self._wizard().action_start_trial()
+        self.assertEqual(self._info().max_users, 0)
 
     def test_pending_stores_nothing(self):
         with self._fake({'status': 'pending', 'trial_id': 'TRL/0002'}):
@@ -208,12 +233,23 @@ class TestTrialExpiryAndMaxUsers(TransactionCase):
         info = self._info()
         info.apply_server_response({'state': 'active', 'max_users': 20})
         self.assertEqual(info.max_users, 20)
-        info.apply_server_response({'state': 'active', 'max_users': 'kaputt'})
-        self.assertEqual(info.max_users, 0)
-        info.apply_server_response({'state': 'active', 'max_users': -3})
-        self.assertEqual(info.max_users, 0)
+        # Ungültig: vorheriger Wert bleibt (fail-closed, nicht unbegrenzt)
+        for bad in ('kaputt', -3, True, 2.5):
+            info.apply_server_response({'state': 'active', 'max_users': bad})
+            self.assertEqual(info.max_users, 20)
+        # Fehlt das Feld (alter Server): unbegrenzt
         info.apply_server_response({'state': 'active'})
         self.assertEqual(info.max_users, 0)
+
+    def test_invalid_max_users_without_previous_check_is_refused(self):
+        info = self._info()
+        info.apply_server_response({'state': 'active', 'max_users': 'kaputt'})
+        self.assertEqual(info.state, 'unlicensed')
+        self.assertFalse(info.last_server_check)
+        self.assertFalse(info.is_valid)
+
+    def test_trial_without_end_date_is_invalid(self):
+        self.assertFalse(self._info(state='trial', valid_to=False).is_valid)
 
     def test_max_users_helper(self):
         self.assertIsNone(self.Client._wb_license_max_users('TRIA'))

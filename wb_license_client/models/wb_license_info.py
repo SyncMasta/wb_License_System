@@ -33,13 +33,19 @@ CLOCK_DRIFT_TOLERANCE_MINUTES = 60
 _logger = logging.getLogger(__name__)
 
 
-def parse_max_users(value):
-    """User limit from a server answer: non-negative int, 0 (unlimited) if missing or invalid."""
-    try:
-        number = int(value or 0)
-    except (TypeError, ValueError):
+def parse_max_users(data):
+    """User limit from a server answer (DECISIONS.md #95, #97).
+
+    :return: ``0`` (unlimited) if the answer has no ``max_users`` field (older
+        servers), the limit for a non-negative integer, ``None`` for any other
+        value (invalid: the caller keeps the previous value or refuses the answer).
+    """
+    if not isinstance(data, dict) or 'max_users' not in data:
         return 0
-    return max(number, 0)
+    value = data['max_users']
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
 
 
 STATE_SELECTION = [
@@ -79,6 +85,7 @@ class WbLicenseInfo(models.Model):
     )
     key = fields.Char(
         string='License Key',
+        groups='base.group_system',
         help="Public key (copy from the system parameters, for display).",
     )
     key_masked = fields.Char(
@@ -134,6 +141,7 @@ class WbLicenseInfo(models.Model):
     )
     server_response_raw = fields.Text(
         string='Raw Server Response (JSON)',
+        groups='base.group_system',
         help="For debugging: last raw answer of the server.",
     )
     last_install_announce_at = fields.Datetime(
@@ -202,10 +210,12 @@ class WbLicenseInfo(models.Model):
     @api.depends('key')
     def _compute_key_masked(self):
         for rec in self:
-            if not rec.key or len(rec.key) < 6:
-                rec.key_masked = rec.key or ''
+            # sudo: key ist nur für Administratoren lesbar, die Maske für alle (#97)
+            key = rec.sudo().key
+            if not key or len(key) < 6:
+                rec.key_masked = key or ''
                 continue
-            rec.key_masked = f"{rec.key[:8]}...{rec.key[-2:]}"
+            rec.key_masked = f"{key[:8]}...{key[-2:]}"
 
     @api.depends('valid_to')
     def _compute_days_remaining(self):
@@ -259,7 +269,8 @@ class WbLicenseInfo(models.Model):
             elif rec.state == 'trial':
                 # Test endet am valid_to, auch wenn der Server nicht erreichbar
                 # ist (sonst verlängerte eine gesperrte Verbindung den Test).
-                rec.is_valid = not rec.valid_to or rec.valid_to >= fields.Date.context_today(rec)
+                # Ohne Enddatum gilt ein Test nicht (fail-closed, #97).
+                rec.is_valid = bool(rec.valid_to) and rec.valid_to >= fields.Date.context_today(rec)
             elif rec.state == 'grace':
                 rec.is_valid = True
             elif rec.state in ('expired', 'unlicensed'):
@@ -389,8 +400,15 @@ class WbLicenseInfo(models.Model):
             'server_response_raw': json.dumps(data, ensure_ascii=False),
             'latest_module_version': (data.get('latest_module_version') or '').strip() or False,
             'download_url': (data.get('download_url') or '').strip() or False,
-            'max_users': parse_max_users(data.get('max_users')),
         }
+        max_users = parse_max_users(data)
+        if max_users is None:
+            if not self.last_server_check:
+                # Erste Antwort mit ungültiger Grenze: nicht übernehmen (#97, M3)
+                self.record_check_failure(200, {'error': 'INVALID_MAX_USERS'})
+                return
+            max_users = self.max_users
+        vals['max_users'] = max_users
         instance = data.get('instance') if isinstance(data.get('instance'), dict) else {}
         status = instance.get('status')
         vals['instance_status'] = status if status in dict(INSTANCE_STATUS) else False
@@ -408,6 +426,19 @@ class WbLicenseInfo(models.Model):
         self.write(vals)
         if old_state != vals['state']:
             self._notify_state_change(old_state, vals['state'])
+
+    def _mark_product_mismatch(self):
+        """Key or server answer belongs to another product: treat as expired (#97, I4)."""
+        self.ensure_one()
+        old_state = self.state
+        self.sudo().write({
+            'state': 'expired',
+            'last_server_check': fields.Datetime.now(),
+            'last_check_success': False,
+            'last_error_message': 'PRODUCT_MISMATCH',
+        })
+        if old_state != 'expired':
+            self._notify_state_change(old_state, 'expired')
 
     def record_check_failure(self, status, data):
         """Server-Fehler dokumentieren, state nicht überschreiben.

@@ -54,6 +54,8 @@ INSTALL_REGISTRY_OPT_OUT_PARAM = 'wb_license_client.disable_install_registry'
 DEFAULT_CHECK_TIMEOUT = 10
 DEFAULT_ACTIVATE_TIMEOUT = 15
 DEFAULT_TRIAL_TIMEOUT = 20
+# Fassung der Datenschutzhinweise, der beim Test zugestimmt wird (Nachweis am Server, #97)
+PRIVACY_VERSION = '2026-11-26'
 # Format eines Public Keys (wie wb.key.generator auf dem Server, ohne Prüfsumme).
 KEY_FORMAT_RE = re.compile(r'^WB-([A-Z0-9]{4})-([a-f0-9]{8})([A-Z2-7]{2})$')
 DEFAULT_ANNOUNCE_TIMEOUT = 5
@@ -75,8 +77,34 @@ class WbLicenseClient(models.AbstractModel):
     _name = 'wb.license.client'
     _description = 'WB License Client Service'
 
+    # ------------------------------------------------------------------
+    # Zugriff: Die öffentlichen Methoden dieses Dienstes sind nicht per RPC
+    # aufrufbar (@api.private), schreibende zusätzlich nur für Administratoren
+    # (DECISIONS.md #97). Produktmodule rufen sie serverseitig auf.
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _ensure_admin(self):
+        """Raise AccessError unless the caller is superuser or a settings administrator."""
+        if not self.env.is_superuser() and not self.env.user.has_group('base.group_system'):
+            raise AccessError(_("Only administrators can manage WB licenses."))
+
+    @api.model
+    def _key_matches(self, product_code, key):
+        """True if ``key`` is a well-formed key of ``product_code`` (prefix WB-<code>-)."""
+        match = KEY_FORMAT_RE.match((key or '').strip())
+        return bool(match and match.group(1) == (product_code or '').strip().upper())
+
+    @api.private
     @api.model
     def check_license(self, product_code, min_cache_age_days=DEFAULT_MIN_CACHE_AGE_DAYS,
+                      module_name=None):
+        """Server-side entry point for product modules (not callable over RPC)."""
+        return self._check_license(product_code, min_cache_age_days=min_cache_age_days,
+                                   module_name=module_name)
+
+    @api.model
+    def _check_license(self, product_code, min_cache_age_days=DEFAULT_MIN_CACHE_AGE_DAYS,
                        module_name=None):
         """Hauptmethode. Liefert wb.license.info-Record mit aktuellem Status.
 
@@ -106,6 +134,10 @@ class WbLicenseClient(models.AbstractModel):
             info.write({'state': 'unlicensed', 'key': False})
             self._maybe_announce_install(info, product_code)
             return info
+        if not self._key_matches(product_code, key):
+            # Schlüssel eines anderen Produkts: gilt nicht, kein Ping (#97, I4)
+            info._mark_product_mismatch()
+            return info
 
         now = fields.Datetime.now()
         needs_refresh = (
@@ -127,6 +159,7 @@ class WbLicenseClient(models.AbstractModel):
         info.apply_cache_age_policy(min_cache_age_days)
         return info
 
+    @api.private
     @api.model
     def activate_license(self, product_code, key, activation_code, consents=None):
         """Ruft /api/license/activate auf dem Server auf.
@@ -144,8 +177,15 @@ class WbLicenseClient(models.AbstractModel):
             Server validiert die Pflicht-Consents und gibt
             ``MISSING_CONSENTS`` zurück, wenn welche fehlen.
         """
+        self._ensure_admin()
+        product_code = (product_code or '').strip().upper()
+        if not self._key_matches(product_code, key):
+            raise UserError(_(
+                "This license key does not belong to product %s. Please check the "
+                "product code and the key.") % product_code)
         payload = {
             'key': key,
+            'product_code': product_code,
             'activation_code': activation_code,
             'domain': self._get_domain(),
             'db_uuid': self._get_db_uuid(),
@@ -183,13 +223,15 @@ class WbLicenseClient(models.AbstractModel):
                 'last_check_success': True,
                 'last_error_message': False,
             }
-            if 'max_users' in data:
-                vals['max_users'] = parse_max_users(data.get('max_users'))
+            max_users = parse_max_users(data)
+            if max_users is not None:
+                vals['max_users'] = max_users
             info.write(vals)
             return info
 
         self._raise_activation_error(status, data)
 
+    @api.private
     @api.model
     def start_trial(self, product_code, contact_name, contact_email, company_name):
         """Request a free trial from /api/license/trial and store its key (DECISIONS.md #94).
@@ -203,10 +245,8 @@ class WbLicenseClient(models.AbstractModel):
             manually by WISSEN BERATUNG; repeating it later fetches the key).
         :raises UserError: on any error; then no key is stored.
         """
-        # Öffentliche Methode (per RPC aufrufbar): nur Administratoren dürfen
-        # Daten an WB senden und einen Schlüssel eintragen.
-        if not self.env.is_superuser() and not self.env.user.has_group('base.group_system'):
-            raise AccessError(_("Only administrators can start a trial."))
+        # Nur Administratoren dürfen Daten an WB senden und einen Schlüssel eintragen.
+        self._ensure_admin()
         product_code = (product_code or '').strip().upper()
         if self._get_stored_key(product_code):
             raise UserError(_(
@@ -226,6 +266,9 @@ class WbLicenseClient(models.AbstractModel):
             'domain': domain,
             'db_uuid': db_uuid,
             'client_version': self._get_module_version(),
+            # Nur nach angehaktem Kästchen im Formular aufgerufen (#97, I6)
+            'consent': True,
+            'privacy_version': PRIVACY_VERSION,
         }
         data, status = self._do_request(
             '/api/license/trial', payload, timeout=DEFAULT_TRIAL_TIMEOUT)
@@ -234,8 +277,14 @@ class WbLicenseClient(models.AbstractModel):
         if status == 200 and data.get('status') == 'pending':
             return 'pending', None
         key = (data.get('key') or '').strip() if status == 200 and data.get('status') == 'ok' else ''
-        match = KEY_FORMAT_RE.match(key)
-        if match and match.group(1) == product_code:
+        max_users = parse_max_users(data)
+        valid_to = data.get('valid_to') if isinstance(data.get('valid_to'), str) else ''
+        if key and (max_users is None or not valid_to):
+            # Fail-closed: unbrauchbare Antwort, nichts speichern (#97, M3)
+            raise UserError(_(
+                "The license server sent an invalid answer. No trial was started. "
+                "Please contact support@wissen-beratung.de."))
+        if self._key_matches(product_code, key):
             self._store_key(product_code, key)
             info = self._get_or_create_info(product_code)
             state = data.get('state') if data.get('state') in ('trial', 'active') else 'trial'
@@ -243,8 +292,8 @@ class WbLicenseClient(models.AbstractModel):
                 'key': key,
                 'state': state,
                 'valid_from': data.get('valid_from') or False,
-                'valid_to': data.get('valid_to') or False,
-                'max_users': parse_max_users(data.get('max_users')),
+                'valid_to': valid_to,
+                'max_users': max_users,
                 'last_server_check': fields.Datetime.now(),
                 'last_check_success': True,
                 'last_error_message': False,
@@ -259,26 +308,20 @@ class WbLicenseClient(models.AbstractModel):
     def _raise_trial_error(self, status, data):
         """Translate an error answer of /api/license/trial into a UserError."""
         error_code = (data or {}).get('error')
+        # Ein Text für alle „nicht möglich“-Fälle; die Einzelcodes kommen nur
+        # noch von älteren Servern (#97, I2).
+        not_available = _(
+            "A free trial is not available for this installation. To test or buy "
+            "the product, please contact vertrieb@wissen-beratung.de.")
         messages = {
-            'EMAIL_LIMIT_REACHED': _(
-                "A free trial was already requested with this email address. "
-                "Only one trial per email address, domain and database is possible. "
-                "Please contact vertrieb@wissen-beratung.de."),
-            'DOMAIN_LIMIT_REACHED': _(
-                "A free trial was already requested for this Odoo domain. Only one "
-                "trial per email address, domain and database is possible. Please "
-                "contact vertrieb@wissen-beratung.de."),
-            'DATABASE_LIMIT_REACHED': _(
-                "A free trial was already requested for this database. Only one "
-                "trial per email address, domain and database is possible. Please "
-                "contact vertrieb@wissen-beratung.de."),
-            'TRIAL_ALREADY_USED': _(
-                "The free trial for this installation has already been used or has "
-                "ended. To keep using the product, please order a license from "
-                "vertrieb@wissen-beratung.de."),
-            'TRIAL_NOT_AVAILABLE': _(
-                "No free trial is offered for this product. Please contact "
-                "vertrieb@wissen-beratung.de."),
+            'TRIAL_NOT_AVAILABLE': not_available,
+            'EMAIL_LIMIT_REACHED': not_available,
+            'DOMAIN_LIMIT_REACHED': not_available,
+            'DATABASE_LIMIT_REACHED': not_available,
+            'TRIAL_ALREADY_USED': not_available,
+            'MISSING_CONSENT': _(
+                "Please agree to the transfer of your data to WISSEN BERATUNG; "
+                "without it no trial can be started."),
             'PRODUCT_NOT_FOUND': _(
                 "The license server does not know this product. Please contact "
                 "support@wissen-beratung.de."),
@@ -319,9 +362,11 @@ class WbLicenseClient(models.AbstractModel):
             return None
         return info.max_users or 0
 
+    @api.private
     @api.model
     def request_migration(self, product_code, new_domain, new_db_uuid, reason, contact_email):
         """Ruft /api/license/migrate auf dem Server auf."""
+        self._ensure_admin()
         key = self._get_stored_key(product_code)
         if not key:
             raise UserError(_(
@@ -344,6 +389,7 @@ class WbLicenseClient(models.AbstractModel):
             ) % status)
         return data
 
+    @api.private
     @api.model
     def submit_lead_request(self, product_code, payload):
         """Sendet einen Lead-/Verkaufschancen-Request an den Lizenzserver (my.wissen-beratung.de).
@@ -412,9 +458,16 @@ class WbLicenseClient(models.AbstractModel):
         )
         raise UserError(message)
 
+    @api.private
     @api.model
-    def register_install(self, product_code, module_name=None,
-                         try_auto_lookup=True):
+    def register_install(self, product_code, module_name=None, try_auto_lookup=True):
+        """Server-side entry point for install hooks of product modules (not callable over RPC)."""
+        return self._register_install(product_code, module_name=module_name,
+                                      try_auto_lookup=try_auto_lookup)
+
+    @api.model
+    def _register_install(self, product_code, module_name=None,
+                          try_auto_lookup=True):
         """Meldet diese Odoo-Instanz als Install beim Lizenzserver (my.wissen-beratung.de) an.
 
         Wird aus zwei Pfaden gerufen:
@@ -486,7 +539,10 @@ class WbLicenseClient(models.AbstractModel):
                 "[wb_license_client] Auto-Lookup %s: kein Match.", product_code)
             return False
         key = (data.get('key') or '').strip()
-        if not key:
+        if not self._key_matches(product_code, key):
+            _logger.warning(
+                "[wb_license_client] Auto-Lookup %s: Schlüssel gehört nicht zum Produkt, "
+                "ignoriert.", product_code)
             return False
         self._store_key(product_code, key)
         vals = {
@@ -497,14 +553,16 @@ class WbLicenseClient(models.AbstractModel):
             'last_check_success': True,
             'last_error_message': False,
         }
-        if 'max_users' in data:
-            vals['max_users'] = parse_max_users(data.get('max_users'))
+        max_users = parse_max_users(data)
+        if max_users is not None:
+            vals['max_users'] = max_users
         info.sudo().write(vals)
         _logger.info(
             "[wb_license_client] Auto-Lookup %s: Match — Lizenz '%s' "
             "automatisch gebunden.", product_code, key)
         return True
 
+    @api.private
     @api.model
     def auto_lookup_all_installed(self):
         """Iteriert ueber alle Module, die ``wb_license_client`` als
@@ -517,6 +575,7 @@ class WbLicenseClient(models.AbstractModel):
         Settings-Dialog aufrufbar — z.B. nach Server-Migration kann der
         Admin damit alle Lizenzen neu auflosen lassen.
         """
+        self._ensure_admin()
         Module = self.env['ir.module.module'].sudo()
         IrConfig = self.env['ir.config_parameter'].sudo()
         installed = Module.search([('state', '=', 'installed')])
@@ -625,6 +684,9 @@ class WbLicenseClient(models.AbstractModel):
     @api.model
     def _do_ping(self, info, product_code, key):
         """Internal HTTP-Call /api/license/check."""
+        if not self._key_matches(product_code, key):
+            info._mark_product_mismatch()
+            return
         payload = {
             'key': key,
             'product_code': product_code,
@@ -641,7 +703,13 @@ class WbLicenseClient(models.AbstractModel):
             key=key, secret=self._get_stored_secret(product_code),
         )
         sperre_key = (self.env.cr.dbname, product_code)
-        if status == 200 and data:
+        if status == 200 and isinstance(data, dict) and (
+                data.get('error') == 'PRODUCT_MISMATCH'
+                or (data.get('product_code') and data.get('product_code') != product_code)):
+            # Antwort für ein anderes Produkt: gilt als abgelaufen (#97, I4)
+            _PING_SPERRE.pop(sperre_key, None)
+            info._mark_product_mismatch()
+        elif status == 200 and data:
             _PING_SPERRE.pop(sperre_key, None)
             info.apply_server_response(data)
         else:

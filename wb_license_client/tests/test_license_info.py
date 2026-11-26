@@ -165,8 +165,8 @@ class TestLicenseInfo(TransactionCase):
 
         with patch.object(type(Client), '_do_request', side_effect=fake_request):
             ICP.set_param('database.is_neutralized', False)
-            Client._do_ping(info, 'TEST', 'WB-TEST-key')
+            Client._do_ping(info, 'TEST', 'WB-TEST-abcdef12AB')
             ICP.set_param('database.is_neutralized', 'true')
-            Client._do_ping(info, 'TEST', 'WB-TEST-key')
+            Client._do_ping(info, 'TEST', 'WB-TEST-abcdef12AB')
         self.assertIs(sent[0]['is_neutralized'], False)
         self.assertIs(sent[1]['is_neutralized'], True)
