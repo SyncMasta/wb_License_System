@@ -15,16 +15,24 @@ import re
 from odoo import http
 from odoo.http import request
 
+from .api_license import _check_rate_limit
+
 _logger = logging.getLogger(__name__)
 
 CORS_WB_ONLY = '*.wissen-beratung.de'
 
 
 EMAIL_RE = re.compile(r'^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$')
+UUID_RE = re.compile(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
 
 
 def _client_ip():
     return request.httprequest.remote_addr or '0.0.0.0'
+
+
+def _text(value):
+    """JSON-Feld als String; andere Typen (Zahl, Liste, null) zählen als leer."""
+    return value if isinstance(value, str) else ''
 
 
 def _rate_limit(bucket_key, endpoint, default_max, default_window):
@@ -39,63 +47,101 @@ class ApiTrialController(http.Controller):
                 type='json', auth='public', methods=['POST'],
                 csrf=False, cors=CORS_WB_ONLY)
     def request_trial(self, **kw):
-        """Trial-Anfrage mit Lead-Capture.
+        """Trial-Anfrage mit Lead-Capture, Freigabe per Klick (DECISIONS.md #94).
 
-        Rate-Limits:
-        - 1 Trial pro 24h pro Email
-        - 1 Trial pro 24h pro Domain
+        Aufrufer: der Kunden-Odoo (wb_license_client, Knopf „Start 7-day free
+        trial“, nur nach ausdrücklicher Zustimmung) und die Website.
+
+        Ablauf:
+        - Formatprüfung, Rate-Limit je IP (Standard 5/h, Parameter
+          ``wb_subscription.rate_limit_trial_ip``)
+        - 1 Test je Produkt und E-Mail, Domain bzw. DB-UUID, unbefristet. Kommt
+          derselbe Antrag (gleiche E-Mail, Domain und DB-UUID) erneut, wird der
+          vorhandene Stand geliefert (Schlüssel bzw. ``pending``) statt eines
+          zweiten Tests — so geht bei einem Netzwerkfehler nichts verloren.
+        - Missbrauchsverdacht → ``status: pending`` ohne Schlüssel, Freigabe von
+          Hand im Backend
+        - sonst sofort frei: ``status: ok`` mit ``key``, ``valid_to`` und
+          ``max_users``. Kein Activation-Code (#28), kein API-Secret.
         """
-        email = (kw.get('contact_email') or '').strip().lower()
-        company = (kw.get('company_name') or '').strip()
-        domain = (kw.get('domain') or '').strip().lower()
-        product_code = (kw.get('product_code') or '').strip().upper()
+        if not _check_rate_limit(_client_ip(), 'trial_ip', 5, 3600):
+            return {'error': 'TOO_MANY_REQUESTS'}
 
-        if not EMAIL_RE.match(email):
+        email = _text(kw.get('contact_email')).strip().lower()
+        company = _text(kw.get('company_name')).strip()
+        domain = _text(kw.get('domain')).strip().lower()
+        db_uuid = _text(kw.get('db_uuid')).strip()
+        product_code = _text(kw.get('product_code')).strip().upper()
+
+        if not EMAIL_RE.match(email) or len(email) > 254:
             return {'error': 'INVALID_EMAIL'}
         if not company:
             return {'error': 'MISSING_COMPANY'}
-        if not domain:
+        if not domain or len(domain) > 255:
             return {'error': 'MISSING_DOMAIN'}
         if not re.match(r'^[A-Z0-9]{4}$', product_code):
             return {'error': 'INVALID_PRODUCT_CODE'}
+        if db_uuid and not UUID_RE.match(db_uuid):
+            return {'error': 'INVALID_DB_UUID'}
 
-        if not _rate_limit(f"email:{email}", 'trial', 1, 86400):
-            return {'error': 'EMAIL_LIMIT_REACHED'}
-        if not _rate_limit(f"domain:{domain}", 'trial', 1, 86400):
-            return {'error': 'DOMAIN_LIMIT_REACHED'}
-
-        product = request.env['product.product'].sudo().search([
-            ('wb_technical_code', '=', product_code),
-            ('wb_is_license_product', '=', True),
-        ], limit=1)
+        product = request.env['product.product'].sudo()._wb_trial_variant(product_code)
         if not product:
             return {'error': 'PRODUCT_NOT_FOUND'}
+        if product.wb_trial_days <= 0:
+            return {'error': 'TRIAL_NOT_AVAILABLE'}
 
-        trial = request.env['wb.license.trial.request'].sudo().create({
+        Trial = request.env['wb.license.trial.request'].sudo()
+        previous = Trial._find_previous(product_code, email, domain, db_uuid)
+        same = previous['email']
+        if same and db_uuid and same == previous['domain'] == previous['db_uuid']:
+            # Wiederholung desselben Antrags: vorhandenen Stand liefern.
+            return same._response()
+        if previous['email']:
+            return {'error': 'EMAIL_LIMIT_REACHED'}
+        if previous['domain']:
+            return {'error': 'DOMAIN_LIMIT_REACHED'}
+        if previous['db_uuid']:
+            return {'error': 'DATABASE_LIMIT_REACHED'}
+
+        # Zusätzlich die bisherigen 24-h-Buckets (schützen vor parallelen
+        # Doppelanträgen, bevor der erste Datensatz committed ist).
+        if not _rate_limit(f"email:{product_code}:{email}", 'trial', 1, 86400):
+            return {'error': 'EMAIL_LIMIT_REACHED'}
+        if not _rate_limit(f"domain:{product_code}:{domain}", 'trial', 1, 86400):
+            return {'error': 'DOMAIN_LIMIT_REACHED'}
+
+        ip = _client_ip()
+        review_reason = Trial._review_reason(product, email, domain, db_uuid, ip)
+        trial = Trial.create({
             'product_id': product.id,
-            'contact_name': (kw.get('contact_name') or '').strip()[:100],
+            'contact_name': _text(kw.get('contact_name')).strip()[:100] or email,
             'contact_email': email,
-            'contact_phone': (kw.get('contact_phone') or '').strip()[:50],
+            'contact_phone': _text(kw.get('contact_phone')).strip()[:50],
             'company_name': company[:100],
             'company_size': kw.get('company_size') if kw.get('company_size') in (
                 'solo', '2-10', '11-50', '51-250', '251+',
             ) else False,
-            'industry': (kw.get('industry') or '').strip()[:100],
+            'industry': _text(kw.get('industry')).strip()[:100],
             'domain': domain,
-            'expected_use_case': (kw.get('expected_use_case') or '').strip()[:1000],
+            'db_uuid': db_uuid or False,
+            'ip_address': ip,
+            'expected_use_case': _text(kw.get('expected_use_case')).strip()[:1000],
+            'review_reason': review_reason or False,
         })
 
+        if review_reason:
+            _logger.info("[wb_subscription] Trial %s zur Prüfung: %s", trial.name, review_reason)
+            return trial._response()
+
         try:
-            trial.action_approve_and_create_trial()
+            with request.env.cr.savepoint():
+                trial.action_approve_and_create_trial()
         except Exception as e:
             _logger.exception("[wb_subscription] Trial-Auto-Approve fehlgeschlagen: %s", e)
+            trial.write({'review_reason': 'Automatische Freigabe fehlgeschlagen'})
             return {'error': 'TRIAL_PROCESSING_FAILED'}
 
-        return {
-            'status': 'ok',
-            'trial_id': trial.name,
-            'message': 'Trial-Anfrage angenommen — Schlüssel kommt per Email.',
-        }
+        return trial._response()
 
     @http.route('/api/wb_subscription/order',
                 type='json', auth='public', methods=['POST'],

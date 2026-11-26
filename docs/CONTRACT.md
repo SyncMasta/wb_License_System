@@ -77,12 +77,12 @@ serverseitig von einem Kunden-Odoo unterscheiden können — bitte sprechend bel
 | `POST /api/license/announce` | nein (Lead-Registry) | schreibend | 20/h pro IP |
 | `POST /api/license/lead` | **nein — nicht verwenden**, siehe §8 | schreibend (legt `crm.lead` an) | 5/h pro IP |
 | `POST /api/license/migrate` | nein | schreibend | 2/Tag pro Key |
-| `POST /api/license/trial` | nein (nur WB-Website) | schreibend | 1/24h je Email und Domain |
+| `POST /api/license/trial` | nein (Website und `wb_license_client`) | schreibend | 5/h pro IP; 1 Test je Produkt und E-Mail, Domain bzw. DB-UUID (unbefristet) |
 | `POST /api/wb_subscription/order` | nein (nur WB-Website, `X-API-Key`) | schreibend | – |
 
 Alle Defaults sind über `ir.config_parameter` `wb_subscription.rate_limit_<endpoint>` im Format
 `"<max>/<window_seconds>"` überschreibbar (`endpoint` ∈ `check`, `check_key`, `activate`,
-`activate_key`, `announce`, `lead`, `lookup`, `migrate`). Der Client darf sich also nicht auf
+`activate_key`, `announce`, `lead`, `lookup`, `migrate`, `trial_ip`). Der Client darf sich also nicht auf
 die Defaults verlassen.
 
 ---
@@ -234,6 +234,7 @@ Weitere Felder werden ignoriert (`**kw`).
 | `product_code` | string | 4 Zeichen |
 | `latest_module_version` | string \| null | gepflegte Soll-Version des Produkts |
 | `download_url` | string \| null | Portal-Link, nur gesetzt wenn `latest_module_version` ≠ `module_version` |
+| `max_users` | int | Benutzergrenze des Pakets (`wb.license.key.max_users`), `0` = unbegrenzt. Seit `wb_subscription` 19.0.2.14.0 (DECISIONS.md #95); ältere Server senden das Feld nicht, Clients werten das als `0`. Auch in den Antworten von `/activate`, `/lookup` und `/trial` |
 | `instance` | object | **Nur vorhanden**, wenn `db_uuid` mitkommt und nicht zur Bindung (`bound_db_uuid` + `bound_domain`) passt. Siehe unten. |
 
 #### Fremde Instanz (`instance`, DECISIONS.md #80-82)
@@ -343,8 +344,22 @@ normalisierte `pre_assigned_domain` == Domain **oder** `pre_assigned_email` == E
   Infrastruktur sinnlos.
 - **`/api/license/migrate`** — `key` + `new_domain`/`new_db_uuid`/`reason`/`contact_email`.
   Legt einen Migrationsantrag an; die Umbindung macht WB manuell im Odoo.
-- **`/api/license/trial`**, **`/api/wb_subscription/order`** — CORS auf `*.wissen-beratung.de`,
-  gehören zur Website. Der Order-Endpunkt ist der einzige mit echter Auth (`X-API-Key` gegen
+- **`/api/license/trial`** (DECISIONS.md #94) — `product_code`, `contact_name`, `contact_email`,
+  `company_name`, `domain`, `db_uuid` (UUID, empfohlen), optional `contact_phone`, `company_size`,
+  `industry`, `expected_use_case`. Aufgerufen vom Kunden-Odoo („Start 7-day free trial“, nur nach
+  Zustimmung im Formular) und von der Website; CORS `*.wissen-beratung.de` betrifft nur Browser.
+  Erfolg: `{"status":"ok","trial_id":...,"key":"WB-XXXX-…","state":"trial","product_code":...,
+  "valid_from":...,"valid_to":...,"max_users":0}` — Laufzeit `wb_trial_days` des Produkts, Schlüssel
+  an `domain` + `db_uuid` gebunden, kein Aktivierungscode, kein API-Secret. Variante: das größte
+  Paket (unbegrenzt vor höchster Grenze). Missbrauchsverdacht: `{"status":"pending","trial_id":...}`
+  ohne Schlüssel, Freigabe von Hand. Derselbe Antrag (gleiche E-Mail, Domain und DB-UUID) erneut:
+  vorhandener Stand (Schlüssel bzw. `pending`). Fehler: `TOO_MANY_REQUESTS`, `INVALID_EMAIL`,
+  `MISSING_COMPANY`, `MISSING_DOMAIN`, `INVALID_PRODUCT_CODE`, `INVALID_DB_UUID`,
+  `PRODUCT_NOT_FOUND`, `TRIAL_NOT_AVAILABLE` (`wb_trial_days` = 0), `EMAIL_LIMIT_REACHED`,
+  `DOMAIN_LIMIT_REACHED`, `DATABASE_LIMIT_REACHED`, `TRIAL_ALREADY_USED` (abgelaufen, umgewandelt
+  oder abgelehnt), `TRIAL_PROCESSING_FAILED`.
+- **`/api/wb_subscription/order`** — CORS auf `*.wissen-beratung.de`, gehört zur Website. Der
+  Order-Endpunkt ist der einzige mit echter Auth (`X-API-Key` gegen
   `ir.config_parameter wb_subscription.webshop_api_key`).
 
 ---

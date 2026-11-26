@@ -20,3 +20,4 @@ from . import test_hmac_signature
 from . import test_retention
 from . import test_instance_resolution
 from . import test_dev_license_sales
+from . import test_trial_and_max_users
