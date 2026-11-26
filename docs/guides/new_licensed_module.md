@@ -217,6 +217,49 @@ ruft der Hook `sale_order._wb_issue_license_keys()` auf, das automatisch
 `wb.license.key` + `wb.activation.ticket` anlegt und Mails versendet.
 Kein Custom-Code dafür im Produkt-Modul nötig.
 
+### Pakete mit Benutzergrenze (Varianten)
+
+Unterschiedliche Pakete eines Produkts sind **Varianten** eines
+Lizenzprodukts (DECISIONS.md #95), nicht eigene Produkte: Der technische
+Code bleibt einer, die Grenze steht an der Variante.
+
+1. Attribut anlegen (`create_variant = always`), z. B. „WB VoIP Paket“ mit
+   den Werten Starter / Team / Business.
+2. Attributzeile am Produkt-Template; Aufpreis je Wert über
+   `price_extra` (Grundpreis = `list_price` des Templates).
+3. `wb_max_users` je Variante setzen (0 = unbegrenzt). Der Wert geht beim
+   Ausstellen in den Schlüssel und wird mit `/api/license/check`,
+   `/activate`, `/lookup` und `/trial` als `max_users` gemeldet; das
+   Produkt-Modul setzt ihn über `_wb_license_max_users(code)` durch.
+4. Abo-Preise je Plan als Regeln am Template (`subscription_rule_ids`,
+   `product.pricelist.item` mit `plan_id`, `applied_on = 0_product_variant`,
+   fester Preis). Jahrespreis = 10 Monatsraten.
+5. `wb_default_subscription_plan_id` = Monatlich. `wb_billing_calendar` gilt
+   für das ganze Template (Jahresabo bekommt deshalb eine anteilige
+   Erstrechnung bis Monatsende).
+6. `sale_ok` erst nach Freigabe setzen.
+
+Ein Test per Klick (`/api/license/trial`) bekommt immer das größte Paket
+(unbegrenzt vor höchster Grenze). `/api/wb_subscription/order` verlangt bei
+mehreren Varianten `product_id` oder `default_code` (sonst
+`AMBIGUOUS_PRODUCT`) und übernimmt den Variantenpreis (`lst_price`).
+
+Zusatzprodukte ohne eigenen Lizenzcode (z. B. „WB VoIP Ansitel“) sind normale
+Abo-Produkte (`recurring_invoice = True`, eigene Abo-Regeln) und hängen als
+`optional_product_ids` am Lizenzprodukt.
+
+Beispiel auf my.wissen-beratung.de (Stand 26.11.2026): Produkt „WB VoIP“
+(Code `VOIP`), Varianten Starter 5 / Team 20 / Business unbegrenzt zu 29 /
+59 / 99 € je Monat bzw. 290 / 590 / 990 € je Jahr, Zusatz „WB VoIP Ansitel“
+15 € / 150 €.
+
+### Deploy-Hinweis
+
+Auf s02 sind die Module Verknüpfungen auf den Git-Checkout
+`/opt/odoo19/src/wb_License_System`; ein Cron (alle 5 min,
+`odoo-deploy auto`) zieht `main` und aktualisiert geänderte Module. Ein Merge
+nach `main` ist damit ein Produktions-Deploy.
+
 ---
 
 ## 6. Tests
