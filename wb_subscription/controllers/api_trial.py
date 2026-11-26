@@ -234,8 +234,9 @@ class ApiTrialController(http.Controller):
             'order_line': [(0, 0, {
                 'product_id': product.id,
                 'product_uom_qty': 1,
-                'name': product.name,
-                'price_unit': product.list_price,
+                # Variante mit Paketname und Paketpreis (Grundpreis + Aufpreis)
+                'name': product.display_name,
+                'price_unit': product.lst_price,
             })],
             'note': f"Webshop-Bestellung. Domain: {kw.get('domain', '-')}",
         })

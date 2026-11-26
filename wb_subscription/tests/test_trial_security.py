@@ -158,6 +158,18 @@ class TestTrialSecurity(_TrialHttpBase, HttpCase):
         self.assertEqual(self.env['sale.order'].browse(res['order_id']).order_line.product_id,
                          self.variants['Starter'])
 
+    def test_order_uses_variant_price(self):
+        """Paketpreis der Variante (Grundpreis + Aufpreis), nicht der Grundpreis."""
+        self.env['ir.config_parameter'].sudo().set_param(
+            'wb_subscription.webshop_api_key', 'geheim-123')
+        self.tmpl.list_price = 29.0
+        team_ptav = self.variants['Team'].product_template_attribute_value_ids
+        team_ptav.price_extra = 30.0
+        res = self._order(product_id=self.variants['Team'].id)
+        line = self.env['sale.order'].browse(res['order_id']).order_line
+        self.assertEqual(line.price_unit, 59.0)
+        self.assertEqual(line.name, self.variants['Team'].display_name)
+
     def test_order_partner_match_is_exact(self):
         self.env['ir.config_parameter'].sudo().set_param(
             'wb_subscription.webshop_api_key', 'geheim-123')
