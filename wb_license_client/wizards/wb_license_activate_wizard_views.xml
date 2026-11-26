@@ -5,84 +5,131 @@
         <field name="name">wb.license.activate.wizard.form</field>
         <field name="model">wb.license.activate.wizard</field>
         <field name="arch" type="xml">
-            <form string="Lizenz aktivieren">
+            <form string="Activate License">
                 <sheet>
-                    <div class="alert alert-info" role="alert">
-                        <field name="info_message" nolabel="1" readonly="1"/>
+                    <group>
+                        <field name="mode" widget="radio" options="{'horizontal': true}"/>
+                        <field name="product_code" placeholder="e.g. TELE"/>
+                    </group>
+
+                    <!-- Test per Klick (DECISIONS.md #94) -->
+                    <div invisible="mode != 'trial'">
+                        <div class="alert alert-info" role="alert">
+                            <p class="mb-1"><strong>Try the product free of charge for 7 days.</strong></p>
+                            <p class="mb-0">The trial key is issued immediately and bound to this
+                                database. One trial per email address, domain and database.
+                                Afterwards the product needs a license; your data stays.</p>
+                        </div>
+                        <group string="Your details">
+                            <field name="trial_contact_name" required="mode == 'trial'"/>
+                            <field name="trial_contact_email" widget="email" required="mode == 'trial'"/>
+                            <field name="trial_company_name" required="mode == 'trial'"/>
+                            <field name="trial_domain"/>
+                        </group>
+                        <group string="Privacy">
+                            <field name="trial_consent"/>
+                            <div class="text-muted small ms-4" colspan="2">
+                                Only after your consent are your name, email address and company,
+                                the address of this Odoo and its database ID sent to
+                                WISSEN BERATUNG (Tobias Wissen) to issue the trial key, bind it to
+                                this database and contact you about the trial. Details in the
+                                privacy policy:
+                                <a href="https://wissen-beratung.de/legal/datenschutz" target="_blank">
+                                    wissen-beratung.de/legal/datenschutz
+                                </a>.
+                            </div>
+                        </group>
                     </div>
-                    <group string="Lizenzdaten">
-                        <field name="product_code" placeholder="z.B. TELE"/>
-                        <field name="key" placeholder="WB-XXXX-xxxxxxxxXX"/>
-                        <field name="activation_code"
-                               placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"/>
-                        <field name="contact_email" widget="email"/>
-                        <field name="api_secret" password="True"
-                               placeholder="WBS-... (nur wenn vorhanden)"/>
-                    </group>
 
-                    <group string="Pflicht-Bestätigungen">
-                        <field name="confirm_eula"/>
-                        <div class="text-muted small ms-4" colspan="2">
-                            Ich habe die <strong>EULA</strong>
-                            (End-User-License-Agreement) gelesen und akzeptiere sie.
-                            Verfügbar unter <em>EULA.md</em> im Modul-Verzeichnis bzw.
-                            <a href="https://wissen-beratung.de/legal/eula" target="_blank">
-                                wissen-beratung.de/legal/eula
-                            </a>.
+                    <div invisible="mode != 'activate'">
+                        <div class="alert alert-info" role="alert">
+                            <field name="info_message" nolabel="1" readonly="1"/>
                         </div>
+                        <group string="License Data">
+                            <field name="key" placeholder="WB-XXXX-xxxxxxxxXX"
+                                   required="mode == 'activate'"/>
+                            <field name="activation_code"
+                                   placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
+                                   required="mode == 'activate'"/>
+                            <field name="contact_email" widget="email"
+                                   required="mode == 'activate'"/>
+                            <field name="api_secret" password="True"
+                                   placeholder="WBS-... (only if available)"/>
+                        </group>
 
-                        <field name="confirm_terms"/>
-                        <div class="text-muted small ms-4" colspan="2">
-                            Ich akzeptiere die <strong>Allgemeinen Geschäftsbedingungen
-                            (AGB)</strong> von WISSEN BERATUNG unter
-                            <a href="https://wissen-beratung.de/legal/agb" target="_blank">
-                                wissen-beratung.de/legal/agb
-                            </a>.
-                        </div>
+                        <group string="Required Confirmations">
+                            <field name="confirm_eula"/>
+                            <div class="text-muted small ms-4" colspan="2">
+                                I have read and accept the <strong>EULA</strong>
+                                (End User License Agreement).
+                                Available as <em>EULA.md</em> in the module directory or at
+                                <a href="https://wissen-beratung.de/legal/eula" target="_blank">
+                                    wissen-beratung.de/legal/eula
+                                </a>.
+                            </div>
 
-                        <field name="confirm_privacy"/>
-                        <div class="text-muted small ms-4" colspan="2">
-                            Ich habe den <strong>Datenschutzhinweis</strong> (DSGVO)
-                            zur Kenntnis genommen
-                            (<a href="https://wissen-beratung.de/legal/datenschutz" target="_blank">
-                                wissen-beratung.de/legal/datenschutz
-                            </a>).
-                        </div>
+                            <field name="confirm_terms"/>
+                            <div class="text-muted small ms-4" colspan="2">
+                                I accept the <strong>general terms and conditions</strong>
+                                of WISSEN BERATUNG at
+                                <a href="https://wissen-beratung.de/legal/agb" target="_blank">
+                                    wissen-beratung.de/legal/agb
+                                </a>.
+                            </div>
 
-                        <field name="confirm_no_refund"/>
-                        <div class="alert alert-warning ms-4" colspan="2">
-                            <strong>Wichtig:</strong> Mit der Aktivierung der Lizenz
-                            ist eine spätere <strong>Gutschrift bzw. Erstattung des
-                            Kaufpreises ausgeschlossen</strong> (§ 6.5 EULA).
-                            Diese Bestätigung wird zu Beweiszwecken bei
-                            WISSEN BERATUNG protokolliert.
-                        </div>
-                    </group>
+                            <field name="confirm_privacy"/>
+                            <div class="text-muted small ms-4" colspan="2">
+                                I have taken note of the <strong>privacy notice</strong> (GDPR)
+                                (<a href="https://wissen-beratung.de/legal/datenschutz" target="_blank">
+                                    wissen-beratung.de/legal/datenschutz
+                                </a>).
+                            </div>
 
-                    <group string="Optional">
-                        <field name="subscribe_newsletter"/>
-                        <div class="text-muted small ms-4" colspan="2">
-                            Ich möchte über <strong>Updates, Sicherheits-Patches
-                            und neue Features</strong> dieses Moduls per Email
-                            informiert werden. Abmeldung jederzeit über den
-                            Unsubscribe-Link in jeder Nachricht möglich.
-                        </div>
-                    </group>
+                            <field name="confirm_no_refund"/>
+                            <div class="alert alert-warning ms-4" colspan="2">
+                                <strong>Important:</strong> Once the license is activated, a later
+                                <strong>credit note or refund of the purchase price is
+                                excluded</strong> (§ 6.5 EULA).
+                                This confirmation is recorded by WISSEN BERATUNG as evidence.
+                            </div>
+                        </group>
+
+                        <group string="Optional">
+                            <field name="subscribe_newsletter"/>
+                            <div class="text-muted small ms-4" colspan="2">
+                                I want to be informed by email about <strong>updates, security
+                                patches and new features</strong> of this module. You can
+                                unsubscribe at any time via the link in every message.
+                            </div>
+                        </group>
+                    </div>
                 </sheet>
                 <footer>
                     <button name="action_activate" type="object"
-                            string="Aktivieren" class="btn-primary"/>
-                    <button special="cancel" string="Abbrechen"/>
+                            string="Activate" class="btn-primary"
+                            invisible="mode != 'activate'"/>
+                    <button name="action_start_trial" type="object"
+                            string="Start 7-day free trial" class="btn-primary"
+                            invisible="mode != 'trial'"/>
+                    <button special="cancel" string="Cancel"/>
                 </footer>
             </form>
         </field>
     </record>
 
     <record id="wb_license_activate_wizard_action" model="ir.actions.act_window">
-        <field name="name">Lizenz aktivieren</field>
+        <field name="name">Activate License</field>
         <field name="res_model">wb.license.activate.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
+    </record>
+
+    <record id="wb_license_trial_wizard_action" model="ir.actions.act_window">
+        <field name="name">Start 7-day free trial</field>
+        <field name="res_model">wb.license.activate.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_mode': 'trial'}</field>
     </record>
 
 </odoo>

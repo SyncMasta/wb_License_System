@@ -1,5 +1,6 @@
 /** @odoo-module **/
 
+import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 import { rpc } from "@web/core/network/rpc";
 
@@ -23,6 +24,8 @@ function severityFor(info) {
     if (state === "expired") return "danger";
     if (state === "grace") return "warning";
     if (state === "unknown") return "info";
+    // Test (Trial): gültig, Ablaufdatum sichtbar machen.
+    if (state === "trial") return "info";
     // Eval oder DEV-Lizenz: gültig, aber als Testsystem kenntlich machen.
     if (info.instance_status) return "info";
     return null;
@@ -35,13 +38,15 @@ function buildBanner(info, severity) {
 
     const text = document.createElement("span");
     text.className = "wb_license_banner__text";
-    text.textContent = info.user_message || `Lizenz ${info.product_code}: ${info.state}`;
+    text.textContent =
+        info.user_message ||
+        _t("License %(code)s: %(state)s", { code: info.product_code, state: info.state });
 
     const dismissBtn = document.createElement("button");
     dismissBtn.className = "wb_license_banner__dismiss";
     dismissBtn.type = "button";
     dismissBtn.textContent = "×";
-    dismissBtn.setAttribute("aria-label", "Ausblenden");
+    dismissBtn.setAttribute("aria-label", _t("Hide"));
     dismissBtn.addEventListener("click", () => {
         setCookie(COOKIE_PREFIX + info.product_code, "1", COOKIE_TTL_HOURS);
         banner.remove();

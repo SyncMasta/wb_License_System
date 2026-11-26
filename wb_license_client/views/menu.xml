@@ -2,25 +2,31 @@
 <odoo>
 
     <menuitem id="menu_wb_license_client_root"
-              name="WB Lizenzen"
+              name="WB Licenses"
               parent="base.menu_administration"
               sequence="50"
               groups="base.group_system"/>
 
     <menuitem id="menu_wb_license_client_infos"
-              name="Lizenz-Status"
+              name="License Status"
               parent="menu_wb_license_client_root"
               action="wb_license_info_action"
               sequence="10"/>
 
     <menuitem id="menu_wb_license_client_activate"
-              name="Lizenz aktivieren"
+              name="Activate License"
               parent="menu_wb_license_client_root"
               action="wb_license_activate_wizard_action"
               sequence="20"/>
 
+    <menuitem id="menu_wb_license_client_trial"
+              name="Start 7-day free trial"
+              parent="menu_wb_license_client_root"
+              action="wb_license_trial_wizard_action"
+              sequence="25"/>
+
     <menuitem id="menu_wb_license_client_migrate"
-              name="Migration beantragen"
+              name="Request Migration"
               parent="menu_wb_license_client_root"
               action="wb_license_migrate_wizard_action"
               sequence="30"/>

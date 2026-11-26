@@ -119,6 +119,7 @@ class WbLicenseInstance(models.Model):
             prod = inst.dev_license_id.converted_to_license_id
             result['state'] = prod.state
             result['grace_until'] = prod.grace_until if prod.state == 'grace' else None
+            result['max_users'] = prod.max_users
         return result
 
     def _classify(self, license, same_db, is_neutralized, today):

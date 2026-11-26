@@ -77,12 +77,12 @@ serverseitig von einem Kunden-Odoo unterscheiden können — bitte sprechend bel
 | `POST /api/license/announce` | nein (Lead-Registry) | schreibend | 20/h pro IP |
 | `POST /api/license/lead` | **nein — nicht verwenden**, siehe §8 | schreibend (legt `crm.lead` an) | 5/h pro IP |
 | `POST /api/license/migrate` | nein | schreibend | 2/Tag pro Key |
-| `POST /api/license/trial` | nein (nur WB-Website) | schreibend | 1/24h je Email und Domain |
+| `POST /api/license/trial` | nein (Website und `wb_license_client`) | schreibend | 5/h pro IP; 1 Test je Produkt und E-Mail, Domain bzw. DB-UUID (unbefristet) |
 | `POST /api/wb_subscription/order` | nein (nur WB-Website, `X-API-Key`) | schreibend | – |
 
 Alle Defaults sind über `ir.config_parameter` `wb_subscription.rate_limit_<endpoint>` im Format
 `"<max>/<window_seconds>"` überschreibbar (`endpoint` ∈ `check`, `check_key`, `activate`,
-`activate_key`, `announce`, `lead`, `lookup`, `migrate`). Der Client darf sich also nicht auf
+`activate_key`, `announce`, `lead`, `lookup`, `migrate`, `trial_ip`). Der Client darf sich also nicht auf
 die Defaults verlassen.
 
 ---
@@ -219,6 +219,7 @@ Der einzige Endpunkt, den der PHP-Client benötigt.
 | `domain` | string | nein | nur Event-Log; zusammen mit `db_uuid` + `module_version` Update der Install-Version |
 | `db_uuid` | string | nein | dito — hier die synthetische Instanzkennung |
 | `module_version` | string | nein | Version des Konsumenten; nur wirksam wenn `domain` **und** `db_uuid` mitkommen |
+| `product_code` | string | nein | Produkt, für das der Client prüft. Gehört der Key zu einem anderen Produkt: `PRODUCT_MISMATCH` (DECISIONS.md #97). Weglassen = keine Prüfung (ältere Clients, PHP) |
 | `is_neutralized` | bool | nein | Nur Odoo-Client: `database.is_neutralized` der Datenbank. Muss echtes JSON-`true` sein, alles andere zählt als `false`. Für PHP gegenstandslos (weglassen). |
 
 Weitere Felder werden ignoriert (`**kw`).
@@ -234,6 +235,7 @@ Weitere Felder werden ignoriert (`**kw`).
 | `product_code` | string | 4 Zeichen |
 | `latest_module_version` | string \| null | gepflegte Soll-Version des Produkts |
 | `download_url` | string \| null | Portal-Link, nur gesetzt wenn `latest_module_version` ≠ `module_version` |
+| `max_users` | int | Benutzergrenze des Pakets (`wb.license.key.max_users`), `0` = unbegrenzt. Seit `wb_subscription` 19.0.2.14.0 (DECISIONS.md #95); ältere Server senden das Feld nicht, Clients werten das als `0`. Auch in den Antworten von `/activate`, `/lookup` und `/trial`. Ein ungültiger Wert wird vom Client verworfen (#97/#98). WB VoIP zählt aktive interne Benutzer mit der Gruppe „WB VoIP: Benutzer“ (auch implizit) **und** gesetztem SIP-Benutzer |
 | `instance` | object | **Nur vorhanden**, wenn `db_uuid` mitkommt und nicht zur Bindung (`bound_db_uuid` + `bound_domain`) passt. Siehe unten. |
 
 #### Fremde Instanz (`instance`, DECISIONS.md #80-82)
@@ -272,6 +274,7 @@ Die Felder `latest_module_version` und `download_url` sind für PHP-Dienste gege
 | `TOO_MANY_REQUESTS` | IP- oder Key-Limit überschritten | kein Retry, Circuit Breaker öffnen, `LicenseServerUnreachable`, aus Cache/LocalGrace bedienen |
 | `INVALID_KEY_FORMAT` | Formatprüfung gescheitert | kein Retry — Konfigurationsfehler, deutlich loggen (maskiert!), `unknown` |
 | `KEY_NOT_FOUND` | Key existiert nicht in `wb.license.key` | kein Retry, deutlicher Log-Eintrag, `unknown` |
+| `PRODUCT_MISMATCH` | `product_code` im Request ≠ Produkt des Keys (#97) | wie `expired` behandeln, Key gilt für dieses Produkt nicht |
 
 **Es gibt kein HTTP 429 und keinen `Retry-After`-Header.** Der Backoff muss vollständig
 clientseitig erfolgen; sinnvoll ist eine feste Sperre (z. B. 15 Minuten) nach `TOO_MANY_REQUESTS`,
@@ -318,7 +321,7 @@ bindet die Lizenz unwiderruflich an die übergebene `db_uuid`/`domain`, setzt `s
 auf `active`, löscht den `activation_hash` und entschärft `auto_bind_armed`.
 
 Request: `product_code` (4 Zeichen, Pflicht), `db_uuid` (Pflicht), `domain` und/oder `email`.
-Antwort bei Treffer: `{"found": true, "key": "...", "state": "...", "valid_from": ..., "valid_to": ...}` —
+Antwort bei Treffer: `{"found": true, "key": "...", "product_code": "...", "state": "...", "valid_from": ..., "valid_to": ..., "max_users": ...}` —
 **enthält den Public Key im Klartext**, deshalb das strenge Limit von 10/h pro IP.
 Ohne Treffer: `{"found": false}` plus Event `auto_bind_lookup_failed`.
 Fehler: `TOO_MANY_REQUESTS`, `INVALID_PRODUCT_CODE`, `MISSING_BINDING_DATA`, `MISSING_MATCH_CRITERIA`.
@@ -332,9 +335,9 @@ normalisierte `pre_assigned_domain` == Domain **oder** `pre_assigned_email` == E
 ## 6. Übrige Endpunkte (Vollständigkeit)
 
 - **`/api/license/activate`** — `key`, `activation_code` (`^[A-HJ-NP-Z2-9]{5}(-[A-HJ-NP-Z2-9]{5}){4}$`),
-  `domain`, `db_uuid`, vier Pflicht-Consents (`confirm_eula`, `confirm_terms`, `confirm_privacy`,
+  `domain`, `db_uuid`, optional `product_code` (sonst `PRODUCT_MISMATCH` bei fremdem Key, #97), vier Pflicht-Consents (`confirm_eula`, `confirm_terms`, `confirm_privacy`,
   `confirm_no_refund`), optional `subscribe_newsletter`, `contact_email`, `request_id` (UUID4,
-  Replay-Dedup). Erfolg: `{"status":"ok","state":...,"bound_domain":...,"valid_to":...}`.
+  Replay-Dedup). Erfolg: `{"status":"ok","state":...,"bound_domain":...,"product_code":...,"valid_to":...,"max_users":...}`.
   Fehler: `TOO_MANY_ATTEMPTS`, `INVALID_KEY_FORMAT`, `INVALID_CODE_FORMAT`, `MISSING_BINDING_DATA`,
   `MISSING_CONSENTS` (+ `missing`-Liste), `KEY_NOT_FOUND`. Code wird bcrypt-geprüft (12 Runden).
   **Laut Übergabe §1 Nicht-Ziel — im PHP-Paket nicht implementieren.**
@@ -343,9 +346,32 @@ normalisierte `pre_assigned_domain` == Domain **oder** `pre_assigned_email` == E
   Infrastruktur sinnlos.
 - **`/api/license/migrate`** — `key` + `new_domain`/`new_db_uuid`/`reason`/`contact_email`.
   Legt einen Migrationsantrag an; die Umbindung macht WB manuell im Odoo.
-- **`/api/license/trial`**, **`/api/wb_subscription/order`** — CORS auf `*.wissen-beratung.de`,
-  gehören zur Website. Der Order-Endpunkt ist der einzige mit echter Auth (`X-API-Key` gegen
-  `ir.config_parameter wb_subscription.webshop_api_key`).
+- **`/api/license/trial`** (DECISIONS.md #94, #97) — `product_code`, `contact_name`, `contact_email`,
+  `company_name`, `domain`, `db_uuid` (UUID, empfohlen), **`consent: true`** (echtes JSON-true) und
+  **`privacy_version`** (Fassung der Datenschutzhinweise, ≤ 32 Zeichen; ohne beides
+  `MISSING_CONSENT`), optional `contact_phone`, `company_size`, `industry`, `expected_use_case`.
+  Header `X-WB-DB-UUID` (der Odoo-Client sendet ihn immer; vom Client gesetzt, also **kein**
+  Schutz — der Schutz der Wiederholung ist, dass die DB-UUID nicht öffentlich ist, #98). Aufgerufen vom Kunden-Odoo („Start 7-day
+  free trial“, nur nach Zustimmung im Formular) und von der Website; CORS `*.wissen-beratung.de`
+  betrifft nur Browser.
+  Erfolg: `{"status":"ok","trial_id":...,"key":"WB-XXXX-…","state":"trial","product_code":...,
+  "valid_from":...,"valid_to":...,"max_users":0}` — Laufzeit `wb_trial_days` des Produkts, Schlüssel
+  an `domain` + `db_uuid` gebunden, kein Aktivierungscode, kein API-Secret. Variante: das größte
+  Paket (unbegrenzt vor höchster Grenze). `{"status":"pending","trial_id":...}` ohne Schlüssel bei
+  Missbrauchsverdacht oder wenn E-Mail bzw. öffentliche Domain schon einen Test aus einer anderen DB
+  hatten; Freigabe von Hand. Derselbe Antrag (exakt gleiche E-Mail, Domain und DB-UUID, Header
+  `X-WB-DB-UUID` = `db_uuid`) erneut: vorhandener Stand (Schlüssel bzw. `pending`). Fehler:
+  `TOO_MANY_REQUESTS`, `INVALID_EMAIL`, `MISSING_COMPANY`, `MISSING_DOMAIN`, `INVALID_PRODUCT_CODE`,
+  `INVALID_DB_UUID`, `MISSING_CONSENT`, `PRODUCT_NOT_FOUND`, **`TRIAL_NOT_AVAILABLE`** (ein Code
+  für: kein Test vorgesehen, diese DB hatte schon einen Test, abgelaufen, umgewandelt, abgelehnt),
+  `TRIAL_PROCESSING_FAILED`. Die Codes `EMAIL_/DOMAIN_/DATABASE_LIMIT_REACHED` und
+  `TRIAL_ALREADY_USED` gibt es seit #97 nicht mehr.
+- **`/api/wb_subscription/order`** — CORS auf `*.wissen-beratung.de`, gehört zur Website. Der
+  Order-Endpunkt ist der einzige mit echter Auth (`X-API-Key` gegen
+  `ir.config_parameter wb_subscription.webshop_api_key`, konstantzeitig verglichen). Variante per
+  `product_id` (JSON-**Integer**, z. B. `302`; Strings wie `"302"` zählen nicht) oder `default_code`; ohne beides bei mehreren Varianten `AMBIGUOUS_PRODUCT`, eine
+  Angabe, die nicht zum `product_code` passt, `PRODUCT_NOT_FOUND`. Kontakt wird nur bei exakt
+  gleicher (normalisierter) E-Mail wiederverwendet (#97).
 
 ---
 

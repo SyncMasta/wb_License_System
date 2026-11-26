@@ -85,10 +85,10 @@ class WbLicenseGatedMixin(models.AbstractModel):
         )
         if not info.is_valid:
             raise AccessError(info.user_message or _(
-                "Keine gültige Lizenz für Produkt '%(code)s'. "
-                "Schreibvorgang auf %(model)s abgelehnt.\n\n"
-                "Bitte unter Einstellungen → WB Lizenzen aktivieren oder "
-                "support@wissen-beratung.de kontaktieren."
+                "No valid license for product '%(code)s'. "
+                "Writing to %(model)s was refused.\n\n"
+                "Please activate a license under Settings → WB Licenses or "
+                "contact support@wissen-beratung.de."
             ) % {'code': code, 'model': self._name})
 
     def _license_gate_skipped(self):

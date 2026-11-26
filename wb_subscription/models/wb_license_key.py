@@ -198,6 +198,18 @@ class WbLicenseKey(models.Model):
     bound_domain = fields.Char(string='Gebundene Domain', tracking=True)
     bound_db_uuid = fields.Char(string='Gebundene DB-UUID')
     instance_limit = fields.Integer(default=1, required=True)
+    max_users = fields.Integer(
+        string='Max. Benutzer',
+        compute='_compute_max_users',
+        store=True,
+        readonly=False,
+        tracking=True,
+        help="Benutzergrenze des Pakets, 0 = unbegrenzt. Wird beim Ausstellen "
+             "aus der Produktvariante übernommen (auch beim Wechsel der Variante) "
+             "und kann je Lizenz überschrieben werden. Eine spätere Änderung am "
+             "Produkt ändert ausgestellte Lizenzen nicht (DECISIONS.md #95). "
+             "/api/license/check meldet den Wert als max_users.",
+    )
     instance_current = fields.Integer(compute='_compute_instance_current', store=False)
     instance_ids = fields.One2many(
         'wb.license.instance', 'license_id', string='Fremde Instanzen', readonly=True,
@@ -350,6 +362,17 @@ class WbLicenseKey(models.Model):
         ('instance_limit_positive', 'CHECK(instance_limit >= 1)',
          'instance_limit muss mindestens 1 sein.'),
     ]
+    _max_users_not_negative = models.Constraint(
+        'CHECK(max_users >= 0)',
+        'Max. Benutzer darf nicht negativ sein (0 = unbegrenzt).',
+    )
+
+    @api.depends('product_id')
+    def _compute_max_users(self):
+        # Absichtlich nur von product_id abhängig, nicht von
+        # product_id.wb_max_users: ausgestellte Lizenzen behalten ihr Paket.
+        for rec in self:
+            rec.max_users = rec.product_id.wb_max_users or 0
 
     @api.depends('name', 'product_id', 'partner_id')
     def _compute_display_name(self):
@@ -1275,8 +1298,11 @@ class WbLicenseKey(models.Model):
             if self.parent_license_id and not is_neutralized:
                 return {'status': 'dev_not_neutralized', 'until': None}
             return None
-        if self.parent_license_id:
+        if self.parent_license_id or self.state == 'trial':
             # DEV-Lizenz in einer anderen DB als ihrer eigenen: gesperrt.
+            # Ebenso ein Test (Trial) in einer Kopie: Eval und Kulanz gibt es
+            # nur für bezahlte Lizenzen, sonst verlängerte jede Kopie den
+            # Test (DECISIONS.md #94).
             return {'status': 'mismatch', 'until': None}
         return self.env['wb.license.instance']._resolve(
             self, domain, db_uuid, is_neutralized)

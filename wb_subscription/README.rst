@@ -90,6 +90,42 @@ ist — folgt dem Odoo-Standard, kein Provider-Coupling.
        → ruft sale.order._wb_issue_license_keys() auf
        → Lizenz + Activation-Code + Ticket + Cert-PDF + 2 Mails + Telegram
 
+Testanträge (Test per Klick)
+============================
+
+``/api/license/trial`` gibt einen Test sofort frei (DECISIONS.md #94, #97). Ein
+Antrag landet stattdessen unter *Lizenzen → Trial-Anfragen* im Zustand
+**Pending**, wenn:
+
+* dieselbe E-Mail-Adresse oder dieselbe öffentliche Domain schon einen Test aus
+  einer **anderen** Datenbank hatte (bei ``localhost``, IP-Adressen, ``.local``
+  und anderen privaten Namen zählt nur die DB-UUID),
+* die Adresse eine Wegwerf-Adresse ist (Liste im Code, erweiterbar über
+  ``wb_subscription.trial_review_email_domains``),
+* die Datenbank schon eine Lizenz des Produkts hatte oder dieselbe IP in 30
+  Tagen mindestens ``wb_subscription.trial_review_ip_threshold`` (Standard 3)
+  Anträge gestellt hat.
+
+Der Grund steht im Feld *Grund der Prüfung*.
+
+**Freigeben:** Antrag öffnen, „Trial aktivieren“. Der Kunde bekommt die Mail mit
+dem Schlüssel; klickt er in seinem Odoo erneut auf „Start 7-day free trial“
+(gleiche E-Mail, gleiche Datenbank), wird der Schlüssel übernommen.
+**Ablehnen:** „Ablehnen“; der Kunde erhält nur ``TRIAL_NOT_AVAILABLE``.
+**Gesperrte Datenbank wieder freigeben** (z. B. Test für ein neues Paket): den alten
+Antrag dieser DB-UUID löschen, dann neu anfragen lassen.
+
+Aufbewahrung: Cron „Aufbewahrungsfristen Testanträge“ entfernt die IP nach
+``wb_subscription.retention_trial_ip_days`` (90) Tagen und die Kontaktdaten nicht
+umgewandelter Anträge nach ``wb_subscription.retention_trial_contact_days`` (365)
+Tagen; 0 schaltet die Stufe ab. Produkt, Domain und DB-UUID bleiben für die Regel
+„1 Test je Datenbank“. Der bei der Freigabe angelegte Kontakt wird mit anonymisiert und
+archiviert, und die E-Mail verschwindet aus den Ereignissen der Test-Lizenz, beides nur, wenn
+der Kontakt sonst nirgends genutzt wird (keine weitere Lizenz, kein Auftrag, keine Rechnung,
+kein Benutzer). **Nicht bereinigt** werden Chatter und Mail-Historie des Kontakts
+(``mail.message``, ``mail.mail``, z. B. die Mail „Test aktiviert“): Sie unterliegen der
+Mail-Aufbewahrung von Odoo und werden bei Bedarf dort bzw. per Löschung des Kontakts entfernt.
+
 Dependencies
 =============
 

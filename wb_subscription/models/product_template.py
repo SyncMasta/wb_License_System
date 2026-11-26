@@ -81,6 +81,22 @@ class ProductTemplate(models.Model):
         store=True,
     )
 
+    @api.depends('product_variant_ids.wb_max_users')
+    def _compute_wb_max_users(self):
+        for rec in self:
+            variants = rec.product_variant_ids
+            rec.wb_max_users = variants.wb_max_users if len(variants) == 1 else 0
+
+    def _inverse_wb_max_users(self):
+        for rec in self:
+            if len(rec.product_variant_ids) == 1:
+                rec.product_variant_ids.wb_max_users = rec.wb_max_users
+
+    def _get_related_fields_variant_template(self):
+        # Beim Anlegen schreibt product.template diese Felder nach dem Erzeugen
+        # der Variante erneut, damit die Inverse die Variante erreicht.
+        return super()._get_related_fields_variant_template() + ['wb_max_users']
+
     @api.depends('wb_release_ids.is_current', 'wb_release_ids.state')
     def _compute_wb_current_release_id(self):
         for rec in self:
@@ -107,6 +123,21 @@ class ProductTemplate(models.Model):
     wb_trial_days = fields.Integer(
         string='Trial-Tage',
         default=7,
+        help="Laufzeit eines Tests per Klick im Kunden-Odoo (/api/license/trial). "
+             "0 = kein Test für dieses Produkt.",
+    )
+    # Benutzergrenze je Paket (DECISIONS.md #95). Gespeichert an der Variante,
+    # damit Starter/Team/Business als Varianten eines Produkts unterschiedliche
+    # Grenzen haben. Am Template nur bei genau einer Variante bearbeitbar (wie
+    # default_code im Odoo-Standard).
+    wb_max_users = fields.Integer(
+        string='Max. Benutzer',
+        compute='_compute_wb_max_users',
+        inverse='_inverse_wb_max_users',
+        help="Höchstzahl der Benutzer, die das Produkt beim Kunden nutzen dürfen "
+             "(z. B. VoIP-Benutzer). 0 = unbegrenzt. Wird beim Ausstellen in den "
+             "Lizenzschlüssel übernommen und mit /api/license/check gemeldet. "
+             "Bei mehreren Varianten an der Variante pflegen.",
     )
     wb_activation_grace_days = fields.Integer(
         string='Activation-Frist (Tage)',
@@ -185,6 +216,16 @@ class ProductTemplate(models.Model):
         return records
 
     def write(self, vals):
+        if 'wb_technical_code' in vals:
+            # Der Code steckt in jedem ausgestellten Schlüssel (WB-<Code>-…) und in
+            # product_code der Lizenzen: nach dem ersten Schlüssel nicht mehr änderbar (#97).
+            neu = vals['wb_technical_code'] or False
+            geaendert = self.filtered(lambda t: (t.wb_technical_code or False) != neu)
+            if geaendert and self.env['wb.license.key'].sudo().search_count([
+                    ('product_id.product_tmpl_id', 'in', geaendert.ids)], limit=1):
+                raise ValidationError(_(
+                    "Der technische Code kann nicht mehr geändert werden: Für das Produkt "
+                    "gibt es bereits Lizenzschlüssel."))
         res = super().write(vals)
         # Auto-Create der Mailingliste, wenn Produkt nachtraeglich auf
         # Lizenz-Produkt umgestellt wird oder ein technischer Code dazukommt.
@@ -252,3 +293,29 @@ class ProductProduct(models.Model):
         related='product_tmpl_id.wb_is_license_product',
         store=True,
     )
+    wb_max_users = fields.Integer(
+        string='Max. Benutzer',
+        default=0,
+        help="Höchstzahl der Benutzer für diese Variante (Paket). 0 = unbegrenzt.",
+    )
+
+    _wb_max_users_not_negative = models.Constraint(
+        'CHECK(wb_max_users >= 0)',
+        'Max. Benutzer darf nicht negativ sein (0 = unbegrenzt).',
+    )
+
+    @api.model
+    def _wb_trial_variant(self, product_code):
+        """Variant a click trial is issued for: the largest package of the product.
+
+        Unlimited (0) wins, otherwise the highest user limit; ties by id so the
+        choice is deterministic. Returns an empty recordset if none exists.
+        """
+        variants = self.search([
+            ('wb_technical_code', '=', product_code),
+            ('wb_is_license_product', '=', True),
+        ])
+        if not variants:
+            return variants
+        return variants.sorted(
+            key=lambda p: (p.wb_max_users == 0, p.wb_max_users, -p.id), reverse=True)[:1]

@@ -57,6 +57,17 @@ def _check_rate_limit(bucket_prefix, endpoint, default_max, default_window):
     )
 
 
+def _product_mismatch(kw, license):
+    """True if the client names a product that is not the license's (DECISIONS.md #97, I4).
+
+    Clients without ``product_code`` (older ones, PHP) are not affected.
+    """
+    code = kw.get('product_code')
+    if not isinstance(code, str) or not code.strip():
+        return False
+    return code.strip().upper() != (license.product_code or '')
+
+
 class ApiLicenseController(http.Controller):
 
     @http.route('/api/license/check',
@@ -94,6 +105,8 @@ class ApiLicenseController(http.Controller):
         license = request.env['wb.license.key'].sudo().search([('name', '=', key)], limit=1)
         if not license:
             return {'error': 'KEY_NOT_FOUND'}
+        if _product_mismatch(kw, license):
+            return {'error': 'PRODUCT_MISMATCH'}
 
         # HMAC-Signatur (optional oder Pflicht, je nach Enforcement-Modus).
         # Vor record_ping, damit ein abgewiesener Request die Ping-Metadaten
@@ -148,6 +161,9 @@ class ApiLicenseController(http.Controller):
             'valid_to': license.valid_to.isoformat() if license.valid_to else None,
             'grace_until': license.grace_until.isoformat() if license.grace_until else None,
             'product_code': license.product_code,
+            # Benutzergrenze des Pakets, 0 = unbegrenzt (DECISIONS.md #95).
+            # Der Client setzt sie durch; ältere Clients ignorieren das Feld.
+            'max_users': license.max_users,
             'latest_module_version': latest_module_version,
             'download_url': download_url,
         }
@@ -165,6 +181,7 @@ class ApiLicenseController(http.Controller):
             response['valid_to'] = instance['until'].isoformat()
             response['grace_until'] = (
                 instance['grace_until'].isoformat() if instance.get('grace_until') else None)
+            response['max_users'] = instance.get('max_users', license.max_users)
         elif instance:
             until = instance['until']
             status = instance['status']
@@ -264,6 +281,8 @@ class ApiLicenseController(http.Controller):
         license = request.env['wb.license.key'].sudo().search([('name', '=', key)], limit=1)
         if not license:
             return {'error': 'KEY_NOT_FOUND'}
+        if _product_mismatch(kw, license):
+            return {'error': 'PRODUCT_MISMATCH'}
 
         consents = {
             'eula': bool(kw.get('confirm_eula')),
@@ -285,7 +304,9 @@ class ApiLicenseController(http.Controller):
                 'status': 'ok',
                 'state': license.state,
                 'bound_domain': license.bound_domain,
+                'product_code': license.product_code,
                 'valid_to': license.valid_to.isoformat() if license.valid_to else None,
+                'max_users': license.max_users,
             }
         else:
             payload = result
@@ -474,6 +495,9 @@ class ApiLicenseController(http.Controller):
         license = License._lookup_for_auto_bind(
             product_code, db_uuid, domain, email,
         )
+        if license and license.product_code != product_code:
+            # Darf nicht vorkommen; nie einen Schlüssel eines anderen Produkts binden (#97, I4)
+            license = License.browse()
         if not license:
             request.env['wb.license.event'].sudo().log_event(
                 False, 'auto_bind_lookup_failed',
@@ -491,9 +515,11 @@ class ApiLicenseController(http.Controller):
         return {
             'found': True,
             'key': license.name,
+            'product_code': license.product_code,
             'state': license.state,
             'valid_from': license.valid_from.isoformat() if license.valid_from else None,
             'valid_to': license.valid_to.isoformat() if license.valid_to else None,
+            'max_users': license.max_users,
         }
 
     @http.route('/api/license/migrate',

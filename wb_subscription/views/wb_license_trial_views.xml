@@ -14,6 +14,7 @@
                 <field name="contact_email"/>
                 <field name="product_id"/>
                 <field name="domain"/>
+                <field name="review_reason" optional="show"/>
                 <field name="company_size"/>
                 <field name="state"/>
                 <field name="create_date"/>
@@ -29,6 +30,9 @@
                 <header>
                     <button name="action_approve_and_create_trial" type="object"
                             string="Trial aktivieren" class="btn-primary"
+                            invisible="state != 'pending'"/>
+                    <button name="action_reject" type="object"
+                            string="Ablehnen"
                             invisible="state != 'pending'"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="pending,active,converted"/>
@@ -53,6 +57,12 @@
                         <group>
                             <field name="product_id"/>
                             <field name="domain"/>
+                            <field name="db_uuid"/>
+                            <field name="ip_address"/>
+                            <field name="review_reason" invisible="not review_reason"/>
+                            <field name="consent_at"/>
+                            <field name="consent_version"/>
+                            <field name="anonymised" invisible="not anonymised"/>
                         </group>
                         <group>
                             <field name="partner_id" readonly="1"/>

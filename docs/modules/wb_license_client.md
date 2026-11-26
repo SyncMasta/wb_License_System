@@ -388,6 +388,29 @@ HTTP POST /api/license/activate
 </form>
 ```
 
+### Test per Klick und Benutzergrenze (ab 19.0.2.7.0, DECISIONS.md #94–96)
+
+- Der Assistent hat zwei Wege (`mode`): „I have a license key“ (oben) und „Start 7-day free trial“.
+  Für den Test: Name, E-Mail, Firma (vorbelegt aus Benutzer und Firma), Odoo-Adresse (nur Anzeige) und
+  das Kästchen `trial_consent`. Ohne Zustimmung geht kein Request raus.
+- `wb.license.client.start_trial(code, name, email, company)` ruft `/api/license/trial` mit Domain und
+  DB-UUID. Gespeichert wird nur ein gültiger Schlüssel des richtigen Produkts (`state=trial`,
+  `valid_to`, `max_users`); bei Fehlern (auch Server nicht erreichbar) bleibt alles wie vorher.
+  `pending` = Prüfung bei WB; ein neuer Klick mit derselben E-Mail holt den Schlüssel später.
+- `trial` ist gültig bis `valid_to`, auch wenn der Server nicht erreichbar ist; danach meldet der
+  Server `expired` (bestehende Logik, Daten bleiben).
+- `max_users` kommt aus `/check`, `/activate`, `/lookup` und `/trial`.
+  `env['wb.license.client']._wb_license_max_users('VOIP')` liefert `None` ohne gültige Lizenz,
+  `0` für unbegrenzt, sonst die Grenze. Durchsetzen tut das Produktmodul.
+- Härtung (#97): `check_license`, `register_install`, `submit_lead_request`, `activate_license`,
+  `request_migration`, `auto_lookup_all_installed`, `start_trial` sind `@api.private` (nicht per RPC);
+  die schreibenden außer `submit_lead_request` prüfen zusätzlich auf Administrator (`_ensure_admin`).
+  Schlüssel werden nur mit Präfix `WB-<Code>-` angenommen; Antworten für ein anderes Produkt oder
+  `PRODUCT_MISMATCH` setzen `expired`. Ungültiges `max_users` behält den vorherigen Wert (bei der
+  ersten Antwort: verworfen), ein Test ohne `valid_to` ist ungültig.
+- Quellsprache Englisch, Deutsch in `i18n/de.po` (Vorlage `i18n/wb_license_client.pot`, exportiert mit
+  `odoo i18n export`).
+
 ### Migrate-Wizard
 
 **Model:** `wb.license.migrate.wizard` (TransientModel)

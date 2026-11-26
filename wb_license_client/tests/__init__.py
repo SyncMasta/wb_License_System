@@ -4,3 +4,7 @@ from . import test_auto_lookup
 from . import test_signature
 from . import test_ping_backoff
 from . import test_server_url_db_header
+from . import test_trial
+from . import test_i18n
+from . import test_de
+from . import test_security

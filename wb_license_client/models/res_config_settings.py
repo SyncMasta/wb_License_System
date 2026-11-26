@@ -10,23 +10,23 @@ class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
 
     wb_license_server_url = fields.Char(
-        string='WB-Lizenz-Server-URL',
+        string='WB License Server URL',
         config_parameter=SERVER_URL_PARAM,
         default='https://my.wissen-beratung.de',
-        help="URL des WB-Lizenz-Servers. Normalerweise nicht ändern. "
-             "Nur für Test-/Staging-Umgebungen anpassen.",
+        help="URL of the WB license server. Normally do not change it; only "
+             "for test or staging environments.",
     )
     wb_license_debug_mode = fields.Boolean(
-        string='Debug-Modus',
+        string='Debug Mode',
         config_parameter=DEBUG_PARAM,
-        help="Wenn aktiv, werden Server-Responses als Notification angezeigt. "
-             "Nicht in Produktion aktivieren!",
+        help="If set, server answers are shown as notifications. "
+             "Do not enable in production!",
     )
     wb_license_disable_install_registry = fields.Boolean(
-        string='Install-Registry deaktivieren',
+        string='Disable Install Registry',
         config_parameter=INSTALL_REGISTRY_OPT_OUT_PARAM,
-        help="Wenn aktiv, wird beim Install eines unlizenzierten WB-Produkt-"
-             "Addons KEIN Announce-Signal an my.wissen-beratung.de gesendet. "
-             "Standardmäßig aus — der Announce enthält nur Domain, DB-UUID, "
-             "Produkt-Code und Admin-Email zur Lead-Verwaltung.",
+        help="If set, installing an unlicensed WB product add-on sends NO "
+             "announcement to my.wissen-beratung.de. Off by default; the "
+             "announcement only contains domain, database ID, product code and "
+             "admin email for lead management.",
     )

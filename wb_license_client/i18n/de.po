@@ -1,0 +1,1342 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* wb_license_client
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-26 13:23+0000\n"
+"PO-Revision-Date: 2026-11-26 13:23+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid ""
+"\n"
+"You have been subscribed to the product newsletter."
+msgstr ""
+"\n"
+"Sie wurden in den Produkt-Newsletter eingetragen."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_info.py:0
+msgid "%(code)s already runs on as many test systems for evaluation as possible. This database needs a DEV license (%(support)s)."
+msgstr "Für %(code)s laufen schon so viele Testsysteme zur Probe wie möglich. Für diese Datenbank brauchen Sie eine DEV-Lizenz (%(support)s)."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_info.py:0
+msgid "%(code)s keeps running here until %(until)s."
+msgstr "Bis %(until)s läuft %(code)s hier weiter."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_activate_wizard__activation_code
+msgid "25 characters in groups of 5, from the portal download."
+msgstr "25 Zeichen in 5er-Gruppen, aus dem Portal-Download."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_activate_wizard__product_code
+msgid "4-character alphanumeric product code (A-Z, 0-9), e.g. 'TELE' or 'MCP1'. Shown on the license certificate."
+msgstr "4-stelliger alphanumerischer Produkt-Code (A-Z, 0-9), z. B. 'TELE' oder 'MCP1'. Steht auf dem Lizenz-Zertifikat."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_info__product_code
+msgid "4-character alphanumeric product code (A-Z/0-9), e.g. 'TELE' or 'MCP1'."
+msgstr "4-stelliger alphanumerischer Produkt-Code (A-Z/0-9), z. B. 'TELE' oder 'MCP1'."
+
+#. module: wb_license_client
+#: model:mail.template,body_html:wb_license_client.mail_template_expired_local
+msgid ""
+"<div>\n"
+"                    <p>Hello,</p>\n"
+"                    <p>Your license for <strong t-out=\"object.product_code\"/> has <strong>expired</strong>.</p>\n"
+"                    <p>Licensed features are locked until the license is renewed. Existing data stays readable.</p>\n"
+"                    <p>To renew it, please contact support@wissen-beratung.de.</p>\n"
+"                    <p>Kind regards<br/>WISSEN BERATUNG</p>\n"
+"                </div>\n"
+"            "
+msgstr ""
+"<div>\n"
+"                    <p>Hallo,</p>\n"
+"                    <p>Ihre Lizenz für <strong t-out=\"object.product_code\"/> ist <strong>abgelaufen</strong>.</p>\n"
+"                    <p>Lizenzpflichtige Funktionen sind bis zur Verlängerung gesperrt. Bestehende Daten bleiben lesbar.</p>\n"
+"                    <p>Für eine Verlängerung kontaktieren Sie bitte support@wissen-beratung.de.</p>\n"
+"                    <p>Viele Grüße<br/>WISSEN BERATUNG</p>\n"
+"                </div>\n"
+"            "
+
+#. module: wb_license_client
+#: model:mail.template,body_html:wb_license_client.mail_template_grace_started_local
+msgid ""
+"<div>\n"
+"                    <p>Hello,</p>\n"
+"                    <p>Your license for <strong t-out=\"object.product_code\"/> is in its <strong>grace period</strong> because an invoice is overdue.</p>\n"
+"                    <p>Please pay the open invoice by <strong t-out=\"object.grace_until or '-'\"/> to avoid interruptions.</p>\n"
+"                    <p>Questions: support@wissen-beratung.de</p>\n"
+"                    <p>Kind regards<br/>WISSEN BERATUNG</p>\n"
+"                </div>\n"
+"            "
+msgstr ""
+"<div>\n"
+"                    <p>Hallo,</p>\n"
+"                    <p>Ihre Lizenz für <strong t-out=\"object.product_code\"/> befindet sich in der <strong>Kulanzzeit</strong>, weil eine Rechnung überfällig ist.</p>\n"
+"                    <p>Bitte begleichen Sie die offene Rechnung bis zum <strong t-out=\"object.grace_until or '-'\"/>, um Unterbrechungen zu vermeiden.</p>\n"
+"                    <p>Bei Fragen: support@wissen-beratung.de</p>\n"
+"                    <p>Viele Grüße<br/>WISSEN BERATUNG</p>\n"
+"                </div>\n"
+"            "
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "<p><strong>How to activate your license:</strong></p><ol><li>Enter the license key (from the certificate)</li><li>Click the ticket link in the activation email</li><li>Enter the 6-digit confirmation code (email)</li><li>Copy the 25-character activation code from the portal and paste it below</li></ol>"
+msgstr "<p><strong>So aktivieren Sie Ihre Lizenz:</strong></p><ol><li>Geben Sie den Lizenzschlüssel ein (vom Zertifikat)</li><li>Klicken Sie auf den Ticket-Link aus der Aktivierungs-E-Mail</li><li>Geben Sie den 6-stelligen Bestätigungs-Code ein (E-Mail)</li><li>Kopieren Sie den 25-stelligen Aktivierungs-Code vom Portal und fügen Sie ihn unten ein</li></ol>"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid ""
+"<strong>Important:</strong> Once the license is activated, a later\n"
+"                                <strong>credit note or refund of the purchase price is\n"
+"                                excluded</strong> (§ 6.5 EULA).\n"
+"                                This confirmation is recorded by WISSEN BERATUNG as evidence."
+msgstr "<strong>Wichtig:</strong> Mit der Aktivierung der Lizenz ist eine spätere <strong>Gutschrift bzw. Erstattung des Kaufpreises ausgeschlossen</strong> (§ 6.5 EULA). Diese Bestätigung wird zu Beweiszwecken bei WISSEN BERATUNG protokolliert."
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_migrate_wizard_view_form
+msgid ""
+"<strong>Note:</strong> A migration is possible once a year and has to be\n"
+"                           approved by WISSEN BERATUNG (usually 1-2 working days)."
+msgstr "<strong>Hinweis:</strong> Eine Migration ist 1x pro Jahr möglich und muss von WISSEN BERATUNG freigegeben werden (normalerweise 1-2 Werktage)."
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid "<strong>Try the product free of charge for 7 days.</strong>"
+msgstr "<strong>Testen Sie das Produkt 7 Tage kostenlos.</strong>"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "A free trial is not available for this installation. To test or buy the product, please contact vertrieb@wissen-beratung.de."
+msgstr "Ein kostenloser Test ist für diese Installation nicht möglich. Zum Testen oder Kaufen wenden Sie sich bitte an vertrieb@wissen-beratung.de."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "A license key for %s is already configured. A trial is only available for new installations."
+msgstr "Für %s ist schon ein Lizenzschlüssel eingetragen. Ein Test ist nur für neue Installationen möglich."
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__api_secret
+msgid "API Secret (optional)"
+msgstr "API-Secret (optional)"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__confirm_eula
+msgid "Accept EULA"
+msgstr "EULA bestätigen"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__confirm_terms
+msgid "Accept Terms and Conditions"
+msgstr "AGB bestätigen"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__confirm_privacy
+msgid "Acknowledge Privacy Notice"
+msgstr "Datenschutzhinweis bestätigen"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid "Activate"
+msgstr "Aktivieren"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_info.py:0
+#: model:ir.actions.act_window,name:wb_license_client.wb_license_activate_wizard_action
+#: model:ir.ui.menu,name:wb_license_client.menu_wb_license_client_activate
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_info_view_form
+msgid "Activate License"
+msgstr "Lizenz aktivieren"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__activation_code
+msgid "Activation Code"
+msgstr "Aktivierungs-Code"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "Activation failed (HTTP %s). Please contact support@wissen-beratung.de."
+msgstr "Aktivierung fehlgeschlagen (HTTP %s). Bitte support@wissen-beratung.de kontaktieren."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "Activation not possible: you have to confirm the EULA, the terms and conditions, the privacy notice and the waiver of a refund."
+msgstr "Aktivierung nicht möglich: Sie müssen EULA, AGB, Datenschutzhinweis und den Verzicht auf Gutschrift bestätigen."
+
+#. module: wb_license_client
+#: model:ir.model.fields.selection,name:wb_license_client.selection__wb_license_info__state__active
+msgid "Active"
+msgstr "Aktiv"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_migrate_wizard_view_form
+msgid "Cancel"
+msgstr "Abbrechen"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_info_view_form
+msgid "Check Now"
+msgstr "Jetzt prüfen"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__trial_company_name
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__company_id
+msgid "Company"
+msgstr "Firma"
+
+#. module: wb_license_client
+#: model:ir.model,name:wb_license_client.model_res_config_settings
+msgid "Config Settings"
+msgstr "Konfigurationseinstellungen"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__confirm_no_refund
+msgid "Confirm Waiver of Refund"
+msgstr "Verzicht auf Gutschrift bestätigen"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_migrate_wizard__contact_email
+msgid "Contact Email"
+msgstr "Kontakt-E-Mail"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__create_uid
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__create_uid
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_migrate_wizard__create_uid
+msgid "Created by"
+msgstr "Erstellt von"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__create_date
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__create_date
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_migrate_wizard__create_date
+msgid "Created on"
+msgstr "Erstellt am"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_migrate_wizard__current_db_uuid
+msgid "Current Database ID (old)"
+msgstr "Aktuelle DB-UUID (alt)"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_migrate_wizard__current_domain
+msgid "Current Domain (old)"
+msgstr "Aktuelle Domain (alt)"
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_info__installed_module_version
+msgid "Currently installed version of the product module."
+msgstr "Aktuell installierte Version des Produkt-Moduls."
+
+#. module: wb_license_client
+#: model:ir.model.fields.selection,name:wb_license_client.selection__wb_license_info__instance_status__dev
+msgid "DEV license"
+msgstr "DEV-Lizenz"
+
+#. module: wb_license_client
+#: model:ir.model.fields.selection,name:wb_license_client.selection__wb_license_info__instance_status__dev_not_neutralized
+msgid "DEV license, database not neutralized"
+msgstr "DEV-Lizenz, DB nicht neutralisiert"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__days_remaining
+msgid "Days Remaining"
+msgstr "Verbleibende Tage"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_res_config_settings__wb_license_debug_mode
+#: model_terms:ir.ui.view,arch_db:wb_license_client.res_config_settings_view_form_wb_license
+msgid "Debug Mode"
+msgstr "Debug-Modus"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_info.py:0
+msgid "Development or staging system: %(code)s runs with a DEV license until %(until)s."
+msgstr "Entwicklungs- oder Staging-System: %(code)s läuft mit DEV-Lizenz bis %(until)s."
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_res_config_settings__wb_license_disable_install_registry
+#: model_terms:ir.ui.view,arch_db:wb_license_client.res_config_settings_view_form_wb_license
+msgid "Disable Install Registry"
+msgstr "Install-Registry deaktivieren"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_res_config_settings__display_name
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__display_name
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_client__display_name
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_gated_mixin__display_name
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__display_name
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_migrate_wizard__display_name
+msgid "Display Name"
+msgstr "Anzeigename"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__download_url
+msgid "Download URL"
+msgstr "Download-URL"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "EULA"
+msgstr "EULA"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__contact_email
+msgid "Email Address"
+msgstr "E-Mail-Adresse"
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_activate_wizard__contact_email
+msgid "Email address for the activation record and, if chosen, the newsletter."
+msgstr "E-Mail-Adresse für den Aktivierungsnachweis und ggf. die Newsletter-Anmeldung."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_info__instance_status
+msgid "Empty if this database is the licensed instance. Otherwise the server reports eval, DEV license or mismatch here."
+msgstr "Leer, wenn diese Datenbank die lizenzierte Instanz ist. Sonst meldet der Server hier Eval, DEV-Lizenz oder Abweichung."
+
+#. module: wb_license_client
+#: model:ir.model.fields.selection,name:wb_license_client.selection__wb_license_info__instance_status__eval
+msgid "Eval (test system)"
+msgstr "Eval (Testsystem)"
+
+#. module: wb_license_client
+#: model:ir.model.fields.selection,name:wb_license_client.selection__wb_license_info__instance_status__eval_expired
+msgid "Eval expired"
+msgstr "Eval abgelaufen"
+
+#. module: wb_license_client
+#: model:ir.model.fields.selection,name:wb_license_client.selection__wb_license_info__instance_status__eval_limit
+msgid "Eval limit reached"
+msgstr "Eval-Limit erreicht"
+
+#. module: wb_license_client
+#: model:ir.model.fields.selection,name:wb_license_client.selection__wb_license_info__state__expired
+msgid "Expired"
+msgstr "Abgelaufen"
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_info__server_response_raw
+msgid "For debugging: last raw answer of the server."
+msgstr "Für die Fehlersuche: letzte Rohantwort des Servers."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_activate_wizard__key
+msgid "Format: WB-XXXX-xxxxxxxxXX"
+msgstr "Format: WB-XXXX-xxxxxxxxXX"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_info.py:0
+msgid "Free trial of %(code)s until %(until)s. To keep using it, order a license from vertrieb@wissen-beratung.de."
+msgstr "Kostenloser Test von %(code)s bis %(until)s. Für die weitere Nutzung bestellen Sie bitte eine Lizenz bei vertrieb@wissen-beratung.de."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "Free trial started"
+msgstr "Kostenloser Test gestartet"
+
+#. module: wb_license_client
+#: model:ir.model.fields.selection,name:wb_license_client.selection__wb_license_info__state__grace
+msgid "Grace (invoice overdue)"
+msgstr "Kulanz (Rechnung offen)"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__grace_until
+msgid "Grace Until"
+msgstr "Kulanz bis"
+
+#. module: wb_license_client
+#. odoo-javascript
+#: code:addons/wb_license_client/static/src/js/license_banner.js:0
+msgid "Hide"
+msgstr "Ausblenden"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__mode
+msgid "How do you want to start?"
+msgstr "Wie möchten Sie starten?"
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_info__effective_min_cache_age_days
+msgid "How long the last successful check stays valid while the license server cannot be reached (applied by the last license check)."
+msgstr "Wie lange die letzte erfolgreiche Prüfung gilt, solange der Lizenzserver nicht erreichbar ist (vom letzten Lizenz-Check gesetzt)."
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid ""
+"I accept the <strong>general terms and conditions</strong>\n"
+"                                of WISSEN BERATUNG at"
+msgstr "Ich akzeptiere die <strong>Allgemeinen Geschäftsbedingungen (AGB)</strong> von WISSEN BERATUNG unter"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__trial_consent
+msgid "I agree to the transfer of this data"
+msgstr "Ich stimme der Übermittlung dieser Daten zu"
+
+#. module: wb_license_client
+#: model:ir.model.fields.selection,name:wb_license_client.selection__wb_license_activate_wizard__mode__activate
+msgid "I have a license key"
+msgstr "Ich habe einen Lizenzschlüssel"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid ""
+"I have read and accept the <strong>EULA</strong>\n"
+"                                (End User License Agreement).\n"
+"                                Available as <em>EULA.md</em> in the module directory or at"
+msgstr "Ich habe die <strong>EULA</strong> (End-User-License-Agreement) gelesen und akzeptiere sie. Verfügbar unter <em>EULA.md</em> im Modul-Verzeichnis bzw."
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid ""
+"I have taken note of the <strong>privacy notice</strong> (GDPR)\n"
+"                                ("
+msgstr "Ich habe den <strong>Datenschutzhinweis</strong> (DSGVO) zur Kenntnis genommen ("
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid ""
+"I want to be informed by email about <strong>updates, security\n"
+"                                patches and new features</strong> of this module. You can\n"
+"                                unsubscribe at any time via the link in every message."
+msgstr "Ich möchte über <strong>Updates, Sicherheits-Patches und neue Funktionen</strong> dieses Moduls per E-Mail informiert werden. Abmeldung jederzeit über den Link in jeder Nachricht möglich."
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_res_config_settings__id
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__id
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_client__id
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_gated_mixin__id
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__id
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_migrate_wizard__id
+msgid "ID"
+msgstr "ID"
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_res_config_settings__wb_license_disable_install_registry
+msgid "If set, installing an unlicensed WB product add-on sends NO announcement to my.wissen-beratung.de. Off by default; the announcement only contains domain, database ID, product code and admin email for lead management."
+msgstr "Wenn aktiv, wird beim Installieren eines unlizenzierten WB-Produkt-Addons KEINE Meldung an my.wissen-beratung.de gesendet. Standardmäßig aus; die Meldung enthält nur Domain, DB-UUID, Produkt-Code und Admin-E-Mail zur Lead-Verwaltung."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_res_config_settings__wb_license_debug_mode
+msgid "If set, server answers are shown as notifications. Do not enable in production!"
+msgstr "Wenn aktiv, werden Serverantworten als Benachrichtigung angezeigt. Nicht in Produktion aktivieren!"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__info_message
+msgid "Info Message"
+msgstr "Hinweis"
+
+#. module: wb_license_client
+#: model_terms:ir.actions.act_window,help:wb_license_client.wb_license_info_action
+msgid ""
+"Install a WB product module, then activate your license or start a\n"
+"               free trial with the wizard in the settings."
+msgstr "Installieren Sie ein WB-Produkt-Modul und aktivieren Sie dann Ihre Lizenz oder starten Sie einen kostenlosen Test über den Assistenten in den Einstellungen."
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__installed_module_version
+msgid "Installed Module Version"
+msgstr "Installierte Modul-Version"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.res_config_settings_view_form_wb_license
+msgid "Installing an unlicensed add-on sends NO announcement to my.wissen-beratung.de. Default: off."
+msgstr "Sendet beim Installieren eines unlizenzierten Addons KEINE Meldung an my.wissen-beratung.de. Standard: aus."
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__instance_status
+msgid "Instance Status"
+msgstr "Instanz-Status"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__instance_until
+msgid "Instance Status Valid Until"
+msgstr "Instanz-Status gültig bis"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "Invalid product code. Please contact support@wissen-beratung.de."
+msgstr "Ungültiger Produkt-Code. Bitte support@wissen-beratung.de kontaktieren."
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__is_valid
+msgid "Is Valid"
+msgstr "Gültig"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__key_masked
+msgid "Key (masked)"
+msgstr "Schlüssel (maskiert)"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__last_check_success
+msgid "Last Check Success"
+msgstr "Letzte Prüfung erfolgreich"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__last_clock_anomaly_at
+msgid "Last Clock Anomaly"
+msgstr "Letzte Uhr-Anomalie"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__last_error_message
+msgid "Last Error Message"
+msgstr "Letzte Fehlermeldung"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__last_failed_check_at
+msgid "Last Failed Check"
+msgstr "Letzte fehlgeschlagene Prüfung"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__last_install_announce_at
+msgid "Last Install Announcement"
+msgstr "Letzte Install-Meldung"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__last_server_check
+msgid "Last Successful Check"
+msgstr "Letzte erfolgreiche Prüfung"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__write_uid
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__write_uid
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_migrate_wizard__write_uid
+msgid "Last Updated by"
+msgstr "Zuletzt aktualisiert von"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__write_date
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__write_date
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_migrate_wizard__write_date
+msgid "Last Updated on"
+msgstr "Zuletzt aktualisiert am"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__latest_module_version
+msgid "Latest Available Version"
+msgstr "Neueste verfügbare Version"
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_info__latest_module_version
+msgid "Latest release version reported by the license server. Updated by the daily check."
+msgstr "Vom Lizenzserver gemeldete neueste Release-Version. Wird bei der täglichen Prüfung aktualisiert."
+
+#. module: wb_license_client
+#. odoo-javascript
+#: code:addons/wb_license_client/static/src/js/license_banner.js:0
+msgid "License %(code)s: %(state)s"
+msgstr "Lizenz %(code)s: %(state)s"
+
+#. module: wb_license_client
+#: model:ir.model,name:wb_license_client.model_wb_license_activate_wizard
+msgid "License Activation Wizard"
+msgstr "Assistent zur Lizenz-Aktivierung"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid "License Data"
+msgstr "Lizenzdaten"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__key
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__key
+msgid "License Key"
+msgstr "Lizenzschlüssel"
+
+#. module: wb_license_client
+#: model:ir.model,name:wb_license_client.model_wb_license_migrate_wizard
+msgid "License Migration Wizard"
+msgstr "Assistent für Lizenz-Migration"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.res_config_settings_view_form_wb_license
+msgid "License Server"
+msgstr "Lizenzserver"
+
+#. module: wb_license_client
+#: model:ir.ui.menu,name:wb_license_client.menu_wb_license_client_infos
+msgid "License Status"
+msgstr "Lizenz-Status"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "License activated"
+msgstr "Lizenz aktiviert"
+
+#. module: wb_license_client
+#: model:ir.model,name:wb_license_client.model_wb_license_gated_mixin
+msgid "License-Gated Mixin (DB-layer license enforcement)"
+msgstr "Lizenz-Mixin (Lizenzprüfung auf Datenbankebene)"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__effective_min_cache_age_days
+msgid "Max. Offline Tolerance (days)"
+msgstr "Max. Offline-Toleranz (Tage)"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__max_users
+msgid "Max. Users"
+msgstr "Max. Benutzer"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_migrate_wizard.py:0
+msgid "Migration requested"
+msgstr "Migration beantragt"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_info_view_form
+msgid "Module Version"
+msgstr "Modul-Version"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_migrate_wizard__new_db_uuid
+msgid "New Database ID"
+msgstr "Neue DB-UUID"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_migrate_wizard__new_domain
+msgid "New Domain"
+msgstr "Neue Domain"
+
+#. module: wb_license_client
+#: model_terms:ir.actions.act_window,help:wb_license_client.wb_license_info_action
+msgid "No WB licenses configured."
+msgstr "Keine WB-Lizenzen konfiguriert."
+
+#. module: wb_license_client
+#: model:ir.model.fields.selection,name:wb_license_client.selection__wb_license_info__state__unlicensed
+msgid "No key configured"
+msgstr "Kein Schlüssel konfiguriert"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_info.py:0
+msgid "No key stored for %s."
+msgstr "Kein Schlüssel gespeichert für %s."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_info.py:0
+msgid "No license configured for %s. Please activate one or start a free trial under Settings → WB Licenses."
+msgstr "Keine Lizenz für %s konfiguriert. Bitte unter Einstellungen → WB Lizenzen eine Lizenz aktivieren oder einen kostenlosen Test starten."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "No license configured for product '%s', migration not possible."
+msgstr "Keine Lizenz für Produkt '%s' konfiguriert, Migration nicht möglich."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "No valid license for '%s'. Please activate one under Settings → WB Licenses."
+msgstr "Keine gültige Lizenz für '%s'. Bitte unter Einstellungen → WB Lizenzen aktivieren."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_gated_mixin.py:0
+msgid ""
+"No valid license for product '%(code)s'. Writing to %(model)s was refused.\n"
+"\n"
+"Please activate a license under Settings → WB Licenses or contact support@wissen-beratung.de."
+msgstr ""
+"Keine gültige Lizenz für Produkt '%(code)s'. Schreibvorgang auf %(model)s abgelehnt.\n"
+"\n"
+"Bitte unter Einstellungen → WB Lizenzen aktivieren oder support@wissen-beratung.de kontaktieren."
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__trial_domain
+msgid "Odoo Address"
+msgstr "Odoo-Adresse"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "Only administrators can manage WB licenses."
+msgstr "Nur Administratoren können WB-Lizenzen verwalten."
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid ""
+"Only after your consent are your name, email address and company,\n"
+"                                the address of this Odoo and its database ID sent to\n"
+"                                WISSEN BERATUNG (Tobias Wissen) to issue the trial key, bind it to\n"
+"                                this database and contact you about the trial. Details in the\n"
+"                                privacy policy:"
+msgstr "Erst nach Ihrer Zustimmung gehen Ihr Name, Ihre E-Mail-Adresse und Ihre Firma sowie die Adresse dieses Odoo und seine Datenbank-ID an WISSEN BERATUNG (Tobias Wissen), um den Test-Schlüssel auszustellen, an diese Datenbank zu binden und Sie zum Test zu kontaktieren. Einzelheiten in der Datenschutzerklärung:"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid "Optional"
+msgstr "Optional"
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_activate_wizard__subscribe_newsletter
+msgid "Optional. I want to be informed by email about updates, security patches and new features of this module."
+msgstr "Optional. Ich möchte über Updates, Sicherheits-Patches und neue Funktionen dieses Moduls per E-Mail informiert werden."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "Please agree to the transfer of your data to WISSEN BERATUNG; without it no trial can be started."
+msgstr "Bitte stimmen Sie der Übermittlung Ihrer Daten an WISSEN BERATUNG zu; ohne Zustimmung kann kein Test gestartet werden."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid ""
+"Please confirm the following required items to activate the license:\n"
+"\n"
+"• %s"
+msgstr ""
+"Bitte bestätigen Sie folgende Pflicht-Punkte, um die Lizenz aktivieren zu können:\n"
+"\n"
+"• %s"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "Please enter a valid email address."
+msgstr "Bitte geben Sie eine gültige E-Mail-Adresse ein."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "Please enter an email address."
+msgstr "Bitte eine E-Mail-Adresse angeben."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "Please enter the license key and the activation code."
+msgstr "Bitte Lizenzschlüssel und Aktivierungs-Code eingeben."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "Please enter your company."
+msgstr "Bitte geben Sie Ihre Firma an."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "Please enter your name and your company."
+msgstr "Bitte geben Sie Ihren Namen und Ihre Firma an."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "Please fill in company, contact person and email."
+msgstr "Bitte Firma, Ansprechpartner und E-Mail ausfüllen."
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_migrate_wizard_view_form
+msgid ""
+"Please open this wizard on the <strong>new</strong> Odoo instance; the current\n"
+"                           domain and database ID are read automatically."
+msgstr "Öffnen Sie diesen Assistenten bitte auf der <strong>neuen</strong> Odoo-Instanz; Domain und DB-UUID werden automatisch ausgelesen."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_info__download_url
+msgid "Portal URL for the module download reported by the server."
+msgstr "Vom Server gemeldete Portal-URL für den Modul-Download."
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.res_config_settings_view_form_wb_license
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid "Privacy"
+msgstr "Datenschutz"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "Privacy notice"
+msgstr "Datenschutzhinweis"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__product_code
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__product_code
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_migrate_wizard__product_code
+msgid "Product Code"
+msgstr "Produkt-Code"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__module_technical_name
+msgid "Product Module (technical)"
+msgstr "Produkt-Modul (technisch)"
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_info__key
+msgid "Public key (copy from the system parameters, for display)."
+msgstr "Öffentlicher Schlüssel (Kopie aus den Systemparametern zur Anzeige)."
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_info_view_form
+msgid "Raw Server Response"
+msgstr "Rohantwort des Servers"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__server_response_raw
+msgid "Raw Server Response (JSON)"
+msgstr "Rohantwort des Servers (JSON)"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_migrate_wizard__reason
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_migrate_wizard_view_form
+msgid "Reason"
+msgstr "Begründung"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_migrate_wizard_view_form
+msgid "Request License Migration"
+msgstr "Lizenz-Migration beantragen"
+
+#. module: wb_license_client
+#: model:ir.actions.act_window,name:wb_license_client.wb_license_migrate_wizard_action
+#: model:ir.ui.menu,name:wb_license_client.menu_wb_license_client_migrate
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_migrate_wizard_view_form
+msgid "Request Migration"
+msgstr "Migration beantragen"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid "Required Confirmations"
+msgstr "Pflicht-Bestätigungen"
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_activate_wizard__trial_consent
+msgid "Required for the trial. Name, email, company, the address of this Odoo and its database ID are sent to WISSEN BERATUNG to issue and bind the trial key."
+msgstr "Pflicht für den Test. Name, E-Mail, Firma, die Adresse dieses Odoo und seine Datenbank-ID gehen an WISSEN BERATUNG, um den Test-Schlüssel auszustellen und zu binden."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_activate_wizard__confirm_terms
+msgid "Required. I accept the general terms and conditions of WISSEN BERATUNG."
+msgstr "Pflicht. Ich akzeptiere die Allgemeinen Geschäftsbedingungen (AGB) von WISSEN BERATUNG."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_activate_wizard__confirm_no_refund
+msgid "Required. I confirm that activating the license excludes a later credit note or refund of the purchase price."
+msgstr "Pflicht. Ich bestätige, dass mit der Aktivierung der Lizenz eine spätere Gutschrift bzw. Erstattung des Kaufpreises ausgeschlossen ist."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_activate_wizard__confirm_eula
+msgid "Required. I have read and accept the End User License Agreement (EULA)."
+msgstr "Pflicht. Ich habe die End-User-License-Agreement (EULA) gelesen und akzeptiert."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_activate_wizard__confirm_privacy
+msgid "Required. I have taken note of the privacy notice (GDPR)."
+msgstr "Pflicht. Ich habe den Datenschutzhinweis (DSGVO) zur Kenntnis genommen."
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.res_config_settings_view_form_wb_license
+msgid "Server Connection"
+msgstr "Server-Verbindung"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_info_view_form
+msgid "Server Sync"
+msgstr "Server-Abgleich"
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_info__update_available
+msgid "Set if a newer module version is available."
+msgstr "Gesetzt, wenn eine neuere Modul-Version verfügbar ist."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_info__is_valid
+msgid "Set if licensed features may be used."
+msgstr "Gesetzt, wenn lizenzpflichtige Funktionen genutzt werden dürfen."
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.res_config_settings_view_form_wb_license
+msgid "Show server answers as notifications. Only for support and diagnosis."
+msgstr "Serverantworten als Benachrichtigung anzeigen. Nur für Support und Diagnose."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_activate_wizard__api_secret
+msgid "Signs the requests of this instance to the license server (format WBS-...). Issued by WISSEN BERATUNG together with the key. Leave empty if you have none; the license check also works unsigned."
+msgstr "Signiert die Anfragen dieser Instanz an den Lizenzserver (Format WBS-...). Wird von WISSEN BERATUNG zusammen mit dem Schlüssel ausgegeben. Leer lassen, wenn keines vorliegt; die Lizenzprüfung funktioniert auch unsigniert."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_info.py:0
+#: model:ir.actions.act_window,name:wb_license_client.wb_license_trial_wizard_action
+#: model:ir.model.fields.selection,name:wb_license_client.selection__wb_license_activate_wizard__mode__trial
+#: model:ir.ui.menu,name:wb_license_client.menu_wb_license_client_trial
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_info_view_form
+msgid "Start 7-day free trial"
+msgstr "7 Tage kostenlos testen"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__state
+msgid "State"
+msgstr "Status"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__subscribe_newsletter
+msgid "Subscribe to Newsletter"
+msgstr "Newsletter abonnieren"
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_info__module_technical_name
+msgid "Technical name of the Odoo module of this license (e.g. 'wb_bitwarden_pro'). Used by the daily check to report the installed version."
+msgstr "Technischer Name des Odoo-Moduls dieser Lizenz (z. B. 'wb_bitwarden_pro'). Die tägliche Prüfung meldet damit die installierte Version."
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_info_view_form
+msgid "Term"
+msgstr "Laufzeit"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "Terms and conditions"
+msgstr "AGB"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_info.py:0
+msgid "Test system: %(code)s runs on this database for evaluation until %(until)s. After that it needs a DEV license (%(support)s)."
+msgstr "Testsystem: %(code)s läuft auf dieser Datenbank zur Probe bis %(until)s. Danach brauchen Sie für sie eine DEV-Lizenz (%(support)s)."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_info.py:0
+msgid "The DEV license for %s only applies to neutralized databases. This database is not neutralized."
+msgstr "Die DEV-Lizenz für %s gilt nur für neutralisierte Datenbanken. Diese Datenbank ist nicht neutralisiert."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "The activation code has an invalid format. Expected: 5 groups of 5 characters separated by hyphens (example: 7H3K9-M4P2N-RQ8T2-W5X7Y-A9B3F)"
+msgstr "Der Aktivierungs-Code hat ein ungültiges Format. Erwartet: 5 Gruppen à 5 Zeichen, mit Bindestrichen (Beispiel: 7H3K9-M4P2N-RQ8T2-W5X7Y-A9B3F)"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "The activation code has an invalid format: 5 groups of 5 characters, separated by hyphens."
+msgstr "Der Aktivierungs-Code hat ein ungültiges Format: 5 Gruppen à 5 Zeichen, mit Bindestrichen getrennt."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "The activation code is wrong. Please check the code in the portal and try again."
+msgstr "Der Aktivierungs-Code ist falsch. Bitte prüfen Sie den Code im Portal und versuchen Sie es erneut."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "The activation period has expired. Please contact support@wissen-beratung.de to reactivate it."
+msgstr "Der Aktivierungs-Zeitraum ist abgelaufen. Bitte kontaktieren Sie support@wissen-beratung.de für eine Reaktivierung."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "The address of this Odoo instance could not be determined. Please inform your system administrator."
+msgstr "Die Adresse dieser Odoo-Instanz konnte nicht ermittelt werden. Bitte informieren Sie Ihren System-Administrator."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "The database ID of this Odoo instance is invalid. Please inform your system administrator."
+msgstr "Die Datenbank-ID dieser Odoo-Instanz ist ungültig. Bitte informieren Sie Ihren System-Administrator."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "The domain or database ID of this Odoo instance could not be determined. Please inform your system administrator."
+msgstr "Domain oder DB-UUID dieser Odoo-Instanz konnte nicht ermittelt werden. Bitte informieren Sie Ihren System-Administrator."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_info.py:0
+msgid "The evaluation period of %(code)s on this test system has expired. This database needs a DEV license (%(support)s)."
+msgstr "Die Probezeit für %(code)s auf diesem Testsystem ist abgelaufen. Für diese Datenbank brauchen Sie eine DEV-Lizenz (%(support)s)."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "The free trial of %(code)s is active until %(until)s."
+msgstr "Der kostenlose Test von %(code)s läuft bis %(until)s."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "The license for %(code)s is now active. Valid until %(until)s.%(suffix)s"
+msgstr "Die Lizenz für %(code)s ist jetzt aktiv. Gültig bis %(until)s.%(suffix)s"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_info.py:0
+msgid "The license for %s has expired. Please contact support@wissen-beratung.de to renew it."
+msgstr "Die Lizenz für %s ist abgelaufen. Bitte kontaktieren Sie support@wissen-beratung.de für eine Verlängerung."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "The license key has an invalid format. Expected: WB-XXXX-xxxxxxxxXX (example: WB-TELE-a3f28c919K)"
+msgstr "Der Lizenzschlüssel hat ein ungültiges Format. Erwartet: WB-XXXX-xxxxxxxxXX (Beispiel: WB-TELE-a3f28c919K)"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "The license key has an invalid format. Please enter it exactly as shown on the certificate."
+msgstr "Der Lizenzschlüssel hat ein ungültiges Format. Bitte genau so eingeben, wie er auf dem Zertifikat steht."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "The license server cannot be reached (HTTP %s). Please try again later or contact vertrieb@wissen-beratung.de."
+msgstr "Lizenzserver nicht erreichbar (HTTP %s). Bitte später erneut versuchen oder vertrieb@wissen-beratung.de kontaktieren."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "The license server cannot be reached. Please check the internet connection and try again. No trial was started."
+msgstr "Der Lizenzserver ist nicht erreichbar. Bitte prüfen Sie die Internetverbindung und versuchen Sie es erneut. Es wurde kein Test gestartet."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "The license server cannot be reached. Please check your internet connection and try again."
+msgstr "Der Lizenzserver ist nicht erreichbar. Bitte prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_info.py:0
+msgid "The license server cannot be reached. Your license keeps working; if the problem persists, please check the internet connection or contact support@wissen-beratung.de."
+msgstr "Der Lizenzserver ist nicht erreichbar. Ihre Lizenz funktioniert weiter; bei anhaltenden Problemen bitte die Internetverbindung prüfen oder support@wissen-beratung.de kontaktieren."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "The license server does not know this product. Please contact support@wissen-beratung.de."
+msgstr "Der Lizenzserver kennt dieses Produkt nicht. Bitte support@wissen-beratung.de kontaktieren."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "The license server sent an invalid answer. No trial was started. Please contact support@wissen-beratung.de."
+msgstr "Der Lizenzserver hat eine ungültige Antwort gesendet. Es wurde kein Test gestartet. Bitte support@wissen-beratung.de kontaktieren."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "The license server sent an invalid answer. The license was not activated. Please contact support@wissen-beratung.de."
+msgstr "Der Lizenzserver hat eine ungültige Antwort gesendet. Die Lizenz wurde nicht aktiviert. Bitte support@wissen-beratung.de kontaktieren."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "The migration could not be requested (HTTP %s). Please try again later or contact support@wissen-beratung.de."
+msgstr "Die Migration konnte nicht beantragt werden (HTTP %s). Bitte später erneut versuchen oder support@wissen-beratung.de kontaktieren."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "The product code must be exactly 4 characters from A-Z/0-9."
+msgstr "Der Produkt-Code muss exakt 4 Zeichen aus A-Z/0-9 haben."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "The request could not be sent (HTTP %s). Please check your input and try again."
+msgstr "Die Anfrage konnte nicht übermittelt werden (HTTP %s). Bitte Eingaben prüfen und erneut versuchen."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "The trial could not be started (HTTP %s). Please try again later or contact support@wissen-beratung.de."
+msgstr "Der Test konnte nicht gestartet werden (HTTP %s). Bitte später erneut versuchen oder support@wissen-beratung.de kontaktieren."
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid ""
+"The trial key is issued immediately and bound to this\n"
+"                                database. One trial per email address, domain and database.\n"
+"                                Afterwards the product needs a license; your data stays."
+msgstr "Der Test-Schlüssel wird sofort ausgestellt und an diese Datenbank gebunden. Ein Test je E-Mail-Adresse, Domain und Datenbank. Danach braucht das Produkt eine Lizenz; Ihre Daten bleiben erhalten."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_info.py:0
+msgid "This database is not the licensed instance for %(code)s. If it is a test system, neutralize it. After a move, please request the migration (%(support)s)."
+msgstr "Diese Datenbank ist nicht die lizenzierte Instanz für %(code)s. Ist sie ein Testsystem, neutralisieren Sie sie. Nach einem Umzug beantragen Sie bitte die Migration (%(support)s)."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "This license key does not belong to product %s. Please check the product code and the key."
+msgstr "Dieser Lizenzschlüssel gehört nicht zum Produkt %s. Bitte Produkt-Code und Schlüssel prüfen."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "This license key has already been activated on another instance. Do you want to request a migration?"
+msgstr "Dieser Lizenzschlüssel wurde bereits an einer anderen Instanz aktiviert. Möchten Sie eine Migration beantragen?"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "This license key is unknown. Please check your input or contact support@wissen-beratung.de."
+msgstr "Dieser Lizenzschlüssel ist nicht bekannt. Bitte Eingabe prüfen oder support@wissen-beratung.de kontaktieren."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_info__last_clock_anomaly_at
+msgid "Time a manipulated system clock was detected (clock turned back or database snapshot restored). The cache is not trusted until the next successful server check."
+msgstr "Zeitpunkt einer erkannten Uhr-Manipulation (Uhr zurückgedreht oder DB-Snapshot eingespielt). Bis zur nächsten erfolgreichen Serverprüfung gilt der Cache als nicht vertrauenswürdig."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_info__last_server_check
+msgid "Time of the last answer from the license server."
+msgstr "Zeitpunkt der letzten Antwort vom Lizenzserver."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_info__last_failed_check_at
+msgid "Time of the last failed ping. The license is checked again at the earliest 15 minutes later; until then the stored state applies."
+msgstr "Zeitpunkt der letzten fehlgeschlagenen Prüfung. Erneut geprüft wird frühestens nach 15 Minuten; bis dahin gilt der gespeicherte Zustand."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_info__last_install_announce_at
+msgid "Time of the last install announcement to the license server (at most once a day)."
+msgstr "Zeitpunkt der letzten Install-Meldung an den Lizenzserver (höchstens einmal am Tag)."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "Too many failed attempts. Please wait one hour and try again."
+msgstr "Zu viele Fehlversuche. Bitte warten Sie eine Stunde und versuchen Sie es erneut."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_client.py:0
+msgid "Too many requests. Please try again in an hour."
+msgstr "Zu viele Anfragen. Bitte in einer Stunde erneut versuchen."
+
+#. module: wb_license_client
+#: model:ir.model.fields.selection,name:wb_license_client.selection__wb_license_info__state__trial
+msgid "Trial"
+msgstr "Test"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "Trial request received"
+msgstr "Testantrag eingegangen"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.res_config_settings_view_form_wb_license
+msgid "URL of the WB license server. Do not change the default."
+msgstr "URL des WB-Lizenzservers. Standard nicht ändern."
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_res_config_settings__wb_license_server_url
+msgid "URL of the WB license server. Normally do not change it; only for test or staging environments."
+msgstr "URL des WB-Lizenzservers. Normalerweise nicht ändern; nur für Test- oder Staging-Umgebungen anpassen."
+
+#. module: wb_license_client
+#: model:ir.model.fields.selection,name:wb_license_client.selection__wb_license_info__state__unknown
+msgid "Unknown (server unreachable)"
+msgstr "Unbekannt (Server unerreichbar)"
+
+#. module: wb_license_client
+#: model:ir.model.fields.selection,name:wb_license_client.selection__wb_license_info__instance_status__mismatch
+msgid "Unlicensed instance"
+msgstr "Nicht lizenzierte Instanz"
+
+#. module: wb_license_client
+#: model:ir.model.fields.selection,name:wb_license_client.selection__wb_license_info__instance_status__mismatch_grace
+msgid "Unlicensed instance (grace period)"
+msgstr "Nicht lizenzierte Instanz (Kulanz)"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__update_available
+msgid "Update Available"
+msgstr "Update verfügbar"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__user_message
+msgid "User Message"
+msgstr "Hinweis für Benutzer"
+
+#. module: wb_license_client
+#: model:ir.model.fields,help:wb_license_client.field_wb_license_info__max_users
+msgid "User limit of the licensed package as reported by the license server. 0 = unlimited."
+msgstr "Benutzergrenze des lizenzierten Pakets laut Lizenzserver. 0 = unbegrenzt."
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__valid_from
+msgid "Valid From"
+msgstr "Gültig ab"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_info__valid_to
+msgid "Valid To"
+msgstr "Gültig bis"
+
+#. module: wb_license_client
+#: model:ir.model,name:wb_license_client.model_wb_license_client
+msgid "WB License Client Service"
+msgstr "WB-Lizenz-Client-Dienst"
+
+#. module: wb_license_client
+#: model:ir.actions.server,name:wb_license_client.ir_cron_daily_ping_ir_actions_server
+msgid "WB License Client: Daily Ping"
+msgstr "WB License Client: Tägliche Prüfung"
+
+#. module: wb_license_client
+#: model:mail.template,name:wb_license_client.mail_template_grace_started_local
+msgid "WB License Client: Grace Period Started"
+msgstr "WB License Client: Kulanzzeit gestartet"
+
+#. module: wb_license_client
+#: model:mail.template,name:wb_license_client.mail_template_expired_local
+msgid "WB License Client: License Expired"
+msgstr "WB License Client: Lizenz abgelaufen"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_res_config_settings__wb_license_server_url
+msgid "WB License Server URL"
+msgstr "URL des WB-Lizenzservers"
+
+#. module: wb_license_client
+#: model:ir.model,name:wb_license_client.model_wb_license_info
+msgid "WB License Status Cache"
+msgstr "WB-Lizenz-Status-Cache"
+
+#. module: wb_license_client
+#: model:ir.actions.act_window,name:wb_license_client.wb_license_info_action
+#: model:ir.ui.menu,name:wb_license_client.menu_wb_license_client_root
+#: model_terms:ir.ui.view,arch_db:wb_license_client.res_config_settings_view_form_wb_license
+msgid "WB Licenses"
+msgstr "WB Lizenzen"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid "WB-XXXX-xxxxxxxxXX"
+msgstr "WB-XXXX-xxxxxxxxXX"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid "WBS-... (only if available)"
+msgstr "WBS-... (nur wenn vorhanden)"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "Waiver of refund"
+msgstr "Verzicht auf Gutschrift"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_migrate_wizard_view_form
+msgid "Why the move? E.g. 'new hosting provider', 'company reorganization'..."
+msgstr "Warum der Umzug? Z. B. 'Neuer Hosting-Provider', 'Firmen-Reorganisation'..."
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
+msgstr "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__trial_contact_email
+msgid "Your Email"
+msgstr "Ihre E-Mail"
+
+#. module: wb_license_client
+#: model:ir.model.fields,field_description:wb_license_client.field_wb_license_activate_wizard__trial_contact_name
+msgid "Your Name"
+msgstr "Ihr Name"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid "Your details"
+msgstr "Ihre Angaben"
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/models/wb_license_info.py:0
+msgid "Your license for %(code)s is running out because of an overdue invoice. Please pay the open invoice by %(until)s to avoid interruptions."
+msgstr "Ihre Lizenz für %(code)s läuft aus wegen einer überfälligen Rechnung. Bitte bezahlen Sie die offene Rechnung bis zum %(until)s, um Unterbrechungen zu vermeiden."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_migrate_wizard.py:0
+msgid "Your migration request has been sent. You will be notified as soon as it has been processed (usually 1-2 working days)."
+msgstr "Ihr Migrations-Antrag wurde übermittelt. Sie erhalten eine Benachrichtigung, sobald er bearbeitet wurde (normalerweise 1-2 Werktage)."
+
+#. module: wb_license_client
+#. odoo-python
+#: code:addons/wb_license_client/wizards/wb_license_activate_wizard.py:0
+msgid "Your trial request for %s is being reviewed by WISSEN BERATUNG. You will receive an email; then click “Start 7-day free trial” again with the same email address to activate the key."
+msgstr "Ihr Testantrag für %s wird von WISSEN BERATUNG geprüft. Sie erhalten eine E-Mail; klicken Sie dann mit derselben E-Mail-Adresse noch einmal auf „7 Tage kostenlos testen“, um den Schlüssel zu aktivieren."
+
+#. module: wb_license_client
+#: model:mail.template,subject:wb_license_client.mail_template_expired_local
+msgid "[WISSEN BERATUNG] License expired: {{ object.product_code }}"
+msgstr "[WISSEN BERATUNG] Lizenz abgelaufen: {{ object.product_code }}"
+
+#. module: wb_license_client
+#: model:mail.template,subject:wb_license_client.mail_template_grace_started_local
+msgid "[WISSEN BERATUNG] License warning: {{ object.product_code }}"
+msgstr "[WISSEN BERATUNG] Lizenz-Warnung: {{ object.product_code }}"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid "e.g. TELE"
+msgstr "z. B. TELE"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.res_config_settings_view_form_wb_license
+msgid "https://my.wissen-beratung.de"
+msgstr "https://my.wissen-beratung.de"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid "wissen-beratung.de/legal/agb"
+msgstr "wissen-beratung.de/legal/agb"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid "wissen-beratung.de/legal/datenschutz"
+msgstr "wissen-beratung.de/legal/datenschutz"
+
+#. module: wb_license_client
+#: model_terms:ir.ui.view,arch_db:wb_license_client.wb_license_activate_wizard_view_form
+msgid "wissen-beratung.de/legal/eula"
+msgstr "wissen-beratung.de/legal/eula"

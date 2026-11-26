@@ -152,13 +152,15 @@
             <field name="body_html" type="html">
                 <div style="font-family: Arial, sans-serif; color: #222;">
                     <p>Guten Tag <t t-out="object.partner_id.name or ''"/>,</p>
-                    <p>Ihr 7-Tage-Trial für <strong t-out="object.product_id.name"/> ist aktiv.</p>
+                    <p>Ihr kostenloser Test von <strong t-out="object.product_id.name"/> ist aktiv.</p>
                     <p>Lizenzschlüssel: <code t-out="object.name"/></p>
-                    <p>Trial-Ende: <strong t-out="object.valid_to"/></p>
+                    <p>Test-Ende: <strong t-out="object.valid_to"/></p>
                     <p>
-                        Geben Sie den Schlüssel in Ihrer Odoo-Instanz unter
-                        Einstellungen → WB Lizenzen ein. Trial-Keys brauchen keinen
-                        separaten Aktivierungs-Code.
+                        Haben Sie den Test in Ihrem Odoo gestartet, ist der Schlüssel dort
+                        schon eingetragen. Wurde Ihr Antrag erst geprüft, klicken Sie in
+                        Odoo unter Einstellungen → WB Lizenzen noch einmal auf
+                        „7 Tage kostenlos testen“ (gleiche E-Mail-Adresse); der Schlüssel
+                        wird dann übernommen. Test-Schlüssel brauchen keinen Aktivierungs-Code.
                     </p>
                     <p>Bei Fragen: support@wissen-beratung.de</p>
                     <p>Viele Grüße<br/>WISSEN BERATUNG</p>

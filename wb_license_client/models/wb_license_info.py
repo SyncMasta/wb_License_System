@@ -33,30 +33,46 @@ CLOCK_DRIFT_TOLERANCE_MINUTES = 60
 _logger = logging.getLogger(__name__)
 
 
+def parse_max_users(data):
+    """User limit from a server answer (DECISIONS.md #95, #97).
+
+    :return: ``0`` (unlimited) if the answer has no ``max_users`` field (older
+        servers), the limit for a non-negative integer, ``None`` for any other
+        value (invalid: the caller keeps the previous value or refuses the answer).
+    """
+    if not isinstance(data, dict) or 'max_users' not in data:
+        return 0
+    value = data['max_users']
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
 STATE_SELECTION = [
-    ('active', 'Aktiv'),
-    ('grace', 'Grace (Rechnung offen)'),
+    ('active', 'Active'),
+    ('trial', 'Trial'),
+    ('grace', 'Grace (invoice overdue)'),
     ('expired', 'Expired'),
-    ('unknown', 'Unbekannt (Server unerreichbar)'),
-    ('unlicensed', 'Kein Key konfiguriert'),
+    ('unknown', 'Unknown (server unreachable)'),
+    ('unlicensed', 'No key configured'),
 ]
 
 # Status einer fremden Instanz (Test-DB, Kopie, Umzug), vom Server im Feld
 # ``instance`` gemeldet. Siehe wb_License_System/DECISIONS.md #80-82.
 INSTANCE_STATUS = [
-    ('eval', 'Eval (Testsystem)'),
-    ('eval_expired', 'Eval abgelaufen'),
-    ('eval_limit', 'Eval-Limit erreicht'),
-    ('dev', 'DEV-Lizenz'),
-    ('dev_not_neutralized', 'DEV-Lizenz, DB nicht neutralisiert'),
-    ('mismatch_grace', 'Nicht lizenzierte Instanz (Kulanz)'),
-    ('mismatch', 'Nicht lizenzierte Instanz'),
+    ('eval', 'Eval (test system)'),
+    ('eval_expired', 'Eval expired'),
+    ('eval_limit', 'Eval limit reached'),
+    ('dev', 'DEV license'),
+    ('dev_not_neutralized', 'DEV license, database not neutralized'),
+    ('mismatch_grace', 'Unlicensed instance (grace period)'),
+    ('mismatch', 'Unlicensed instance'),
 ]
 
 
 class WbLicenseInfo(models.Model):
     _name = 'wb.license.info'
-    _description = 'WB Lizenz-Status-Cache (persistent)'
+    _description = 'WB License Status Cache'
     _order = 'product_code'
     _rec_name = 'product_code'
 
@@ -64,16 +80,17 @@ class WbLicenseInfo(models.Model):
         size=4,
         required=True,
         index=True,
-        help="4-stelliger alphanumerischer Produkt-Code (A-Z/0-9), "
-             "z.B. 'TELE' oder 'MCP1'.",
+        help="4-character alphanumeric product code (A-Z/0-9), "
+             "e.g. 'TELE' or 'MCP1'.",
     )
     key = fields.Char(
-        string='Lizenzschlüssel',
-        help="Public Key (Kopie aus ir.config_parameter für Anzeige).",
+        string='License Key',
+        groups='base.group_system',
+        help="Public key (copy from the system parameters, for display).",
     )
     key_masked = fields.Char(
         compute='_compute_key_masked',
-        string='Key (maskiert)',
+        string='Key (masked)',
     )
     state = fields.Selection(
         STATE_SELECTION,
@@ -88,90 +105,89 @@ class WbLicenseInfo(models.Model):
         compute='_compute_days_remaining',
         store=False,
     )
+    max_users = fields.Integer(
+        string='Max. Users',
+        default=0,
+        help="User limit of the licensed package as reported by the license server. "
+             "0 = unlimited.",
+    )
 
     instance_status = fields.Selection(
         INSTANCE_STATUS,
-        string='Instanz-Status',
-        help="Leer, wenn diese Datenbank die lizenzierte Instanz ist. Sonst "
-             "meldet der Server hier Eval, DEV-Lizenz oder Abweichung.",
+        string='Instance Status',
+        help="Empty if this database is the licensed instance. Otherwise the "
+             "server reports eval, DEV license or mismatch here.",
     )
-    instance_until = fields.Date(string='Instanz-Status gültig bis')
+    instance_until = fields.Date(string='Instance Status Valid Until')
 
     last_server_check = fields.Datetime(
-        string='Letzter erfolgreicher Check',
-        help="Zeitpunkt der letzten Antwort vom WB-Server.",
+        string='Last Successful Check',
+        help="Time of the last answer from the license server.",
     )
     last_check_success = fields.Boolean(default=False)
     last_failed_check_at = fields.Datetime(
-        string='Letzter fehlgeschlagener Check',
+        string='Last Failed Check',
         readonly=True,
-        help="Zeitpunkt des letzten fehlgeschlagenen Pings. check_license "
-             "pingt danach frühestens nach 15 Minuten erneut; bis dahin gilt "
-             "der gespeicherte Zustand.",
+        help="Time of the last failed ping. The license is checked again at "
+             "the earliest 15 minutes later; until then the stored state applies.",
     )
     last_error_message = fields.Char()
     last_clock_anomaly_at = fields.Datetime(
-        string='Letzte Clock-Anomalie',
+        string='Last Clock Anomaly',
         readonly=True,
-        help="Sprint 5 / L-H1: Zeitpunkt einer erkannten Uhr-Manipulation. "
-             "Tritt auf wenn die System-Zeit zurueckgedreht wurde oder "
-             "ein DB-Snapshot in der Zeit zurueckgespielt wurde — der "
-             "Cache wird in dem Fall als nicht-vertrauenswuerdig "
-             "behandelt (is_valid=False bis zum naechsten erfolgreichen "
-             "Server-Ping).",
+        help="Time a manipulated system clock was detected (clock turned back "
+             "or database snapshot restored). The cache is not trusted until "
+             "the next successful server check.",
     )
     server_response_raw = fields.Text(
         string='Raw Server Response (JSON)',
-        help="Für Debugging — letzte Rohantwort vom Server.",
+        groups='base.group_system',
+        help="For debugging: last raw answer of the server.",
     )
     last_install_announce_at = fields.Datetime(
-        string='Letztes Install-Announce',
-        help="Zeitpunkt des letzten /api/license/announce-Calls. Drosselt "
-             "den Fallback in check_license auf 1×/Tag.",
+        string='Last Install Announcement',
+        help="Time of the last install announcement to the license server "
+             "(at most once a day).",
     )
 
     module_technical_name = fields.Char(
-        string='Produkt-Modul (technisch)',
-        help="Technischer Name des Odoo-Moduls, das dieser Lizenz entspricht "
-             "(z.B. 'wb_bitwarden_pro'). Wird vom register_install des "
-             "Produkt-Moduls gesetzt und vom täglichen Ping benutzt, um "
-             "die installierte Version zu melden.",
+        string='Product Module (technical)',
+        help="Technical name of the Odoo module of this license "
+             "(e.g. 'wb_bitwarden_pro'). Used by the daily check to report "
+             "the installed version.",
     )
     installed_module_version = fields.Char(
-        string='Installierte Modul-Version',
+        string='Installed Module Version',
         compute='_compute_installed_module_version',
         store=False,
-        help="Live aus ir.module.module gelesen — die aktuell installierte "
-             "Version des Produkt-Moduls.",
+        help="Currently installed version of the product module.",
     )
     latest_module_version = fields.Char(
-        string='Neueste verfügbare Version',
-        help="Vom WB-Lizenz-Server gemeldete höchste Release-Version. "
-             "Wird beim täglichen Ping aktualisiert.",
+        string='Latest Available Version',
+        help="Latest release version reported by the license server. "
+             "Updated by the daily check.",
     )
     download_url = fields.Char(
-        string='Download-URL',
-        help="Vom Server gemeldete Portal-URL für den Modul-Download. "
-             "Leer wenn Portal noch nicht eingerichtet ist; Banner zeigt "
-             "in dem Fall einen Support-Hinweis statt eines Links.",
+        string='Download URL',
+        help="Portal URL for the module download reported by the server.",
     )
     update_available = fields.Boolean(
-        string='Update verfügbar',
+        string='Update Available',
         compute='_compute_update_available',
         store=False,
-        help="True wenn latest_module_version > installed_module_version.",
+        help="Set if a newer module version is available.",
     )
 
     effective_min_cache_age_days = fields.Integer(
-        string='Min Cache-Age (Tage)',
+        string='Max. Offline Tolerance (days)',
         default=30,
-        help="Temporär angewandter min_cache_age_days beim letzten check_license-Aufruf. "
-             "Methodenspezifisch setzbar via @license_required.",
+        help="How long the last successful check stays valid while the license "
+             "server cannot be reached (applied by the last license check).",
     )
     is_valid = fields.Boolean(
         compute='_compute_is_valid',
         store=False,
-        help="True wenn Feature gated-Methoden laufen dürfen.",
+        help="Set if licensed features may be used.",
     )
     user_message = fields.Text(
         compute='_compute_user_message',
@@ -194,10 +210,12 @@ class WbLicenseInfo(models.Model):
     @api.depends('key')
     def _compute_key_masked(self):
         for rec in self:
-            if not rec.key or len(rec.key) < 6:
-                rec.key_masked = rec.key or ''
+            # sudo: key ist nur für Administratoren lesbar, die Maske für alle (#97)
+            key = rec.sudo().key
+            if not key or len(key) < 6:
+                rec.key_masked = key or ''
                 continue
-            rec.key_masked = f"{rec.key[:8]}...{rec.key[-2:]}"
+            rec.key_masked = f"{key[:8]}...{key[-2:]}"
 
     @api.depends('valid_to')
     def _compute_days_remaining(self):
@@ -229,7 +247,7 @@ class WbLicenseInfo(models.Model):
             )
 
     @api.depends('state', 'last_server_check', 'effective_min_cache_age_days',
-                 'last_clock_anomaly_at')
+                 'last_clock_anomaly_at', 'valid_to')
     def _compute_is_valid(self):
         """Berechnet is_valid und blockt bei erkannter Clock-Anomalie.
 
@@ -248,6 +266,11 @@ class WbLicenseInfo(models.Model):
                 continue
             if rec.state == 'active':
                 rec.is_valid = True
+            elif rec.state == 'trial':
+                # Test endet am valid_to, auch wenn der Server nicht erreichbar
+                # ist (sonst verlängerte eine gesperrte Verbindung den Test).
+                # Ohne Enddatum gilt ein Test nicht (fail-closed, #97).
+                rec.is_valid = bool(rec.valid_to) and rec.valid_to >= fields.Date.context_today(rec)
             elif rec.state == 'grace':
                 rec.is_valid = True
             elif rec.state in ('expired', 'unlicensed'):
@@ -263,33 +286,39 @@ class WbLicenseInfo(models.Model):
 
     @api.depends('state', 'grace_until', 'valid_to', 'last_server_check',
                  'instance_status', 'instance_until')
+    @api.depends_context('lang')
     def _compute_user_message(self):
         for rec in self:
             if rec.instance_status:
                 rec.user_message = rec._instance_message()
             elif rec.state == 'active':
                 rec.user_message = False
+            elif rec.state == 'trial':
+                rec.user_message = _(
+                    "Free trial of %(code)s until %(until)s. To keep using it, "
+                    "order a license from vertrieb@wissen-beratung.de."
+                ) % {'code': rec.product_code, 'until': rec.valid_to or '-'}
             elif rec.state == 'grace':
                 rec.user_message = _(
-                    "Ihre Lizenz für %s läuft aus wegen einer überfälligen Rechnung. "
-                    "Bitte bezahlen Sie die offene Rechnung bis zum %s, um "
-                    "Unterbrechungen zu vermeiden."
-                ) % (rec.product_code, rec.grace_until or '-')
+                    "Your license for %(code)s is running out because of an overdue "
+                    "invoice. Please pay the open invoice by %(until)s to avoid "
+                    "interruptions."
+                ) % {'code': rec.product_code, 'until': rec.grace_until or '-'}
             elif rec.state == 'expired':
                 rec.user_message = _(
-                    "Die Lizenz für %s ist abgelaufen. Bitte kontaktieren Sie "
-                    "support@wissen-beratung.de für eine Verlängerung."
+                    "The license for %s has expired. Please contact "
+                    "support@wissen-beratung.de to renew it."
                 ) % rec.product_code
             elif rec.state == 'unknown':
                 rec.user_message = _(
-                    "Der Lizenz-Server ist nicht erreichbar. Ihre Lizenz funktioniert "
-                    "weiter — bei anhaltenden Problemen bitte Internet-Verbindung prüfen "
-                    "oder support@wissen-beratung.de kontaktieren."
+                    "The license server cannot be reached. Your license keeps "
+                    "working; if the problem persists, please check the internet "
+                    "connection or contact support@wissen-beratung.de."
                 )
             elif rec.state == 'unlicensed':
                 rec.user_message = _(
-                    "Keine Lizenz für %s konfiguriert. Bitte unter Einstellungen "
-                    "→ WISSEN BERATUNG Lizenzen aktivieren."
+                    "No license configured for %s. Please activate one or start a "
+                    "free trial under Settings → WB Licenses."
                 ) % rec.product_code
             else:
                 rec.user_message = False
@@ -302,33 +331,37 @@ class WbLicenseInfo(models.Model):
         status = self.instance_status
         if status == 'eval':
             return _(
-                "Testsystem: %s läuft auf dieser Datenbank zur Probe bis %s. "
-                "Danach brauchen Sie für sie eine DEV-Lizenz (%s)."
-            ) % (code, until, support)
+                "Test system: %(code)s runs on this database for evaluation until "
+                "%(until)s. After that it needs a DEV license (%(support)s)."
+            ) % {'code': code, 'until': until, 'support': support}
         if status == 'eval_expired':
             return _(
-                "Die Probezeit für %s auf diesem Testsystem ist abgelaufen. "
-                "Für diese Datenbank brauchen Sie eine DEV-Lizenz (%s)."
-            ) % (code, support)
+                "The evaluation period of %(code)s on this test system has expired. "
+                "This database needs a DEV license (%(support)s)."
+            ) % {'code': code, 'support': support}
         if status == 'eval_limit':
             return _(
-                "Für %s laufen schon so viele Testsysteme zur Probe wie möglich. "
-                "Für diese Datenbank brauchen Sie eine DEV-Lizenz (%s)."
-            ) % (code, support)
+                "%(code)s already runs on as many test systems for evaluation as "
+                "possible. This database needs a DEV license (%(support)s)."
+            ) % {'code': code, 'support': support}
         if status == 'dev':
-            return _("Entwicklungs- oder Staging-System: %s läuft mit DEV-Lizenz bis %s.") % (code, until)
+            return _(
+                "Development or staging system: %(code)s runs with a DEV license "
+                "until %(until)s."
+            ) % {'code': code, 'until': until}
         if status == 'dev_not_neutralized':
             return _(
-                "Die DEV-Lizenz für %s gilt nur für neutralisierte Datenbanken. "
-                "Diese Datenbank ist nicht neutralisiert."
+                "The DEV license for %s only applies to neutralized databases. "
+                "This database is not neutralized."
             ) % code
         message = _(
-            "Diese Datenbank ist nicht die lizenzierte Instanz für %s. Ist sie "
-            "ein Testsystem, neutralisieren Sie sie. Nach einem Umzug beantragen "
-            "Sie bitte die Migration (%s)."
-        ) % (code, support)
+            "This database is not the licensed instance for %(code)s. If it is a "
+            "test system, neutralize it. After a move, please request the "
+            "migration (%(support)s)."
+        ) % {'code': code, 'support': support}
         if status == 'mismatch_grace':
-            return message + ' ' + _("Bis %s läuft %s hier weiter.") % (until, code)
+            return message + ' ' + _("%(code)s keeps running here until %(until)s.") % {
+                'code': code, 'until': until}
         return message
 
     def apply_cache_age_policy(self, min_cache_age_days):
@@ -368,6 +401,14 @@ class WbLicenseInfo(models.Model):
             'latest_module_version': (data.get('latest_module_version') or '').strip() or False,
             'download_url': (data.get('download_url') or '').strip() or False,
         }
+        max_users = parse_max_users(data)
+        if max_users is None:
+            if not self.last_server_check:
+                # Erste Antwort mit ungültiger Grenze: nicht übernehmen (#97, M3)
+                self.record_check_failure(200, {'error': 'INVALID_MAX_USERS'})
+                return
+            max_users = self.max_users
+        vals['max_users'] = max_users
         instance = data.get('instance') if isinstance(data.get('instance'), dict) else {}
         status = instance.get('status')
         vals['instance_status'] = status if status in dict(INSTANCE_STATUS) else False
@@ -386,6 +427,19 @@ class WbLicenseInfo(models.Model):
         if old_state != vals['state']:
             self._notify_state_change(old_state, vals['state'])
 
+    def _mark_product_mismatch(self):
+        """Key or server answer belongs to another product: treat as expired (#97, I4)."""
+        self.ensure_one()
+        old_state = self.state
+        self.sudo().write({
+            'state': 'expired',
+            'last_server_check': fields.Datetime.now(),
+            'last_check_success': False,
+            'last_error_message': 'PRODUCT_MISMATCH',
+        })
+        if old_state != 'expired':
+            self._notify_state_change(old_state, 'expired')
+
     def record_check_failure(self, status, data):
         """Server-Fehler dokumentieren, state nicht überschreiben.
 
@@ -401,6 +455,8 @@ class WbLicenseInfo(models.Model):
             'last_error_message': msg,
             'last_failed_check_at': fields.Datetime.now(),
         })
+        # Ein Test bleibt 'trial': is_valid endet dann am valid_to statt erst
+        # nach der Offline-Toleranz von 'unknown'.
         if self.state == 'active':
             self.state = 'unknown'
 
@@ -409,6 +465,7 @@ class WbLicenseInfo(models.Model):
         critical_transitions = {
             ('active', 'grace'): 'wb_license_client.mail_template_grace_started_local',
             ('active', 'expired'): 'wb_license_client.mail_template_expired_local',
+            ('trial', 'expired'): 'wb_license_client.mail_template_expired_local',
             ('grace', 'expired'): 'wb_license_client.mail_template_expired_local',
             ('unknown', 'active'): None,
             ('expired', 'active'): None,
@@ -432,11 +489,23 @@ class WbLicenseInfo(models.Model):
         self.ensure_one()
         return {
             'type': 'ir.actions.act_window',
-            'name': _("Lizenz aktivieren"),
+            'name': _("Activate License"),
             'res_model': 'wb.license.activate.wizard',
             'view_mode': 'form',
             'target': 'new',
             'context': {'default_product_code': self.product_code},
+        }
+
+    def action_open_trial_wizard(self):
+        """Button: open the wizard in trial mode for this product."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _("Start 7-day free trial"),
+            'res_model': 'wb.license.activate.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_product_code': self.product_code, 'default_mode': 'trial'},
         }
 
     def action_force_ping(self):
@@ -444,5 +513,5 @@ class WbLicenseInfo(models.Model):
         self.ensure_one()
         key = self.env['wb.license.client']._get_stored_key(self.product_code)
         if not key:
-            raise UserError(_("Kein Key gespeichert für %s.") % self.product_code)
+            raise UserError(_("No key stored for %s.") % self.product_code)
         self.env['wb.license.client']._do_ping(self, self.product_code, key)
