@@ -1,6 +1,6 @@
 {
     'name': 'WB Subscription & License Platform',
-    'version': '19.0.2.13.0',
+    'version': '19.0.2.14.0',
     'category': 'Sales/Subscriptions',
     'summary': 'Vertriebs-Backend für WISSEN BERATUNG Produkt-Module',
     'description': """
@@ -13,7 +13,7 @@ Funktionen:
 - Lizenzschlüssel-Verwaltung (Public Key + bcrypt-gehashter Activation-Code)
 - Odoo-Instanz-Bindung (Domain + DB-UUID)
 - Portal-Ticket-Flow mit Email-OTP für Code-Auslieferung
-- Trial-System (7 Tage, Lead-Capture)
+- Trial-System (7 Tage per Klick, Lead-Capture, Benutzergrenze je Paket)
 - Migration-Workflow (Domain-Umzug mit Approval)
 - Integration mit sale.order (Subscriptions in Odoo 19), product.product, account_followup
 - Audit-Log aller License-Events

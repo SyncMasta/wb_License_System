@@ -148,6 +148,9 @@ class ApiLicenseController(http.Controller):
             'valid_to': license.valid_to.isoformat() if license.valid_to else None,
             'grace_until': license.grace_until.isoformat() if license.grace_until else None,
             'product_code': license.product_code,
+            # Benutzergrenze des Pakets, 0 = unbegrenzt (DECISIONS.md #95).
+            # Der Client setzt sie durch; ältere Clients ignorieren das Feld.
+            'max_users': license.max_users,
             'latest_module_version': latest_module_version,
             'download_url': download_url,
         }
@@ -165,6 +168,7 @@ class ApiLicenseController(http.Controller):
             response['valid_to'] = instance['until'].isoformat()
             response['grace_until'] = (
                 instance['grace_until'].isoformat() if instance.get('grace_until') else None)
+            response['max_users'] = instance.get('max_users', license.max_users)
         elif instance:
             until = instance['until']
             status = instance['status']
@@ -286,6 +290,7 @@ class ApiLicenseController(http.Controller):
                 'state': license.state,
                 'bound_domain': license.bound_domain,
                 'valid_to': license.valid_to.isoformat() if license.valid_to else None,
+                'max_users': license.max_users,
             }
         else:
             payload = result
@@ -494,6 +499,7 @@ class ApiLicenseController(http.Controller):
             'state': license.state,
             'valid_from': license.valid_from.isoformat() if license.valid_from else None,
             'valid_to': license.valid_to.isoformat() if license.valid_to else None,
+            'max_users': license.max_users,
         }
 
     @http.route('/api/license/migrate',

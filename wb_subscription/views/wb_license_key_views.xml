@@ -123,6 +123,7 @@
                             <field name="bound_db_uuid" readonly="1"
                                    groups="wb_subscription.group_wb_subscription_manager"/>
                             <field name="instance_limit"/>
+                            <field name="max_users"/>
                             <field name="instance_current" readonly="1"/>
                             <field name="parent_license_id" invisible="not parent_license_id"/>
                         </group>

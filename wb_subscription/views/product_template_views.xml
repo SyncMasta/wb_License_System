@@ -43,6 +43,8 @@
                             <field name="wb_instance_limit"/>
                             <field name="wb_extra_instance_price"/>
                             <field name="wb_trial_days"/>
+                            <field name="wb_max_users"
+                                   invisible="product_variant_count > 1"/>
                             <field name="wb_activation_grace_days"/>
                         </group>
                     </group>
@@ -102,6 +104,19 @@
                     </group>
                 </page>
             </notebook>
+        </field>
+    </record>
+
+    <!-- Benutzergrenze je Paket an der Variante (Starter/Team/Business), DECISIONS.md #95 -->
+    <record id="product_variant_easy_edit_view_wb_license" model="ir.ui.view">
+        <field name="name">product.product.variant.easy.edit.wb.license</field>
+        <field name="model">product.product</field>
+        <field name="inherit_id" ref="product.product_variant_easy_edit_view"/>
+        <field name="arch" type="xml">
+            <field name="barcode" position="after">
+                <field name="wb_is_license_product" invisible="1"/>
+                <field name="wb_max_users" invisible="not wb_is_license_product"/>
+            </field>
         </field>
     </record>
 
