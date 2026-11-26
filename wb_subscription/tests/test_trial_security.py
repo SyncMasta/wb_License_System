@@ -281,6 +281,36 @@ class TestTrialRetentionPartner(_PaketSetup, TransactionCase):
         self.assertFalse(partner.active)
         self.assertEqual(self._details_with('alt1@example.com'), 0)
 
+    def test_events_of_paying_customer_with_same_email_stay(self):
+        kunde = self.env['res.partner'].create({'name': 'Zahlender Kunde', 'email': 'gleich@example.com'})
+        bezahlt = self.env['wb.license.key'].create({
+            'product_id': self.variants['Team'].id, 'partner_id': kunde.id,
+            'state': 'issued', 'valid_from': fields.Date.today(),
+            'valid_to': fields.Date.today() + timedelta(days=30),
+        })
+        self.env['wb.license.event'].log_event(
+            bezahlt, 'auto_bind_lookup_failed', details={'email': 'gleich@example.com'})
+        self._approved('gleich@example.com')
+        self.assertEqual(self._details_with('gleich@example.com'), 2)
+        self.env['wb.license.trial.request']._cron_apply_retention()
+        # Nur das Ereignis der Test-Lizenz ist bereinigt
+        self.assertEqual(self._details_with('gleich@example.com'), 1)
+        self.env.cr.execute(
+            "SELECT license_id FROM wb_license_event WHERE strpos(details, %s) > 0",
+            ('gleich@example.com',))
+        self.assertEqual(self.env.cr.fetchone()[0], bezahlt.id)
+
+    def test_referenced_partner_keeps_events(self):
+        rec = self._approved('alt7@example.com')
+        self.env['wb.license.key'].create({
+            'product_id': self.variants['Starter'].id, 'partner_id': rec.partner_id.id,
+            'state': 'issued', 'valid_from': fields.Date.today(),
+            'valid_to': fields.Date.today() + timedelta(days=30),
+        })
+        self.env['wb.license.trial.request']._cron_apply_retention()
+        self.assertTrue(rec.anonymised)
+        self.assertEqual(self._details_with('alt7@example.com'), 1)
+
     def test_referenced_partner_is_kept(self):
         rec = self._approved('alt2@example.com')
         partner = rec.partner_id

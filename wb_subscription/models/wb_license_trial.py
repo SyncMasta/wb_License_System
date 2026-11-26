@@ -378,19 +378,23 @@ class WbLicenseTrialRequest(models.Model):
         self.ensure_one()
         email = self.contact_email
         partner = self.partner_id
-        if partner and not self._partner_in_use_elsewhere(partner):
-            partner.sudo().write({
-                'name': 'Anonymisiert', 'email': False, 'phone': False,
-                'street': False, 'street2': False, 'zip': False, 'city': False,
-                'website': False, 'vat': False, 'comment': False, 'active': False,
-            })
-        if email:
-            # Audit-Log ist per ORM unveränderlich (wb.license.event.write):
-            # die Adresse per SQL aus den Details entfernen, wie die Event-Retention.
-            self.env.flush_all()
-            self.env.cr.execute(
-                "UPDATE wb_license_event SET details = replace(details, %s, 'anonymisiert') "
-                "WHERE strpos(details, %s) > 0", (email, email))
+        # Kontakt und Ereignisse nur, wenn der Kontakt sonst nirgends genutzt
+        # wird; sonst gehört die Adresse (auch) einem Kunden und bleibt (#98).
+        if not (partner and self._partner_in_use_elsewhere(partner)):
+            if partner:
+                partner.sudo().write({
+                    'name': 'Anonymisiert', 'email': False, 'phone': False,
+                    'street': False, 'street2': False, 'zip': False, 'city': False,
+                    'website': False, 'vat': False, 'comment': False, 'active': False,
+                })
+            if email and self.license_id:
+                # Nur Ereignisse der eigenen Test-Lizenz. Das Audit-Log ist per ORM
+                # unveränderlich (wb.license.event.write), daher SQL wie die Event-Retention.
+                self.env.flush_all()
+                self.env.cr.execute(
+                    "UPDATE wb_license_event SET details = replace(details, %s, 'anonymisiert') "
+                    "WHERE license_id = %s AND strpos(details, %s) > 0",
+                    (email, self.license_id.id, email))
         self.write({
             'contact_name': 'anonymisiert',
             'contact_email': f'anonymisiert-{self.id}@invalid',

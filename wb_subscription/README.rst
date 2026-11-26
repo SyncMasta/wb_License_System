@@ -119,7 +119,12 @@ Aufbewahrung: Cron „Aufbewahrungsfristen Testanträge“ entfernt die IP nach
 ``wb_subscription.retention_trial_ip_days`` (90) Tagen und die Kontaktdaten nicht
 umgewandelter Anträge nach ``wb_subscription.retention_trial_contact_days`` (365)
 Tagen; 0 schaltet die Stufe ab. Produkt, Domain und DB-UUID bleiben für die Regel
-„1 Test je Datenbank“.
+„1 Test je Datenbank“. Der bei der Freigabe angelegte Kontakt wird mit anonymisiert und
+archiviert, und die E-Mail verschwindet aus den Ereignissen der Test-Lizenz, beides nur, wenn
+der Kontakt sonst nirgends genutzt wird (keine weitere Lizenz, kein Auftrag, keine Rechnung,
+kein Benutzer). **Nicht bereinigt** werden Chatter und Mail-Historie des Kontakts
+(``mail.message``, ``mail.mail``, z. B. die Mail „Test aktiviert“): Sie unterliegen der
+Mail-Aufbewahrung von Odoo und werden bei Bedarf dort bzw. per Löschung des Kontakts entfernt.
 
 Dependencies
 =============
