@@ -235,7 +235,7 @@ Weitere Felder werden ignoriert (`**kw`).
 | `product_code` | string | 4 Zeichen |
 | `latest_module_version` | string \| null | gepflegte Soll-Version des Produkts |
 | `download_url` | string \| null | Portal-Link, nur gesetzt wenn `latest_module_version` ≠ `module_version` |
-| `max_users` | int | Benutzergrenze des Pakets (`wb.license.key.max_users`), `0` = unbegrenzt. Seit `wb_subscription` 19.0.2.14.0 (DECISIONS.md #95); ältere Server senden das Feld nicht, Clients werten das als `0`. Auch in den Antworten von `/activate`, `/lookup` und `/trial` |
+| `max_users` | int | Benutzergrenze des Pakets (`wb.license.key.max_users`), `0` = unbegrenzt. Seit `wb_subscription` 19.0.2.14.0 (DECISIONS.md #95); ältere Server senden das Feld nicht, Clients werten das als `0`. Auch in den Antworten von `/activate`, `/lookup` und `/trial`. Ein ungültiger Wert wird vom Client verworfen (#97/#98). WB VoIP zählt aktive interne Benutzer mit der Gruppe „WB VoIP: Benutzer“ (auch implizit) **und** gesetztem SIP-Benutzer |
 | `instance` | object | **Nur vorhanden**, wenn `db_uuid` mitkommt und nicht zur Bindung (`bound_db_uuid` + `bound_domain`) passt. Siehe unten. |
 
 #### Fremde Instanz (`instance`, DECISIONS.md #80-82)
@@ -321,7 +321,7 @@ bindet die Lizenz unwiderruflich an die übergebene `db_uuid`/`domain`, setzt `s
 auf `active`, löscht den `activation_hash` und entschärft `auto_bind_armed`.
 
 Request: `product_code` (4 Zeichen, Pflicht), `db_uuid` (Pflicht), `domain` und/oder `email`.
-Antwort bei Treffer: `{"found": true, "key": "...", "state": "...", "valid_from": ..., "valid_to": ...}` —
+Antwort bei Treffer: `{"found": true, "key": "...", "product_code": "...", "state": "...", "valid_from": ..., "valid_to": ..., "max_users": ...}` —
 **enthält den Public Key im Klartext**, deshalb das strenge Limit von 10/h pro IP.
 Ohne Treffer: `{"found": false}` plus Event `auto_bind_lookup_failed`.
 Fehler: `TOO_MANY_REQUESTS`, `INVALID_PRODUCT_CODE`, `MISSING_BINDING_DATA`, `MISSING_MATCH_CRITERIA`.
@@ -337,7 +337,7 @@ normalisierte `pre_assigned_domain` == Domain **oder** `pre_assigned_email` == E
 - **`/api/license/activate`** — `key`, `activation_code` (`^[A-HJ-NP-Z2-9]{5}(-[A-HJ-NP-Z2-9]{5}){4}$`),
   `domain`, `db_uuid`, optional `product_code` (sonst `PRODUCT_MISMATCH` bei fremdem Key, #97), vier Pflicht-Consents (`confirm_eula`, `confirm_terms`, `confirm_privacy`,
   `confirm_no_refund`), optional `subscribe_newsletter`, `contact_email`, `request_id` (UUID4,
-  Replay-Dedup). Erfolg: `{"status":"ok","state":...,"bound_domain":...,"valid_to":...}`.
+  Replay-Dedup). Erfolg: `{"status":"ok","state":...,"bound_domain":...,"product_code":...,"valid_to":...,"max_users":...}`.
   Fehler: `TOO_MANY_ATTEMPTS`, `INVALID_KEY_FORMAT`, `INVALID_CODE_FORMAT`, `MISSING_BINDING_DATA`,
   `MISSING_CONSENTS` (+ `missing`-Liste), `KEY_NOT_FOUND`. Code wird bcrypt-geprüft (12 Runden).
   **Laut Übergabe §1 Nicht-Ziel — im PHP-Paket nicht implementieren.**
@@ -350,7 +350,8 @@ normalisierte `pre_assigned_domain` == Domain **oder** `pre_assigned_email` == E
   `company_name`, `domain`, `db_uuid` (UUID, empfohlen), **`consent: true`** (echtes JSON-true) und
   **`privacy_version`** (Fassung der Datenschutzhinweise, ≤ 32 Zeichen; ohne beides
   `MISSING_CONSENT`), optional `contact_phone`, `company_size`, `industry`, `expected_use_case`.
-  Header `X-WB-DB-UUID` (der Odoo-Client sendet ihn immer). Aufgerufen vom Kunden-Odoo („Start 7-day
+  Header `X-WB-DB-UUID` (der Odoo-Client sendet ihn immer; vom Client gesetzt, also **kein**
+  Schutz — der Schutz der Wiederholung ist, dass die DB-UUID nicht öffentlich ist, #98). Aufgerufen vom Kunden-Odoo („Start 7-day
   free trial“, nur nach Zustimmung im Formular) und von der Website; CORS `*.wissen-beratung.de`
   betrifft nur Browser.
   Erfolg: `{"status":"ok","trial_id":...,"key":"WB-XXXX-…","state":"trial","product_code":...,
@@ -368,7 +369,7 @@ normalisierte `pre_assigned_domain` == Domain **oder** `pre_assigned_email` == E
 - **`/api/wb_subscription/order`** — CORS auf `*.wissen-beratung.de`, gehört zur Website. Der
   Order-Endpunkt ist der einzige mit echter Auth (`X-API-Key` gegen
   `ir.config_parameter wb_subscription.webshop_api_key`, konstantzeitig verglichen). Variante per
-  `product_id` oder `default_code`; ohne beides bei mehreren Varianten `AMBIGUOUS_PRODUCT`, eine
+  `product_id` (JSON-**Integer**, z. B. `302`; Strings wie `"302"` zählen nicht) oder `default_code`; ohne beides bei mehreren Varianten `AMBIGUOUS_PRODUCT`, eine
   Angabe, die nicht zum `product_code` passt, `PRODUCT_NOT_FOUND`. Kontakt wird nur bei exakt
   gleicher (normalisierter) E-Mail wiederverwendet (#97).
 
