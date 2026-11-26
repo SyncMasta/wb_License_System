@@ -100,6 +100,27 @@ class TestTrialSecurity(_TrialHttpBase, HttpCase):
                          confirm_no_refund=True)
         self.assertEqual(res, {'error': 'PRODUCT_MISMATCH'})
         self.assertEqual(lic.state, 'issued')
+        res = self._post('/api/license/activate', key=lic.name, activation_code=code,
+                         product_code='TRIA', domain=DOMAIN, db_uuid=UUID_A,
+                         confirm_eula=True, confirm_terms=True, confirm_privacy=True,
+                         confirm_no_refund=True)
+        self.assertEqual(res['status'], 'ok')
+        self.assertEqual(res['product_code'], 'TRIA')
+
+    def test_lookup_reports_product_code(self):
+        lic = self.env['wb.license.key'].create({
+            'product_id': self.variants['Team'].id,
+            'partner_id': self.env['res.partner'].create({'name': 'Lookup-Kunde'}).id,
+            'state': 'issued', 'valid_from': fields.Date.today(),
+            'valid_to': fields.Date.today() + timedelta(days=30),
+            'pre_assigned_domain': 'lookup.example.com',
+        })
+        lic.action_arm_auto_bind()
+        res = self._post('/api/license/lookup', product_code='TRIA', db_uuid=UUID_C,
+                         domain='https://lookup.example.com')
+        self.assertTrue(res['found'])
+        self.assertEqual(res['product_code'], 'TRIA')
+        self.assertEqual(res['max_users'], 20)
 
     # -------------------------------------------------------------------- I6
     def test_consent_required(self):
@@ -209,3 +230,130 @@ class TestTrialRetention(_PaketSetup, TransactionCase):
         self.assertNotEqual(rec.contact_name, 'Erika Muster')
         self.assertTrue(rec.anonymised)
         self.assertFalse(rec.ip_address)
+
+
+@tagged('wb_subscription', 'wb_trial', 'wb_retention')
+class TestTrialRetentionPartner(_PaketSetup, TransactionCase):
+    """Runde 2: auch Kontakt und Audit-Log eines alten Tests werden anonymisiert (#97)."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._setup_products()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._restore_env()
+        super().tearDownClass()
+
+    def _approved(self, email, days_old=400):
+        rec = self.env['wb.license.trial.request'].create({
+            'product_id': self.variants['Business'].id, 'contact_name': 'Erika Muster',
+            'contact_email': email, 'company_name': 'Firma', 'contact_phone': '+49 1',
+            'domain': f'https://{email.split("@")[0]}.example.com',
+        })
+        rec.action_approve_and_create_trial()
+        self.env['wb.license.event'].log_event(
+            rec.license_id, 'auto_bind_lookup_failed', details={'email': email})
+        self.env.flush_all()
+        self.env.cr.execute(
+            "UPDATE wb_license_trial_request SET create_date = NOW() - (%s * INTERVAL '1 day') "
+            "WHERE id = %s", (days_old, rec.id))
+        rec.invalidate_recordset()
+        return rec
+
+    def _details_with(self, text):
+        self.env.flush_all()
+        self.env.cr.execute("SELECT count(*) FROM wb_license_event WHERE strpos(details, %s) > 0",
+                            (text,))
+        return self.env.cr.fetchone()[0]
+
+    def test_unreferenced_partner_and_events_are_anonymised(self):
+        rec = self._approved('alt1@example.com')
+        partner = rec.partner_id
+        self.assertEqual(self._details_with('alt1@example.com'), 1)
+        self.env['wb.license.trial.request']._cron_apply_retention()
+        partner.invalidate_recordset()
+        self.assertTrue(rec.anonymised)
+        self.assertEqual(partner.name, 'Anonymisiert')
+        self.assertFalse(partner.email)
+        self.assertFalse(partner.phone)
+        self.assertFalse(partner.active)
+        self.assertEqual(self._details_with('alt1@example.com'), 0)
+
+    def test_referenced_partner_is_kept(self):
+        rec = self._approved('alt2@example.com')
+        partner = rec.partner_id
+        self.env['wb.license.key'].create({
+            'product_id': self.variants['Starter'].id, 'partner_id': partner.id,
+            'state': 'issued', 'valid_from': fields.Date.today(),
+            'valid_to': fields.Date.today() + timedelta(days=30),
+        })
+        self.env['wb.license.trial.request']._cron_apply_retention()
+        partner.invalidate_recordset()
+        self.assertTrue(rec.anonymised)
+        self.assertEqual(partner.email, 'alt2@example.com')
+        self.assertTrue(partner.active)
+
+    def test_converted_trial_is_untouched(self):
+        rec = self._approved('alt3@example.com')
+        rec.state = 'converted'
+        self.env['wb.license.trial.request']._cron_apply_retention()
+        self.assertFalse(rec.anonymised)
+        self.assertEqual(rec.partner_id.email, 'alt3@example.com')
+
+    def test_failure_of_one_record_does_not_stop_others(self):
+        from unittest.mock import patch
+        from odoo.exceptions import ValidationError
+        kaputt = self._approved('alt4@example.com')
+        gut = self._approved('alt5@example.com')
+        Partner = type(self.env['res.partner'])
+        original = Partner.write
+
+        def write(records, vals):
+            if kaputt.partner_id in records:
+                raise ValidationError('simuliert')
+            return original(records, vals)
+
+        with patch.object(Partner, 'write', write):
+            self.env['wb.license.trial.request']._cron_apply_retention()
+        self.assertFalse(kaputt.anonymised)
+        self.assertEqual(kaputt.contact_email, 'alt4@example.com')
+        self.assertTrue(gut.anonymised)
+
+    def test_unexpected_error_propagates(self):
+        from unittest.mock import patch
+        self._approved('alt6@example.com')
+        with patch.object(type(self.env['wb.license.trial.request']), '_anonymise_one',
+                          side_effect=RuntimeError('unerwartet')):
+            with self.assertRaises(RuntimeError):
+                self.env['wb.license.trial.request']._cron_apply_retention()
+
+
+@tagged('wb_subscription', 'wb_max_users')
+class TestTechnicalCodeImmutable(_PaketSetup, TransactionCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._setup_products()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._restore_env()
+        super().tearDownClass()
+
+    def test_code_change_refused_once_keys_exist(self):
+        from odoo.exceptions import ValidationError
+        tmpl = self.env['product.template'].create({
+            'name': 'CODE Lizenz-Produkt', 'wb_is_license_product': True, 'wb_technical_code': 'COD1'})
+        tmpl.wb_technical_code = 'COD2'
+        self.env['wb.license.key'].create({
+            'product_id': tmpl.product_variant_id.id,
+            'partner_id': self.env['res.partner'].create({'name': 'Code-Kunde'}).id,
+            'state': 'issued', 'valid_from': fields.Date.today(),
+            'valid_to': fields.Date.today() + timedelta(days=30),
+        })
+        with self.assertRaises(ValidationError):
+            tmpl.wb_technical_code = 'COD3'
+        tmpl.name = 'Umbenannt'  # andere Felder bleiben änderbar

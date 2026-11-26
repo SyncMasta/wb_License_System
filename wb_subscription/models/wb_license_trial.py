@@ -11,8 +11,10 @@ import ipaddress
 import logging
 from datetime import timedelta
 
+import psycopg2
+
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 
 TRIAL_STATES = [
@@ -320,38 +322,85 @@ class WbLicenseTrialRequest(models.Model):
         """Anonymise trial requests (DECISIONS.md #97, I6).
 
         1. IP address after ``retention_trial_ip_days`` (default 90).
-        2. Contact data of requests not converted to a paid license after
-           ``retention_trial_contact_days`` (default 365). Product, domain and
+        2. Requests not converted to a paid license after
+           ``retention_trial_contact_days`` (default 365): contact data of the
+           request, the contact created at approval (only if nothing else uses
+           it) and the email address in audit events. Product, domain and
            database ID stay, so the rule "one trial per database" keeps working.
+
+        One savepoint per request; expected failures (validation, database
+        constraint) are logged per record, anything else propagates.
         """
         self.env.flush_all()
         ip_tage = self._retention_days(RETENTION_IP_PARAM, RETENTION_IP_DEFAULT)
         kontakt_tage = self._retention_days(RETENTION_CONTACT_PARAM, RETENTION_CONTACT_DEFAULT)
         now = fields.Datetime.now()
-        try:
-            if ip_tage:
-                alt = self.search([('ip_address', '!=', False),
-                                   ('create_date', '<', now - timedelta(days=ip_tage))])
-                alt.write({'ip_address': False})
-            if kontakt_tage:
-                alt = self.search([('state', '!=', 'converted'),
-                                   ('anonymised', '=', False),
-                                   ('create_date', '<', now - timedelta(days=kontakt_tage))])
-                for rec in alt:
-                    rec.write({
-                        'contact_name': 'anonymisiert',
-                        'contact_email': f'anonymisiert-{rec.id}@invalid',
-                        'contact_phone': False,
-                        'company_name': 'anonymisiert',
-                        'industry': False,
-                        'expected_use_case': False,
-                        'ip_address': False,
-                        'anonymised': True,
-                    })
-                if alt:
-                    _logger.info("[wb_subscription] Trial-Retention: %d Anträge anonymisiert", len(alt))
-        except Exception as exc:
-            _logger.exception("[wb_subscription] Trial-Retention fehlgeschlagen: %s", exc)
+        if ip_tage:
+            self.search([('ip_address', '!=', False),
+                         ('create_date', '<', now - timedelta(days=ip_tage))]).write(
+                {'ip_address': False})
+        if not kontakt_tage:
+            return
+        alt = self.search([('state', '!=', 'converted'), ('anonymised', '=', False),
+                           ('create_date', '<', now - timedelta(days=kontakt_tage))])
+        erledigt = 0
+        for rec in alt:
+            try:
+                with self.env.cr.savepoint():
+                    rec._anonymise_one()
+                erledigt += 1
+            except (UserError, ValidationError, psycopg2.Error) as exc:
+                _logger.warning("[wb_subscription] Trial-Retention %s übersprungen: %s",
+                                rec.name, exc)
+        if erledigt:
+            _logger.info("[wb_subscription] Trial-Retention: %d Anträge anonymisiert", erledigt)
+
+    def _partner_in_use_elsewhere(self, partner):
+        """True if ``partner`` is used by anything but this trial request and its own trial license."""
+        self.ensure_one()
+        env = self.env
+        if env['wb.license.key'].sudo().search_count([
+                ('partner_id', 'child_of', partner.id), ('id', '!=', self.license_id.id)], limit=1):
+            return True
+        if self.sudo().search_count([('partner_id', '=', partner.id), ('id', '!=', self.id)], limit=1):
+            return True
+        if env['res.users'].sudo().with_context(active_test=False).search_count(
+                [('partner_id', '=', partner.id)], limit=1):
+            return True
+        for model in ('sale.order', 'account.move'):
+            if model in env and env[model].sudo().search_count(
+                    [('partner_id', 'child_of', partner.id)], limit=1):
+                return True
+        return bool(partner.child_ids)
+
+    def _anonymise_one(self):
+        """Remove personal data of one expired, unconverted trial request (#97)."""
+        self.ensure_one()
+        email = self.contact_email
+        partner = self.partner_id
+        if partner and not self._partner_in_use_elsewhere(partner):
+            partner.sudo().write({
+                'name': 'Anonymisiert', 'email': False, 'phone': False,
+                'street': False, 'street2': False, 'zip': False, 'city': False,
+                'website': False, 'vat': False, 'comment': False, 'active': False,
+            })
+        if email:
+            # Audit-Log ist per ORM unveränderlich (wb.license.event.write):
+            # die Adresse per SQL aus den Details entfernen, wie die Event-Retention.
+            self.env.flush_all()
+            self.env.cr.execute(
+                "UPDATE wb_license_event SET details = replace(details, %s, 'anonymisiert') "
+                "WHERE strpos(details, %s) > 0", (email, email))
+        self.write({
+            'contact_name': 'anonymisiert',
+            'contact_email': f'anonymisiert-{self.id}@invalid',
+            'contact_phone': False,
+            'company_name': 'anonymisiert',
+            'industry': False,
+            'expected_use_case': False,
+            'ip_address': False,
+            'anonymised': True,
+        })
 
     def action_reject(self):
         """Manuell ablehnen (Missbrauchsverdacht bestätigt). Kein Schlüssel."""

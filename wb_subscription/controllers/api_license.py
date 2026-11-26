@@ -304,6 +304,7 @@ class ApiLicenseController(http.Controller):
                 'status': 'ok',
                 'state': license.state,
                 'bound_domain': license.bound_domain,
+                'product_code': license.product_code,
                 'valid_to': license.valid_to.isoformat() if license.valid_to else None,
                 'max_users': license.max_users,
             }
@@ -514,6 +515,7 @@ class ApiLicenseController(http.Controller):
         return {
             'found': True,
             'key': license.name,
+            'product_code': license.product_code,
             'state': license.state,
             'valid_from': license.valid_from.isoformat() if license.valid_from else None,
             'valid_to': license.valid_to.isoformat() if license.valid_to else None,

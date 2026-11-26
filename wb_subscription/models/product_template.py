@@ -216,6 +216,16 @@ class ProductTemplate(models.Model):
         return records
 
     def write(self, vals):
+        if 'wb_technical_code' in vals:
+            # Der Code steckt in jedem ausgestellten Schlüssel (WB-<Code>-…) und in
+            # product_code der Lizenzen: nach dem ersten Schlüssel nicht mehr änderbar (#97).
+            neu = vals['wb_technical_code'] or False
+            geaendert = self.filtered(lambda t: (t.wb_technical_code or False) != neu)
+            if geaendert and self.env['wb.license.key'].sudo().search_count([
+                    ('product_id.product_tmpl_id', 'in', geaendert.ids)], limit=1):
+                raise ValidationError(_(
+                    "Der technische Code kann nicht mehr geändert werden: Für das Produkt "
+                    "gibt es bereits Lizenzschlüssel."))
         res = super().write(vals)
         # Auto-Create der Mailingliste, wenn Produkt nachtraeglich auf
         # Lizenz-Produkt umgestellt wird oder ein technischer Code dazukommt.
