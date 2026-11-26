@@ -142,6 +142,12 @@ class TestTrialWizard(TransactionCase):
                     self._wizard().action_start_trial()
         self.assertFalse(self.ICP.get_param(KEY_PARAM_PREFIX + 'TRIA'))
 
+    def test_trial_answer_for_other_product_stores_nothing(self):
+        with self._fake(self._ok(product_code='ANDR')):
+            with self.assertRaises(UserError):
+                self._wizard().action_start_trial()
+        self.assertFalse(self.ICP.get_param(KEY_PARAM_PREFIX + 'TRIA'))
+
     def test_missing_max_users_means_unlimited(self):
         answer = self._ok()
         del answer['max_users']

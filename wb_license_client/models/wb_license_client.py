@@ -90,6 +90,12 @@ class WbLicenseClient(models.AbstractModel):
             raise AccessError(_("Only administrators can manage WB licenses."))
 
     @api.model
+    def _answer_for_other_product(self, product_code, data):
+        """True if a server answer names a different product (missing field = older server, accepted)."""
+        code = data.get('product_code') if isinstance(data, dict) else None
+        return bool(code) and code != (product_code or '').strip().upper()
+
+    @api.model
     def _key_matches(self, product_code, key):
         """True if ``key`` is a well-formed key of ``product_code`` (prefix WB-<code>-)."""
         match = KEY_FORMAT_RE.match((key or '').strip())
@@ -213,6 +219,13 @@ class WbLicenseClient(models.AbstractModel):
         )
 
         if status == 200 and data and data.get('status') == 'ok':
+            # Fail-closed (#97): Antwort für ein anderes Produkt oder ungültige
+            # Benutzergrenze → nichts speichern.
+            max_users = parse_max_users(data)
+            if self._answer_for_other_product(product_code, data) or max_users is None:
+                raise UserError(_(
+                    "The license server sent an invalid answer. The license was not "
+                    "activated. Please contact support@wissen-beratung.de."))
             self._store_key(product_code, key)
             info = self._get_or_create_info(product_code)
             vals = {
@@ -223,9 +236,7 @@ class WbLicenseClient(models.AbstractModel):
                 'last_check_success': True,
                 'last_error_message': False,
             }
-            max_users = parse_max_users(data)
-            if max_users is not None:
-                vals['max_users'] = max_users
+            vals['max_users'] = max_users
             info.write(vals)
             return info
 
@@ -281,6 +292,10 @@ class WbLicenseClient(models.AbstractModel):
         valid_to = data.get('valid_to') if isinstance(data.get('valid_to'), str) else ''
         if key and (max_users is None or not valid_to):
             # Fail-closed: unbrauchbare Antwort, nichts speichern (#97, M3)
+            raise UserError(_(
+                "The license server sent an invalid answer. No trial was started. "
+                "Please contact support@wissen-beratung.de."))
+        if key and self._answer_for_other_product(product_code, data):
             raise UserError(_(
                 "The license server sent an invalid answer. No trial was started. "
                 "Please contact support@wissen-beratung.de."))
@@ -539,10 +554,15 @@ class WbLicenseClient(models.AbstractModel):
                 "[wb_license_client] Auto-Lookup %s: kein Match.", product_code)
             return False
         key = (data.get('key') or '').strip()
-        if not self._key_matches(product_code, key):
+        if not self._key_matches(product_code, key) or self._answer_for_other_product(product_code, data):
             _logger.warning(
                 "[wb_license_client] Auto-Lookup %s: Schlüssel gehört nicht zum Produkt, "
                 "ignoriert.", product_code)
+            return False
+        max_users = parse_max_users(data)
+        if max_users is None:
+            # Fail-closed (#97): nicht speichern, Fehler am Cache vermerken
+            info.sudo().record_check_failure(200, {'error': 'INVALID_MAX_USERS'})
             return False
         self._store_key(product_code, key)
         vals = {
@@ -553,9 +573,7 @@ class WbLicenseClient(models.AbstractModel):
             'last_check_success': True,
             'last_error_message': False,
         }
-        max_users = parse_max_users(data)
-        if max_users is not None:
-            vals['max_users'] = max_users
+        vals['max_users'] = max_users
         info.sudo().write(vals)
         _logger.info(
             "[wb_license_client] Auto-Lookup %s: Match — Lizenz '%s' "

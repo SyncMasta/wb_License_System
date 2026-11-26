@@ -133,3 +133,44 @@ class TestClientSecurity(TransactionCase):
             'product_code': 'TRIA', 'key': 'WB-TRIA-abcdef12AB', 'state': 'active',
             'last_server_check': fields.Datetime.now()})
         self.assertEqual(info.key_masked, 'WB-TRIA-...AB')
+
+    # ------------------------------------------------- Runde 2: fail-closed, product_code
+    def test_activate_refuses_invalid_max_users(self):
+        for bad in ('viele', -1, True):
+            with self.subTest(bad=bad), self._fake({'status': 'ok', 'state': 'active',
+                                                     'valid_to': '2026-12-31', 'max_users': bad}):
+                with self.assertRaises(UserError):
+                    self.Client.activate_license('TRIA', 'WB-TRIA-abcdef12AB', CODE)
+        self.assertFalse(self.ICP.get_param(KEY_PARAM_PREFIX + 'TRIA'))
+
+    def test_activate_refuses_answer_for_other_product(self):
+        with self._fake({'status': 'ok', 'state': 'active', 'valid_to': '2026-12-31',
+                         'product_code': 'ANDR'}):
+            with self.assertRaises(UserError):
+                self.Client.activate_license('TRIA', 'WB-TRIA-abcdef12AB', CODE)
+        self.assertFalse(self.ICP.get_param(KEY_PARAM_PREFIX + 'TRIA'))
+
+    def test_lookup_refuses_invalid_max_users(self):
+        self.ICP.set_param('web.base.url', 'https://kunde.example.com')
+        info = self.Client._get_or_create_info('TRIA')
+        with self._fake({'found': True, 'key': 'WB-TRIA-abcdef12AB', 'state': 'active',
+                         'max_users': 'viele'}):
+            self.assertFalse(self.Client._try_auto_lookup(info, 'TRIA'))
+        self.assertFalse(self.ICP.get_param(KEY_PARAM_PREFIX + 'TRIA'))
+        self.assertEqual(info.last_error_message, 'HTTP 200: INVALID_MAX_USERS')
+
+    def test_lookup_refuses_answer_for_other_product(self):
+        self.ICP.set_param('web.base.url', 'https://kunde.example.com')
+        info = self.Client._get_or_create_info('TRIA')
+        with self._fake({'found': True, 'key': 'WB-TRIA-abcdef12AB', 'state': 'active',
+                         'product_code': 'ANDR'}):
+            self.assertFalse(self.Client._try_auto_lookup(info, 'TRIA'))
+        self.assertFalse(self.ICP.get_param(KEY_PARAM_PREFIX + 'TRIA'))
+
+    def test_lookup_with_matching_product_code_is_stored(self):
+        self.ICP.set_param('web.base.url', 'https://kunde.example.com')
+        info = self.Client._get_or_create_info('TRIA')
+        with self._fake({'found': True, 'key': 'WB-TRIA-abcdef12AB', 'state': 'active',
+                         'product_code': 'TRIA', 'max_users': 5}):
+            self.assertTrue(self.Client._try_auto_lookup(info, 'TRIA'))
+        self.assertEqual(info.max_users, 5)
