@@ -8,6 +8,7 @@ Trials haben:
 """
 
 import ipaddress
+import logging
 from datetime import timedelta
 
 from odoo import _, api, fields, models
@@ -42,6 +43,17 @@ REVIEW_EMAIL_DOMAINS_PARAM = 'wb_subscription.trial_review_email_domains'
 # Ab so vielen Anträgen derselben IP in 30 Tagen: manuelle Prüfung.
 REVIEW_IP_THRESHOLD_PARAM = 'wb_subscription.trial_review_ip_threshold'
 DEFAULT_REVIEW_IP_THRESHOLD = 3
+# Aufbewahrung (DECISIONS.md #97): IP nach 90 Tagen, Kontaktdaten nicht
+# umgewandelter Anträge nach 12 Monaten. 0 schaltet die Stufe ab.
+RETENTION_IP_PARAM = 'wb_subscription.retention_trial_ip_days'
+RETENTION_IP_DEFAULT = 90
+RETENTION_CONTACT_PARAM = 'wb_subscription.retention_trial_contact_days'
+RETENTION_CONTACT_DEFAULT = 365
+# Endungen privater Netze: die Regel „1 Test je Domain“ gilt dort nicht (#97, I3)
+PRIVATE_HOST_SUFFIXES = ('.local', '.localdomain', '.lan', '.internal', '.intranet',
+                         '.home', '.home.arpa', '.corp', '.test', '.localhost')
+
+_logger = logging.getLogger(__name__)
 
 
 def normalize_trial_domain(value):
@@ -98,6 +110,18 @@ class WbLicenseTrialRequest(models.Model):
     )
     ip_address = fields.Char(string='IP-Adresse', readonly=True)
     expected_use_case = fields.Text(string='Geplanter Einsatz')
+    consent_at = fields.Datetime(
+        string='Zustimmung am', readonly=True,
+        help="Zeitpunkt, zu dem der Antrag mit Zustimmung zur Datenübermittlung einging.",
+    )
+    consent_version = fields.Char(
+        string='Fassung Datenschutzhinweis', readonly=True,
+        help="Vom Client gemeldete Fassung der Datenschutzhinweise, denen zugestimmt wurde.",
+    )
+    anonymised = fields.Boolean(
+        string='Anonymisiert', readonly=True,
+        help="Kontaktdaten nach Ablauf der Aufbewahrungsfrist entfernt.",
+    )
     review_reason = fields.Char(
         string='Grund der Prüfung', readonly=True,
         help="Warum der Antrag nicht sofort freigegeben wurde (Missbrauchsverdacht).",
@@ -115,6 +139,9 @@ class WbLicenseTrialRequest(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            # E-Mail immer klein und ohne Leerraum: Vergleiche sind exakt (#97, I1)
+            if vals.get('contact_email'):
+                vals['contact_email'] = vals['contact_email'].strip().lower()
             if not vals.get('name') or vals['name'] == 'Neu':
                 vals['name'] = self.env['ir.sequence'].next_by_code(
                     'wb.license.trial.request') or 'TRL/XXXX'
@@ -123,22 +150,37 @@ class WbLicenseTrialRequest(models.Model):
     # ------------------------------------------------------------------ Regeln
 
     @api.model
+    def _is_public_host(self, host):
+        """True for a public DNS name; False for localhost, IP literals, private suffixes, single labels."""
+        host = normalize_trial_domain(host)
+        if not host or host == 'localhost' or '.' not in host and ':' not in host:
+            return False
+        try:
+            ipaddress.ip_address(host)
+            return False
+        except ValueError:
+            pass
+        return not any(host.endswith(suffix) for suffix in PRIVATE_HOST_SUFFIXES)
+
+    @api.model
     def _find_previous(self, product_code, email, domain, db_uuid):
         """Earlier trial requests (any state) of this product for the same email, domain or database.
 
-        Returns a dict ``{'email': rec, 'domain': rec, 'db_uuid': rec}`` with the
-        first match per criterion (empty recordsets if none). A trial of another
-        product does not count (DECISIONS.md #94).
+        Exact comparisons only (lower-case email, normalised host, UUID), no
+        LIKE patterns (#97, I1). The domain counts only for public host names
+        (#97, I3). Returns ``{'email': rec, 'domain': rec, 'db_uuid': rec}`` with
+        the first match per criterion (empty recordsets if none). A trial of
+        another product does not count (DECISIONS.md #94).
         """
+        email = (email or '').strip().lower()
         normalized = normalize_trial_domain(domain)
         base = [('product_id.wb_technical_code', '=', product_code)]
+        empty = self.browse()
         return {
-            'email': self.search(base + [('contact_email', '=ilike', email)], limit=1)
-            if email else self.browse(),
+            'email': self.search(base + [('contact_email', '=', email)], limit=1) if email else empty,
             'domain': self.search(base + [('domain_normalized', '=', normalized)], limit=1)
-            if normalized else self.browse(),
-            'db_uuid': self.search(base + [('db_uuid', '=', db_uuid)], limit=1)
-            if db_uuid else self.browse(),
+            if normalized and self._is_public_host(normalized) else empty,
+            'db_uuid': self.search(base + [('db_uuid', '=', db_uuid)], limit=1) if db_uuid else empty,
         }
 
     @api.model
@@ -205,7 +247,7 @@ class WbLicenseTrialRequest(models.Model):
                 'trial_id': self.name,
                 'message': 'Trial request received. It is being reviewed; you will receive the key by email.',
             }
-        return {'error': 'TRIAL_ALREADY_USED'}
+        return {'error': 'TRIAL_NOT_AVAILABLE'}
 
     # --------------------------------------------------------------- Freigabe
 
@@ -223,11 +265,10 @@ class WbLicenseTrialRequest(models.Model):
                 raise UserError(_("Für %s ist kein Test vorgesehen (Trial-Tage = 0).")
                                 % rec.product_id.display_name)
 
+            # Ungeprüfte Angaben nie mit vorhandenen Kontakten zusammenführen,
+            # immer ein eigener Kontakt je Antrag (#97, I1). Eine von Hand
+            # gesetzte Verknüpfung bleibt.
             partner = rec.partner_id
-            if not partner:
-                partner = self.env['res.partner'].search([
-                    ('email', '=ilike', rec.contact_email)
-                ], limit=1)
             if not partner:
                 partner = self.env['res.partner'].create({
                     'name': rec.company_name or rec.contact_name,
@@ -269,6 +310,48 @@ class WbLicenseTrialRequest(models.Model):
                 company=rec.company_name or '',
                 email=rec.contact_email or '',
             )
+
+    @api.model
+    def _retention_days(self, param, default):
+        return self.env['wb.license.event']._retention_days(param, default)
+
+    @api.model
+    def _cron_apply_retention(self):
+        """Anonymise trial requests (DECISIONS.md #97, I6).
+
+        1. IP address after ``retention_trial_ip_days`` (default 90).
+        2. Contact data of requests not converted to a paid license after
+           ``retention_trial_contact_days`` (default 365). Product, domain and
+           database ID stay, so the rule "one trial per database" keeps working.
+        """
+        self.env.flush_all()
+        ip_tage = self._retention_days(RETENTION_IP_PARAM, RETENTION_IP_DEFAULT)
+        kontakt_tage = self._retention_days(RETENTION_CONTACT_PARAM, RETENTION_CONTACT_DEFAULT)
+        now = fields.Datetime.now()
+        try:
+            if ip_tage:
+                alt = self.search([('ip_address', '!=', False),
+                                   ('create_date', '<', now - timedelta(days=ip_tage))])
+                alt.write({'ip_address': False})
+            if kontakt_tage:
+                alt = self.search([('state', '!=', 'converted'),
+                                   ('anonymised', '=', False),
+                                   ('create_date', '<', now - timedelta(days=kontakt_tage))])
+                for rec in alt:
+                    rec.write({
+                        'contact_name': 'anonymisiert',
+                        'contact_email': f'anonymisiert-{rec.id}@invalid',
+                        'contact_phone': False,
+                        'company_name': 'anonymisiert',
+                        'industry': False,
+                        'expected_use_case': False,
+                        'ip_address': False,
+                        'anonymised': True,
+                    })
+                if alt:
+                    _logger.info("[wb_subscription] Trial-Retention: %d Anträge anonymisiert", len(alt))
+        except Exception as exc:
+            _logger.exception("[wb_subscription] Trial-Retention fehlgeschlagen: %s", exc)
 
     def action_reject(self):
         """Manuell ablehnen (Missbrauchsverdacht bestätigt). Kein Schlüssel."""

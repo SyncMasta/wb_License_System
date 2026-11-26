@@ -57,6 +57,17 @@ def _check_rate_limit(bucket_prefix, endpoint, default_max, default_window):
     )
 
 
+def _product_mismatch(kw, license):
+    """True if the client names a product that is not the license's (DECISIONS.md #97, I4).
+
+    Clients without ``product_code`` (older ones, PHP) are not affected.
+    """
+    code = kw.get('product_code')
+    if not isinstance(code, str) or not code.strip():
+        return False
+    return code.strip().upper() != (license.product_code or '')
+
+
 class ApiLicenseController(http.Controller):
 
     @http.route('/api/license/check',
@@ -94,6 +105,8 @@ class ApiLicenseController(http.Controller):
         license = request.env['wb.license.key'].sudo().search([('name', '=', key)], limit=1)
         if not license:
             return {'error': 'KEY_NOT_FOUND'}
+        if _product_mismatch(kw, license):
+            return {'error': 'PRODUCT_MISMATCH'}
 
         # HMAC-Signatur (optional oder Pflicht, je nach Enforcement-Modus).
         # Vor record_ping, damit ein abgewiesener Request die Ping-Metadaten
@@ -268,6 +281,8 @@ class ApiLicenseController(http.Controller):
         license = request.env['wb.license.key'].sudo().search([('name', '=', key)], limit=1)
         if not license:
             return {'error': 'KEY_NOT_FOUND'}
+        if _product_mismatch(kw, license):
+            return {'error': 'PRODUCT_MISMATCH'}
 
         consents = {
             'eula': bool(kw.get('confirm_eula')),
@@ -479,6 +494,9 @@ class ApiLicenseController(http.Controller):
         license = License._lookup_for_auto_bind(
             product_code, db_uuid, domain, email,
         )
+        if license and license.product_code != product_code:
+            # Darf nicht vorkommen; nie einen Schlüssel eines anderen Produkts binden (#97, I4)
+            license = License.browse()
         if not license:
             request.env['wb.license.event'].sudo().log_event(
                 False, 'auto_bind_lookup_failed',

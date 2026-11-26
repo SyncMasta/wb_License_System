@@ -3,7 +3,7 @@
 
 Deckt:
 * /api/license/trial gibt sofort frei: Schlüssel, Ablauf, Bindung an Domain + DB-UUID
-* 1 Test je E-Mail, Domain und DB-UUID, unbefristet; zweiter Antrag ohne Schlüssel
+* 1 Test je DB-UUID; gleiche E-Mail/Domain aus anderer DB → Prüfung (pending), kein Schlüssel
 * gleicher Antrag erneut → derselbe Schlüssel (kein zweiter Test)
 * Missbrauchsverdacht → pending ohne Schlüssel, nach Freigabe liefert ein neuer Klick den Schlüssel
 * Rate-Limit je IP, Produkt ohne Testtage
@@ -63,8 +63,8 @@ class _PaketSetup:
             os.environ['WB_SUBSCRIPTION_FERNET_KEY'] = cls._fernet_env_backup
 
 
-@tagged('wb_subscription', 'wb_trial', 'post_install', '-at_install')
-class TestTrialEndpoint(_PaketSetup, HttpCase):
+class _TrialHttpBase(_PaketSetup):
+    """HTTP helpers for /api/license/trial (mixed into HttpCase classes)."""
 
     @classmethod
     def setUpClass(cls):
@@ -82,15 +82,17 @@ class TestTrialEndpoint(_PaketSetup, HttpCase):
         self.env['ir.config_parameter'].sudo().set_param(
             'wb_subscription.rate_limit_trial_ip', '1000/3600')
 
-    def _post(self, endpoint, **params):
+    def _post(self, endpoint, _headers=None, **params):
+        headers = {'Content-Type': 'application/json'}
+        headers.update(_headers or {})
         resp = self.url_open(
             endpoint,
             data=json.dumps({'jsonrpc': '2.0', 'method': 'call', 'params': params}),
-            headers={'Content-Type': 'application/json'},
+            headers=headers,
         )
         return resp.json()['result']
 
-    def _trial(self, **overrides):
+    def _trial(self, _from_db=None, **overrides):
         params = {
             'product_code': 'TRIA',
             'contact_name': 'Erika Muster',
@@ -98,12 +100,20 @@ class TestTrialEndpoint(_PaketSetup, HttpCase):
             'company_name': 'Kunde Trial GmbH',
             'domain': DOMAIN,
             'db_uuid': UUID_A,
+            'consent': True,
+            'privacy_version': '2026-11-26',
         }
         params.update(overrides)
-        return self._post('/api/license/trial', **params)
+        # Der Client sendet seine DB-UUID zusätzlich im Header X-WB-DB-UUID
+        header_db = _from_db if _from_db is not None else params.get('db_uuid') or ''
+        return self._post('/api/license/trial', _headers={'X-WB-DB-UUID': header_db}, **params)
 
     def _licenses(self):
         return self.env['wb.license.key'].search([('product_code', '=', 'TRIA')])
+
+
+@tagged('wb_subscription', 'wb_trial', 'post_install', '-at_install')
+class TestTrialEndpoint(_TrialHttpBase, HttpCase):
 
     def test_trial_is_approved_immediately(self):
         res = self._trial()
@@ -153,25 +163,26 @@ class TestTrialEndpoint(_PaketSetup, HttpCase):
         self.assertEqual(second['key'], first['key'])
         self.assertEqual(len(self._licenses()), 1)
 
-    def test_second_trial_same_email_rejected(self):
+    def test_second_trial_same_email_other_db_is_reviewed(self):
         self._trial()
         res = self._trial(domain='https://andere.example.com', db_uuid=UUID_B)
-        self.assertEqual(res, {'error': 'EMAIL_LIMIT_REACHED'})
+        self.assertEqual(res['status'], 'pending')
+        self.assertNotIn('key', res)
         self.assertEqual(len(self._licenses()), 1)
 
-    def test_second_trial_same_domain_rejected(self):
+    def test_second_trial_same_domain_other_db_is_reviewed(self):
         self._trial()
         # Schema, www. und Groß-/Kleinschreibung zählen nicht als andere Domain
         res = self._trial(contact_email='max@andere.example.com',
                           domain='http://WWW.kunde-trial.example.com/', db_uuid=UUID_B)
-        self.assertEqual(res, {'error': 'DOMAIN_LIMIT_REACHED'})
+        self.assertEqual(res['status'], 'pending')
         self.assertEqual(len(self._licenses()), 1)
 
     def test_second_trial_same_database_rejected(self):
         self._trial()
         res = self._trial(contact_email='max@andere.example.com',
                           domain='https://andere.example.com')
-        self.assertEqual(res, {'error': 'DATABASE_LIMIT_REACHED'})
+        self.assertEqual(res, {'error': 'TRIAL_NOT_AVAILABLE'})
         self.assertEqual(len(self._licenses()), 1)
 
     def test_trial_of_other_product_is_allowed(self):
@@ -191,7 +202,7 @@ class TestTrialEndpoint(_PaketSetup, HttpCase):
         lic = self._licenses()
         lic.write({'state': 'expired'})
         res = self._trial()
-        self.assertEqual(res, {'error': 'TRIAL_ALREADY_USED'})
+        self.assertEqual(res, {'error': 'TRIAL_NOT_AVAILABLE'})
         self.assertNotIn(first['key'], json.dumps(res))
 
     def test_abuse_suspicion_is_pending_without_key(self):
@@ -236,7 +247,7 @@ class TestTrialEndpoint(_PaketSetup, HttpCase):
         trial = self.env['wb.license.trial.request'].search([('contact_email', '=', 'wer@mailinator.com')])
         trial.action_reject()
         self.assertEqual(trial.state, 'rejected')
-        self.assertEqual(self._trial(contact_email='wer@mailinator.com'), {'error': 'TRIAL_ALREADY_USED'})
+        self.assertEqual(self._trial(contact_email='wer@mailinator.com'), {'error': 'TRIAL_NOT_AVAILABLE'})
 
     def test_ip_rate_limit(self):
         self.env['ir.config_parameter'].sudo().set_param(

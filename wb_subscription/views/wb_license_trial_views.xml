@@ -60,6 +60,9 @@
                             <field name="db_uuid"/>
                             <field name="ip_address"/>
                             <field name="review_reason" invisible="not review_reason"/>
+                            <field name="consent_at"/>
+                            <field name="consent_version"/>
+                            <field name="anonymised" invisible="not anonymised"/>
                         </group>
                         <group>
                             <field name="partner_id" readonly="1"/>
